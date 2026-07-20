@@ -1,0 +1,31 @@
+# Dependencies and generated output
+node_modules/
+dist/
+.output/
+coverage/
+playwright-report/
+test-results/
+
+# Local environment and Cloudflare state
+.env
+.env.*
+!.env.example
+!.env.*.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/
+
+# Package-manager logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+.agents/
+.scratch/
+docs/
+AGENTS.md
