@@ -24,10 +24,14 @@
     "prototype:renderer:bundle": "WRANGLER_SEND_METRICS=false WRANGLER_LOG_PATH=.output/publication-renderer-prototype/wrangler.log wrangler deploy --dry-run --config prototype/publication-renderer/wrangler.jsonc --outfile .output/publication-renderer-prototype/worker.js --metafile .output/publication-renderer-prototype/bundle-meta.json",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
+    "lint": "node scripts/validate-release-workflows.mjs",
     "cf-typegen": "wrangler types",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "deploy": "pnpm build && wrangler deploy --env production"
+    "db:migrate:production": "wrangler d1 migrations apply DB --env production --remote",
+    "deploy:worker": "wrangler deploy --env production",
+    "smoke:production": "node scripts/smoke-production.mjs",
+    "deploy": "pnpm build && pnpm db:migrate:production && pnpm deploy:worker && pnpm smoke:production"
   },
   "dependencies": {
     "@elysiajs/eden": "1.4.9",
@@ -54,6 +58,7 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.4",
     "drizzle-kit": "0.31.10",
+    "js-yaml": "4.3.0",
     "prettier": "3.9.6",
     "tailwindcss": "4.3.3",
     "typescript": "5.9.3",

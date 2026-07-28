@@ -1,0 +1,39 @@
+name: Pull request checks
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Repository checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the reviewed revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check formatting
+        run: pnpm format
+      - name: Lint release workflows
+        run: pnpm lint
+      - name: Type-check application and tests
+        run: pnpm typecheck
+      - name: Run all tests
+        run: pnpm test
+      - name: Build the production artifact
+        run: pnpm build

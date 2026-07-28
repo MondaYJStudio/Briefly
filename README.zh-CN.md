@@ -87,6 +87,7 @@ pnpm dev
 
 ```sh
 pnpm format
+pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
@@ -105,15 +106,11 @@ Ticket 01 不要求应用秘密。后续功能需要的本地秘密应写入从 
 
 ## Cloudflare 部署
 
-唯一受支持的部署形态是：一个 Cloudflare Worker、一个生产 D1 数据库和一个私有生产 R2 存储桶。首次部署前：
+唯一受支持的部署形态是：一个 Cloudflare Worker、一个生产 D1 数据库和一个私有生产 R2 存储桶。只有经过检查的变更进入受保护的 `main` 后，已提交的 GitHub Actions 工作流才会发布生产版本。工作流先构建，再由 Wrangler 应用待处理且已提交的迁移；迁移成功后才部署 Worker，最后通过只读的 `GET /health` 能力探测完成冒烟检查。
 
-1. 在目标 Cloudflare 账户创建生产 D1 数据库和私有 R2 存储桶。
-2. 替换 `wrangler.jsonc` 中占位的生产 D1 ID、自定义域名路由和示例 `APP_ORIGIN`，并保持 R2 存储桶私有。生产 Worker 会禁用 `workers.dev` 来源，并拒绝来源与 `APP_ORIGIN` 不同的请求。
-3. 使用 `pnpm exec wrangler secret put <NAME> --env production` 添加功能所需的凭据。
-4. 使用 `pnpm exec wrangler d1 migrations apply DB --env production --remote` 应用已评审的迁移。
-5. 执行 `pnpm deploy`，并在规范来源上验证 `GET /health`。
+首次发布前，请创建 Cloudflare 资源、替换 `wrangler.jsonc` 中的生产占位值，并按 [OPERATIONS.zh-CN.md](OPERATIONS.zh-CN.md) 配置受保护的 GitHub 环境和分支规则。应用凭据（包括后续的初始化、恢复与 Better Auth secret）属于 Cloudflare Secrets；Cloudflare 部署令牌和账户标识符属于受保护的 GitHub 环境 secret，二者都不会传给拉取请求任务。
 
-Drizzle schema 文件是数据库结构的事实来源；Drizzle Kit 生成提交在 `src/db/migrations` 下的有序 SQL 与元数据。Wrangler 是迁移执行器，并在 D1 的 `d1_migrations` 表中记录已应用文件；项目不再维护第二套应用 schema 版本计数器。项目不支持生产 schema push。Worker 不会在模块初始化、请求处理或健康检查期间执行迁移。只读健康检查探测当前 Worker 所需的最低数据库能力，因此后续兼容的增量迁移不会让旧 Worker 变为不健康。在迁移优先的自动发布工作流完成前，运维人员必须保持上述顺序，让迁移失败阻止部署。
+Drizzle schema 文件是数据库结构的事实来源；Drizzle Kit 生成提交在 `src/db/migrations` 下的有序 SQL 与元数据。Wrangler 是唯一的迁移执行器并拥有 D1 迁移账本。项目不支持生产 schema push，Worker 也不会在初始化、请求处理或健康检查期间执行迁移。扩展—收缩迁移规则、0.x 发布兼容要求和故障诊断见运维手册。
 
 该基线不包含产品遥测、主动联网、第三方分析或强制监控账户。结构化服务端日志使用固定的安全信封：时间戳、事件名、已校验的请求 ID、粗粒度操作、方法、状态和可选诊断码。日志 API 排除请求体、Cookie、凭据、会话值、初始化/恢复秘密、URL 和签名媒体数据。
 

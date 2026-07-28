@@ -87,6 +87,7 @@ The standard contributor checks are:
 
 ```sh
 pnpm format
+pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
@@ -105,15 +106,11 @@ Ticket 01 has no required application secrets. For later features, put local-onl
 
 ## Cloudflare deployment
 
-Cloudflare Workers with one production D1 database and one private production R2 bucket is the only supported deployment shape. Before the first deployment:
+Cloudflare Workers with one production D1 database and one private production R2 bucket is the only supported deployment shape. Production releases run only through the committed GitHub Actions workflow after a checked change reaches protected `main`. The workflow builds first, applies pending committed migrations with Wrangler, deploys the Worker only after migration success, and then makes a read-only `GET /health` capability probe.
 
-1. Create the production D1 database and private R2 bucket in the target Cloudflare account.
-2. Replace the placeholder production D1 ID, custom-domain route, and example `APP_ORIGIN` in `wrangler.jsonc`. Keep the bucket private. The production Worker disables its `workers.dev` origin, and requests whose origin differs from `APP_ORIGIN` are rejected.
-3. Add any feature-required credentials with `pnpm exec wrangler secret put <NAME> --env production`.
-4. Apply reviewed migrations with `pnpm exec wrangler d1 migrations apply DB --env production --remote`.
-5. Run `pnpm deploy` and verify `GET /health` at the canonical origin.
+Before the first release, create the Cloudflare resources, replace the production placeholders in `wrangler.jsonc`, and configure the protected GitHub environment and branch rules described in [OPERATIONS.md](OPERATIONS.md). Application credentials, including future setup, recovery, and Better Auth secrets, belong in Cloudflare Secrets. The Cloudflare deployment token and account identifier belong in protected GitHub environment secrets; neither is passed to pull-request jobs.
 
-Drizzle schema files are the source of truth, and Drizzle Kit generates the ordered SQL and metadata committed under `src/db/migrations`. Wrangler is the migration executor and records applied files in D1's `d1_migrations` table; the project does not maintain a second application schema-version counter. Production schema push is unsupported. The Worker never runs migrations during module initialization, requests, or health checks. Its read-only health check probes the minimum database capabilities required by that Worker, so later compatible additive migrations do not make an older Worker unhealthy. Until the automated migration-first release workflow is added, operators must preserve the order above so a migration failure prevents deployment.
+Drizzle schema files are the source of truth, and Drizzle Kit generates the ordered SQL and metadata committed under `src/db/migrations`. Wrangler is the sole migration executor and owns D1's migration ledger. Production schema push is unsupported, and the Worker never runs migrations during initialization, requests, or health checks. See the operations runbook for expand-contract migration rules, 0.x release compatibility, and failure diagnosis.
 
 The baseline contains no product telemetry, phone-home behavior, third-party analytics, or mandatory monitoring account. Structured server logs use a fixed safe envelope: timestamp, event name, validated request ID, coarse operation, method, status, and optional diagnosis code. Request bodies, cookies, credentials, session values, setup/recovery secrets, URLs, and signed media data are excluded by the logging API.
 
