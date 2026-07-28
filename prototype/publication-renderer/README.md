@@ -57,9 +57,9 @@ static renderer, and iframe markup is generated only from fixed templates.
 
 `pnpm prototype:renderer:bundle` produced:
 
-- uncompressed Worker file: 983,788 bytes
-- Wrangler upload: 960.34 KiB
-- gzip: 171.15 KiB
+- uncompressed Worker file: 983,949 bytes
+- Wrangler upload: 960.50 KiB
+- gzip: 171.26 KiB
 - bindings: none
 
 The workerd suite observes `navigator.userAgent === "Cloudflare-Workers"`, no

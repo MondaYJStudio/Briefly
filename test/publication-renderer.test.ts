@@ -562,7 +562,7 @@ describe("Publication renderer", () => {
     });
   });
 
-  it("renders a decorative figure with an empty alt attribute", async () => {
+  it("accepts a canonical null caption and renders a decorative figure with empty alt", async () => {
     const result = await renderPublication(
       {
         documentSchemaVersion: 1,
@@ -575,6 +575,7 @@ describe("Publication renderer", () => {
                 assetId: "asset-divider",
                 alt: "authored text must not leak into decorative output",
                 decorative: true,
+                caption: null,
               },
             },
           ],

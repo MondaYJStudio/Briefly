@@ -10,6 +10,21 @@ import {
 import { z } from "zod";
 
 const DOCUMENT_SCHEMA_VERSION = 1;
+const VIDEO_PROVIDER_POLICIES = {
+  youtube: {
+    idPattern: /^[A-Za-z0-9_-]{11}$/,
+    source: (id: string) => `https://www.youtube-nocookie.com/embed/${id}`,
+    allow: "encrypted-media; picture-in-picture; fullscreen",
+  },
+  bilibili: {
+    idPattern: /^BV[A-Za-z0-9]{10}$/,
+    source: (id: string) =>
+      `https://player.bilibili.com/player.html?bvid=${id}`,
+    allow: "fullscreen",
+  },
+} as const;
+
+type VideoProvider = keyof typeof VIDEO_PROVIDER_POLICIES;
 
 const Document = Node.create({
   name: "doc",
@@ -291,7 +306,7 @@ const figureNodeSchema = z
         assetId: z.string().min(1).max(128),
         alt: z.string().max(1_000),
         decorative: z.boolean(),
-        caption: z.string().max(2_000).optional(),
+        caption: z.string().max(2_000).nullable().optional(),
       })
       .strict(),
   })
@@ -313,14 +328,14 @@ const videoEmbedNodeSchema = z
       z
         .object({
           provider: z.literal("youtube"),
-          id: z.string().regex(/^[A-Za-z0-9_-]{11}$/),
+          id: z.string().regex(VIDEO_PROVIDER_POLICIES.youtube.idPattern),
           title: z.string().trim().min(1).max(200),
         })
         .strict(),
       z
         .object({
           provider: z.literal("bilibili"),
-          id: z.string().regex(/^BV[A-Za-z0-9]{10}$/),
+          id: z.string().regex(VIDEO_PROVIDER_POLICIES.bilibili.idPattern),
           title: z.string().trim().min(1).max(200),
         })
         .strict(),
@@ -368,10 +383,7 @@ export type PublicationRenderResult =
       value: {
         html: string;
         referencedAssets: ResolvedPublicationAsset[];
-        referencedProviders: Array<{
-          provider: "youtube" | "bilibili";
-          id: string;
-        }>;
+        referencedProviders: Array<{ provider: VideoProvider; id: string }>;
       };
     }
   | { ok: false; issues: PublicationIssue[] };
@@ -507,13 +519,15 @@ function invalidDocumentIssues(
       }
 
       const owningNode = valueAtPath(document, issue.path.slice(0, -2));
-      if (
-        issue.path.at(-1) === "level" &&
+      const owningNodeType =
         typeof owningNode === "object" &&
         owningNode !== null &&
         "type" in owningNode &&
-        owningNode.type === "heading"
-      ) {
+        typeof owningNode.type === "string"
+          ? owningNode.type
+          : null;
+
+      if (issue.path.at(-1) === "level" && owningNodeType === "heading") {
         return {
           code: "INVALID_HEADING_LEVEL",
           path,
@@ -521,13 +535,7 @@ function invalidDocumentIssues(
         };
       }
 
-      if (
-        issue.path.at(-1) === "alt" &&
-        typeof owningNode === "object" &&
-        owningNode !== null &&
-        "type" in owningNode &&
-        owningNode.type === "figure"
-      ) {
+      if (issue.path.at(-1) === "alt" && owningNodeType === "figure") {
         return {
           code: "FIGURE_ALT_REQUIRED",
           path,
@@ -535,13 +543,7 @@ function invalidDocumentIssues(
         };
       }
 
-      if (
-        issue.path.at(-1) === "id" &&
-        typeof owningNode === "object" &&
-        owningNode !== null &&
-        "type" in owningNode &&
-        owningNode.type === "videoEmbed"
-      ) {
+      if (issue.path.at(-1) === "id" && owningNodeType === "videoEmbed") {
         return {
           code: "INVALID_PROVIDER_IDENTIFIER",
           path,
@@ -581,11 +583,11 @@ function isSafeLink(value: string): boolean {
 
 function collectReferences(node: ProseMirrorNode): {
   assetIds: string[];
-  providers: Array<{ provider: "youtube" | "bilibili"; id: string }>;
+  providers: Array<{ provider: VideoProvider; id: string }>;
 } {
   const assetIds: string[] = [];
   const seenAssets = new Set<string>();
-  const providers: Array<{ provider: "youtube" | "bilibili"; id: string }> = [];
+  const providers: Array<{ provider: VideoProvider; id: string }> = [];
   const seenProviders = new Set<string>();
 
   node.descendants((child) => {
@@ -595,7 +597,7 @@ function collectReferences(node: ProseMirrorNode): {
     }
 
     if (child.type.name === "videoEmbed") {
-      const provider = child.attrs.provider as "youtube" | "bilibili";
+      const provider = child.attrs.provider as VideoProvider;
       const key = `${provider}:${child.attrs.id}`;
       if (!seenProviders.has(key)) {
         seenProviders.add(key);
@@ -705,26 +707,17 @@ function renderFigure(
 }
 
 function renderVideo(attrs: Record<string, unknown>): string {
-  const provider = attrs.provider as "youtube" | "bilibili";
+  const provider = attrs.provider as VideoProvider;
   const id = String(attrs.id);
-  const providerAttrs =
-    provider === "youtube"
-      ? {
-          src: `https://www.youtube-nocookie.com/embed/${id}`,
-          title: attrs.title,
-          loading: "lazy",
-          referrerpolicy: "strict-origin-when-cross-origin",
-          allow: "encrypted-media; picture-in-picture; fullscreen",
-          allowfullscreen: "",
-        }
-      : {
-          src: `https://player.bilibili.com/player.html?bvid=${id}`,
-          title: attrs.title,
-          loading: "lazy",
-          referrerpolicy: "strict-origin-when-cross-origin",
-          allow: "fullscreen",
-          allowfullscreen: "",
-        };
+  const policy = VIDEO_PROVIDER_POLICIES[provider];
+  const providerAttrs = {
+    src: policy.source(id),
+    title: attrs.title,
+    loading: "lazy",
+    referrerpolicy: "strict-origin-when-cross-origin",
+    allow: policy.allow,
+    allowfullscreen: "",
+  };
 
   return `<iframe${serializeAttrsToHTMLString(providerAttrs)}></iframe>`;
 }
