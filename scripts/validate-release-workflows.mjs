@@ -188,8 +188,8 @@ function validateProductionWorkflow() {
   );
   assert.equal(
     scripts.deploy,
-    "pnpm build && pnpm db:migrate:production && pnpm deploy:worker && pnpm smoke:production",
-    "The convenience release command must preserve migration-first ordering",
+    undefined,
+    "Production releases must only run through the protected workflow",
   );
 }
 

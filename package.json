@@ -30,8 +30,7 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:production": "wrangler d1 migrations apply DB --env production --remote",
     "deploy:worker": "wrangler deploy --env production",
-    "smoke:production": "node scripts/smoke-production.mjs",
-    "deploy": "pnpm build && pnpm db:migrate:production && pnpm deploy:worker && pnpm smoke:production"
+    "smoke:production": "node scripts/smoke-production.mjs"
   },
   "dependencies": {
     "@elysiajs/eden": "1.4.9",
