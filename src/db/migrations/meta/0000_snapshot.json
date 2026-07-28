@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6b3a4aa3-f219-44fd-8182-4e666e39ca32",
+  "id": "6d49fe7e-192b-47ff-aa87-8c9cec77188b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "runtime_metadata": {
@@ -11,13 +11,6 @@
           "name": "id",
           "type": "integer",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "schema_version": {
-          "name": "schema_version",
-          "type": "integer",
-          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -38,10 +31,6 @@
         "runtime_metadata_singleton": {
           "name": "runtime_metadata_singleton",
           "value": "\"runtime_metadata\".\"id\" = 1"
-        },
-        "runtime_metadata_schema_version_positive": {
-          "name": "runtime_metadata_schema_version_positive",
-          "value": "\"runtime_metadata\".\"schema_version\" > 0"
         }
       }
     }

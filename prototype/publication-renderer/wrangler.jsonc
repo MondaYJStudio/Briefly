@@ -1,0 +1,8 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "briefly-publication-renderer-prototype",
+  "main": "worker.ts",
+  "send_metrics": false,
+  "compatibility_date": "2026-07-28",
+  "compatibility_flags": ["nodejs_compat"],
+}

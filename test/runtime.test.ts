@@ -45,7 +45,7 @@ describe("Worker HTTP runtime", () => {
       status: "ok",
       service: "briefly",
       runtime: "cloudflare-workers",
-      schema: { status: "compatible", version: 1 },
+      schema: { status: "compatible" },
       storage: { d1: "ready", r2: "ready" },
       requestId: expect.any(String),
     });
@@ -149,26 +149,28 @@ describe("Worker HTTP runtime", () => {
     }
   });
 
-  it("reports schema mismatch without changing the schema", async () => {
-    await env.DB.prepare(
-      "UPDATE runtime_metadata SET schema_version = 99 WHERE id = 1",
-    ).run();
+  it("reports a missing required schema capability without changing the schema", async () => {
+    await env.DB.prepare("DELETE FROM runtime_metadata WHERE id = 1").run();
 
-    const response = await SELF.fetch("http://briefly.test/health");
+    try {
+      const response = await SELF.fetch("http://briefly.test/health");
 
-    expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({
-      status: "error",
-      code: "SCHEMA_INCOMPATIBLE",
-      schema: { expected: 1, actual: 99 },
-    });
-    const row = await env.DB.prepare(
-      "SELECT schema_version FROM runtime_metadata WHERE id = 1",
-    ).first<{ schema_version: number }>();
-    expect(row?.schema_version).toBe(99);
-    await env.DB.prepare(
-      "UPDATE runtime_metadata SET schema_version = 1 WHERE id = 1",
-    ).run();
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({
+        status: "error",
+        code: "SCHEMA_INCOMPATIBLE",
+        schema: { status: "incompatible" },
+        requestId: expect.any(String),
+      });
+      const row = await env.DB.prepare(
+        "SELECT id FROM runtime_metadata WHERE id = 1",
+      ).first<{ id: number }>();
+      expect(row).toBeNull();
+    } finally {
+      await env.DB.prepare(
+        "INSERT INTO runtime_metadata (id) VALUES (1)",
+      ).run();
+    }
   });
 
   it("distinguishes unavailable R2 storage from a schema mismatch", async () => {
@@ -248,7 +250,7 @@ describe("Worker HTTP runtime", () => {
 });
 
 describe("ordered D1 migrations", () => {
-  it("apply repeatably to clean D1 and work through the Worker interface", async () => {
+  it("applies pending migrations once and works through the Worker interface", async () => {
     await applyD1Migrations(env.MIGRATION_DB, env.TEST_MIGRATIONS);
     await applyD1Migrations(env.MIGRATION_DB, env.TEST_MIGRATIONS);
     const ctx = createExecutionContext();
@@ -265,7 +267,7 @@ describe("ordered D1 migrations", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      schema: { status: "compatible", version: 1 },
+      schema: { status: "compatible" },
     });
   });
 });

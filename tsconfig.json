@@ -17,6 +17,7 @@
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
+    "prototype/**/*.ts",
     "drizzle.config.ts",
     "vite.config.ts",
     "vitest.config.ts",

@@ -113,7 +113,7 @@ Ticket 01 不要求应用秘密。后续功能需要的本地秘密应写入从 
 4. 使用 `pnpm exec wrangler d1 migrations apply DB --env production --remote` 应用已评审的迁移。
 5. 执行 `pnpm deploy`，并在规范来源上验证 `GET /health`。
 
-Drizzle schema 文件是数据库结构的事实来源；有序 SQL 迁移提交在 `src/db/migrations` 下。项目不支持生产 schema push。Worker 不会在模块初始化、请求处理或健康检查期间执行迁移。在迁移优先的自动发布工作流完成前，运维人员必须保持上述顺序，让迁移失败阻止部署。
+Drizzle schema 文件是数据库结构的事实来源；Drizzle Kit 生成提交在 `src/db/migrations` 下的有序 SQL 与元数据。Wrangler 是迁移执行器，并在 D1 的 `d1_migrations` 表中记录已应用文件；项目不再维护第二套应用 schema 版本计数器。项目不支持生产 schema push。Worker 不会在模块初始化、请求处理或健康检查期间执行迁移。只读健康检查探测当前 Worker 所需的最低数据库能力，因此后续兼容的增量迁移不会让旧 Worker 变为不健康。在迁移优先的自动发布工作流完成前，运维人员必须保持上述顺序，让迁移失败阻止部署。
 
 该基线不包含产品遥测、主动联网、第三方分析或强制监控账户。结构化服务端日志使用固定的安全信封：时间戳、事件名、已校验的请求 ID、粗粒度操作、方法、状态和可选诊断码。日志 API 排除请求体、Cookie、凭据、会话值、初始化/恢复秘密、URL 和签名媒体数据。
 

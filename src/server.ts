@@ -1,9 +1,6 @@
 import startHandler from "@tanstack/react-start/server-entry";
 
-import {
-  checkRuntimeHealth,
-  APPLICATION_SCHEMA_VERSION,
-} from "./env/health.server";
+import { checkRuntimeHealth } from "./env/health.server";
 import { logRequest, type LogCode } from "./env/logger.server";
 import { requestIdFor } from "./env/request-id.server";
 import {
@@ -108,10 +105,7 @@ const worker = {
               {
                 status: "error",
                 code: health.code,
-                schema: {
-                  expected: APPLICATION_SCHEMA_VERSION,
-                  actual: health.actualSchemaVersion,
-                },
+                schema: { status: "incompatible" },
                 requestId,
               },
               503,
@@ -137,7 +131,6 @@ const worker = {
               runtime: "cloudflare-workers",
               schema: {
                 status: "compatible",
-                version: health.schemaVersion,
               },
               storage: { d1: "ready", r2: "ready" },
               requestId,
