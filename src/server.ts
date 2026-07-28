@@ -10,6 +10,16 @@ import {
 
 type WorkerBindings = RuntimeBindings;
 
+function authenticationRateLimitFor(
+  request: Request,
+  pathname: string,
+): import("./auth/rate-limit.server").AuthenticationRateLimit | undefined {
+  if (request.method !== "POST") return undefined;
+  if (pathname === "/api/initialize") return "initialization";
+  if (pathname === "/api/auth/sign-in/email") return "signIn";
+  return undefined;
+}
+
 function jsonResponse(
   body: unknown,
   status: number,
@@ -93,8 +103,32 @@ const worker = {
 
     try {
       let response: Response;
-      let diagnosisCode:
-        "SCHEMA_INCOMPATIBLE" | "STORAGE_UNAVAILABLE" | undefined;
+      let diagnosisCode: LogCode | undefined;
+      const authenticationRateLimit = authenticationRateLimitFor(
+        request,
+        requestUrl.pathname,
+      );
+      if (authenticationRateLimit) {
+        const { checkAuthenticationRateLimit } =
+          await import("./auth/rate-limit.server");
+        const rateLimit = await checkAuthenticationRateLimit(
+          configuration.bindings.DB,
+          request,
+          authenticationRateLimit,
+        );
+        if (!rateLimit.allowed) {
+          response = jsonResponse(
+            { status: "error", code: "RATE_LIMITED" },
+            429,
+            requestId,
+          );
+          response.headers.set(
+            "retry-after",
+            String(rateLimit.retryAfterSeconds),
+          );
+          return finishResponse(response, "RATE_LIMITED");
+        }
+      }
 
       if (operation === "health") {
         const health = await checkRuntimeHealth(configuration.bindings);
@@ -143,6 +177,35 @@ const worker = {
         if (request.method === "HEAD") {
           response = new Response(null, response);
         }
+      } else if (
+        (request.method === "GET" || request.method === "HEAD") &&
+        (requestUrl.pathname === "/admin" ||
+          requestUrl.pathname.startsWith("/admin/"))
+      ) {
+        const { createAuth } = await import("./auth/auth.server");
+        const session = await createAuth(configuration.bindings).api.getSession(
+          {
+            headers: request.headers,
+            query: { disableRefresh: true },
+          },
+        );
+        response = session
+          ? withRequestId(await startHandler.fetch(request), requestId)
+          : withRequestId(
+              Response.redirect(
+                new URL("/sign-in", configuration.bindings.APP_ORIGIN),
+                302,
+              ),
+              requestId,
+            );
+        response.headers.set("cache-control", "no-store");
+      } else if (requestUrl.pathname.startsWith("/api/auth/")) {
+        const { createAuth } = await import("./auth/auth.server");
+        response = withRequestId(
+          await createAuth(configuration.bindings).handler(request),
+          requestId,
+        );
+        response.headers.set("cache-control", "no-store");
       } else {
         response = withRequestId(await startHandler.fetch(request), requestId);
       }

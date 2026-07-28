@@ -1,15 +1,9 @@
 import { treaty } from "@elysiajs/eden";
 import { createFileRoute } from "@tanstack/react-router";
 import { createIsomorphicFn } from "@tanstack/react-start";
-import { Elysia } from "elysia";
 
-export const api = new Elysia({
-  prefix: "/api",
-  aot: false,
-}).get("/", () => ({
-  service: "briefly" as const,
-  transport: "elysia" as const,
-}));
+import { api } from "../api/app.server";
+import { createApiClient } from "../api/client";
 
 const handle = ({ request }: { request: Request }) => api.fetch(request);
 
@@ -24,4 +18,4 @@ export const Route = createFileRoute("/api/$")({
 
 export const getApiClient = createIsomorphicFn()
   .server(() => treaty(api).api)
-  .client(() => treaty<typeof api>(globalThis.location.origin).api);
+  .client(() => createApiClient(globalThis.location.origin));

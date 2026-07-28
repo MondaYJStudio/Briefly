@@ -1,0 +1,4 @@
+export const PASSWORD_MINIMUM_LENGTH = 12;
+export const PASSWORD_MAXIMUM_LENGTH = 128;
+export const SESSION_LIFETIME_SECONDS = 60 * 60 * 24 * 7;
+export const SESSION_RENEWAL_AGE_SECONDS = 60 * 60 * 24;

@@ -39,6 +39,62 @@ export async function checkRuntimeHealth(
     if (!metadata) {
       return { ok: false, code: "SCHEMA_INCOMPATIBLE" };
     }
+
+    const authentication = await bindings.DB.prepare(
+      `SELECT
+         (SELECT state FROM installation WHERE id = 1) AS installationState,
+         (SELECT COUNT(id) + COUNT(state) + COUNT(initialized_at)
+            FROM installation) AS installationColumns,
+         (SELECT COUNT(id) + COUNT(singleton) + COUNT(name) + COUNT(email) +
+                 COUNT(email_verified) + COUNT(image) + COUNT(created_at) +
+                 COUNT(updated_at)
+            FROM auth_user) AS userColumns,
+         (SELECT COUNT(id) + COUNT(account_id) + COUNT(provider_id) +
+                 COUNT(user_id) + COUNT(access_token) + COUNT(refresh_token) +
+                 COUNT(id_token) + COUNT(access_token_expires_at) +
+                 COUNT(refresh_token_expires_at) + COUNT(scope) +
+                 COUNT(password) + COUNT(created_at) + COUNT(updated_at)
+            FROM auth_account) AS accountColumns,
+         (SELECT COUNT(id) + COUNT(expires_at) + COUNT(token) +
+                 COUNT(created_at) + COUNT(updated_at) + COUNT(ip_address) +
+                 COUNT(user_agent) + COUNT(user_id)
+            FROM auth_session) AS sessionColumns,
+         (SELECT COUNT(id) + COUNT(identifier) + COUNT(value) +
+                 COUNT(expires_at) + COUNT(created_at) + COUNT(updated_at)
+            FROM auth_verification) AS verificationColumns,
+         (SELECT COUNT(key) + COUNT(attempts) + COUNT(reset_at)
+            FROM auth_rate_limit) AS rateLimitColumns,
+         (SELECT COUNT(*) FROM sqlite_master
+            WHERE type = 'index'
+              AND name IN (
+                'auth_user_singleton_unique',
+                'auth_user_email_unique',
+                'auth_session_token_unique'
+              )) AS requiredIndexCount,
+         (SELECT COUNT(*) FROM sqlite_master
+            WHERE type = 'table' AND name = 'installation'
+              AND sql LIKE '%installation_singleton%'
+              AND sql LIKE '%installation_valid_state%') AS installationConstraints,
+         (SELECT COUNT(*) FROM sqlite_master
+            WHERE type = 'table' AND name = 'auth_user'
+              AND sql LIKE '%auth_user_singleton%') AS userConstraints`,
+    ).first<{
+      installationState: string | null;
+      requiredIndexCount: number;
+      installationConstraints: number;
+      userConstraints: number;
+    }>();
+    if (
+      !authentication ||
+      !["uninitialized", "initialized"].includes(
+        authentication.installationState ?? "",
+      ) ||
+      authentication.requiredIndexCount !== 3 ||
+      authentication.installationConstraints !== 1 ||
+      authentication.userConstraints !== 1
+    ) {
+      return { ok: false, code: "SCHEMA_INCOMPATIBLE" };
+    }
   } catch {
     return { ok: false, code: "SCHEMA_INCOMPATIBLE" };
   }

@@ -5,11 +5,20 @@ export type ApplicationEnvironment = "local" | "test" | "production";
 export interface RuntimeBindings {
   APP_ENV: ApplicationEnvironment;
   APP_ORIGIN: string;
+  BETTER_AUTH_SECRET: string;
   DB: D1Database;
   MEDIA_BUCKET: R2Bucket;
+  SETUP_SECRET: string;
 }
 
-const bindingNames = ["APP_ENV", "APP_ORIGIN", "DB", "MEDIA_BUCKET"] as const;
+const bindingNames = [
+  "APP_ENV",
+  "APP_ORIGIN",
+  "BETTER_AUTH_SECRET",
+  "DB",
+  "MEDIA_BUCKET",
+  "SETUP_SECRET",
+] as const;
 
 export type RuntimeBindingName = (typeof bindingNames)[number];
 
@@ -47,8 +56,10 @@ const runtimeBindingsSchema = z
   .object({
     APP_ENV: z.enum(["local", "test", "production"]),
     APP_ORIGIN: z.string().url(),
+    BETTER_AUTH_SECRET: z.string().min(32),
     DB: z.custom<D1Database>(isD1Database),
     MEDIA_BUCKET: z.custom<R2Bucket>(isR2Bucket),
+    SETUP_SECRET: z.string().min(32),
   })
   .superRefine((bindings, context) => {
     if (!URL.canParse(bindings.APP_ORIGIN)) return;

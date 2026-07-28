@@ -21,6 +21,9 @@ export default defineConfig(async () => {
           bindings: {
             APP_ENV: "test",
             APP_ORIGIN: "http://briefly.test",
+            BETTER_AUTH_SECRET:
+              "test-only-better-auth-secret-32-characters-minimum",
+            SETUP_SECRET: "test-only-setup-secret-32-characters-minimum",
             TEST_MIGRATIONS: migrations,
           },
           d1Databases: ["DB", "MIGRATION_DB"],

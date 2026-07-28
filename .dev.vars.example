@@ -1,4 +1,6 @@
-# Ticket 01 requires no local secrets. When a feature introduces one, copy this
-# file to .dev.vars and add the value there. Never commit .dev.vars.
-#
-# EXAMPLE_SECRET=replace-with-a-local-only-value
+# Copy this file to .dev.vars and replace both values with independent random
+# secrets of at least 32 characters. Never commit .dev.vars or reuse production
+# values locally.
+
+BETTER_AUTH_SECRET=replace-with-an-independent-random-secret
+SETUP_SECRET=replace-with-an-independent-random-secret
