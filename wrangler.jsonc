@@ -1,0 +1,59 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "briefly",
+  "main": "src/server.ts",
+  "send_metrics": false,
+  "dependencies_instrumentation": {
+    "enabled": false,
+  },
+  "compatibility_date": "2026-07-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "APP_ENV": "local",
+    "APP_ORIGIN": "http://localhost:3000",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "briefly-local",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "src/db/migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_BUCKET",
+      "bucket_name": "briefly-local",
+    },
+  ],
+  "env": {
+    "production": {
+      "name": "briefly",
+      "workers_dev": false,
+      "routes": [
+        {
+          "pattern": "briefly.example.com",
+          "custom_domain": true,
+        },
+      ],
+      "vars": {
+        "APP_ENV": "production",
+        "APP_ORIGIN": "https://briefly.example.com",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "briefly-production",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "src/db/migrations",
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "MEDIA_BUCKET",
+          "bucket_name": "briefly-production",
+        },
+      ],
+    },
+  },
+}
