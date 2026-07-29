@@ -41,9 +41,9 @@ Briefly 处于 0.x 生命周期。发布说明必须明确指出任何破坏性 
 
 - 编码文件大小：最多 8 MiB（8,388,608 字节）；
 - 宽或高：每边最多 8,192 像素；
-- 总尺寸：最多 16,777,216 像素。
+- 总尺寸：最多 8,388,608 像素。
 
-这些应用限制有意低于平台上限。Cloudflare 文档规定，所有套餐的 Worker 请求体限制均至少为 [100 MB](https://developers.cloudflare.com/workers/platform/limits/#request-limits)，[isolate 内存限制为 128 MB](https://developers.cloudflare.com/workers/platform/limits/#worker-limits)，而 R2 [单次上传限制为 5 GiB](https://developers.cloudflare.com/r2/platform/limits/#r2-limits)。达到像素上限的图片按每像素四字节展开后约占 64 MiB，可为 multipart 解析、JavaScript/Wasm 运行时状态、验证和并发请求开销保留其余 Worker 内存。
+这些应用限制有意低于平台上限。Cloudflare 文档规定，所有套餐的 Worker 请求体限制均至少为 [100 MB](https://developers.cloudflare.com/workers/platform/limits/#request-limits)，[isolate 内存限制为 128 MB](https://developers.cloudflare.com/workers/platform/limits/#worker-limits)，而 R2 [单次上传限制为 5 GiB](https://developers.cloudflare.com/r2/platform/limits/#r2-limits)。上传校验会在受支持的 workerd 运行时中使用 jSquash 完整解码像素。达到像素上限时，一份 RGBA 图片占 32 MiB；PNG 路径可能短暂同时持有 Wasm 输出及其 32 MiB JavaScript 副本。再为编码请求、JavaScript 缓冲区和 Wasm 输入预留最多 24 MiB 后，isolate 预算仍约有 40 MiB 可供解码器工作内存和运行时状态使用。该精确边界通过使用真实测试 D1/R2 绑定的 Worker HTTP 接口测试验证。
 
 必须保持 R2 绑定私有。未发布对象只能通过认证应用路由 `/media/private/:assetId` 交付；响应带有 `private, no-store` 和 `nosniff`。浏览器可见 API 只公开不透明的 Asset ID 和安全元数据，绝不公开原始 R2 对象键。对象键保密不是授权边界，运维人员不得为私有 Asset 增加直接或匿名存储桶交付。
 

@@ -1,6 +1,6 @@
 export const ASSET_MAXIMUM_BYTE_SIZE = 8 * 1024 * 1024;
 export const ASSET_MAXIMUM_DIMENSION = 8_192;
-export const ASSET_MAXIMUM_PIXEL_COUNT = 16_777_216;
+export const ASSET_MAXIMUM_PIXEL_COUNT = 8_388_608;
 export const ASSET_ORIGINAL_FILENAME_MAXIMUM_LENGTH = 255;
 
 export type AssetMimeType =

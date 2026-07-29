@@ -121,7 +121,7 @@ export function AssetMediaLibrary() {
         </div>
         <p className="text-sm text-default-500">
           JPEG, PNG, WebP, or AVIF up to 8 MiB; maximum 8192 px per side and
-          16,777,216 pixels total.
+          8,388,608 pixels total.
         </p>
         <Button fullWidth type="submit" isPending={state === "uploading"}>
           Upload image

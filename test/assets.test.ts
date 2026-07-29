@@ -534,8 +534,8 @@ describe("private Asset media library", () => {
     const maximumBytes = 8 * 1024 * 1024;
     const atByteLimit = await createGrayscalePng(1, 1, maximumBytes);
     const overByteLimit = concatenate([atByteLimit, Uint8Array.of(0)]);
-    const atPixelLimit = await createGrayscalePng(8_192, 2_048);
-    const overPixelLimit = await createGrayscalePng(8_192, 2_049);
+    const atPixelLimit = await createGrayscalePng(8_192, 1_024);
+    const overPixelLimit = await createGrayscalePng(8_192, 1_025);
     const overEdgeLimit = await createGrayscalePng(8_193, 1);
 
     expect(atByteLimit.byteLength).toBe(maximumBytes);
@@ -556,7 +556,7 @@ describe("private Asset media library", () => {
     expect(atPixelResponse.status).toBe(201);
     expect(await atPixelResponse.json()).toMatchObject({
       width: 8_192,
-      height: 2_048,
+      height: 1_024,
     });
     for (const [filename, bytes] of [
       ["too-many-pixels.png", overPixelLimit],

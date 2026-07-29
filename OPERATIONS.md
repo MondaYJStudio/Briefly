@@ -41,9 +41,9 @@ Each upload is limited to exactly these boundaries:
 
 - encoded file size: at most 8 MiB (8,388,608 bytes);
 - width or height: at most 8,192 pixels per side;
-- total dimensions: at most 16,777,216 pixels.
+- total dimensions: at most 8,388,608 pixels.
 
-These application limits are intentionally below the platform ceilings. Cloudflare documents a Worker request-body limit of at least [100 MB on every plan](https://developers.cloudflare.com/workers/platform/limits/#request-limits), an [isolate memory limit of 128 MB](https://developers.cloudflare.com/workers/platform/limits/#worker-limits), and an R2 [single-upload limit of 5 GiB](https://developers.cloudflare.com/r2/platform/limits/#r2-limits). A maximum-size image expands to about 64 MiB at four bytes per pixel, leaving the remainder of the Worker limit for multipart parsing, JavaScript/Wasm runtime state, validation, and concurrent request overhead.
+These application limits are intentionally below the platform ceilings. Cloudflare documents a Worker request-body limit of at least [100 MB on every plan](https://developers.cloudflare.com/workers/platform/limits/#request-limits), an [isolate memory limit of 128 MB](https://developers.cloudflare.com/workers/platform/limits/#worker-limits), and an R2 [single-upload limit of 5 GiB](https://developers.cloudflare.com/r2/platform/limits/#r2-limits). Upload validation fully decodes pixels with jSquash in the supported workerd runtime. At the pixel limit, an RGBA image occupies 32 MiB; the PNG path can momentarily hold both the Wasm output and its 32 MiB JavaScript copy. Reserving up to 24 MiB for the encoded request, JavaScript buffer, and Wasm input still leaves about 40 MiB of the isolate budget for decoder working memory and runtime state. The exact boundary is exercised through the Worker HTTP interface with real test D1/R2 bindings.
 
 Keep the R2 binding private. A never-published object is delivered only through the authenticated `/media/private/:assetId` application route, whose response is marked `private, no-store` and `nosniff`. Browser-visible APIs expose the opaque Asset ID and safe metadata, never the raw R2 object key. Object-key secrecy is not an authorization boundary, and operators must not add direct or anonymous bucket delivery for private Assets.
 

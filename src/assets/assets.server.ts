@@ -413,7 +413,7 @@ async function validateImage(
     image.width * image.height > ASSET_MAXIMUM_PIXEL_COUNT
   ) {
     return invalid(
-      "Image dimensions must be at most 8192 px per side and 16777216 pixels total.",
+      "Image dimensions must be at most 8192 px per side and 8388608 pixels total.",
     );
   }
   try {
