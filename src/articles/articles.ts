@@ -39,6 +39,41 @@ export interface Article {
   draft: ArticleDraft;
 }
 
+export interface RenderedArticleDraft {
+  articleId: string;
+  draftVersion: number;
+  documentSchemaVersion: number;
+  metadata: {
+    title: string;
+    slug: string | null;
+    summary: string | null;
+    tags: string[];
+    byline: Byline;
+    language: string;
+  };
+  rendererVersion: number;
+  html: string;
+}
+
+export interface PublicationIssue {
+  code: string;
+  path: string;
+  message: string;
+}
+
+export function isPublicationIssue(value: unknown): value is PublicationIssue {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "code" in value &&
+    typeof value.code === "string" &&
+    "path" in value &&
+    typeof value.path === "string" &&
+    "message" in value &&
+    typeof value.message === "string"
+  );
+}
+
 export interface ArticleDraftUpdate {
   version: number;
   title: string;

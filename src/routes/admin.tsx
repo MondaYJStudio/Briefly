@@ -24,8 +24,11 @@ import {
 
 import {
   ARTICLE_DRAFT_AUTOSAVE_DEBOUNCE_MS,
+  isPublicationIssue,
   type Article,
   type ArticleDraftUpdate,
+  type PublicationIssue,
+  type RenderedArticleDraft,
 } from "../articles/articles";
 import {
   AuthenticationField,
@@ -421,6 +424,19 @@ function ArticleDraftManager() {
   const revisionRef = useRef(0);
   const confirmedRevisionRef = useRef(0);
   const savingRef = useRef(false);
+  const [preview, setPreview] = useState<RenderedArticleDraft | null>(null);
+  const [previewIssues, setPreviewIssues] = useState<PublicationIssue[]>([]);
+  const [previewState, setPreviewState] = useState<
+    "idle" | "loading" | "ready" | "invalid" | "conflict" | "error"
+  >("idle");
+  const previewRequestGeneration = useRef(0);
+
+  function resetPreview() {
+    previewRequestGeneration.current += 1;
+    setPreview(null);
+    setPreviewIssues([]);
+    setPreviewState("idle");
+  }
 
   function selectServerDraft(article: Article) {
     selectedRef.current = article;
@@ -430,6 +446,7 @@ function ArticleDraftManager() {
     setRevision(0);
     setConfirmedRevision(0);
     setEditorGeneration((current) => current + 1);
+    resetPreview();
   }
 
   useEffect(() => {
@@ -515,6 +532,7 @@ function ArticleDraftManager() {
         confirmedRevisionRef.current = capturedRevision;
         setConfirmedRevision(capturedRevision);
         setConflictCopy(null);
+        resetPreview();
         setState(localChanged ? "dirty" : "saved");
         return;
       }
@@ -641,6 +659,49 @@ function ArticleDraftManager() {
     enableBeforeUnload: hasUnsavedChanges,
     withResolver: true,
   });
+
+  async function previewSavedDraft() {
+    if (!selected) return;
+    const previewGeneration = ++previewRequestGeneration.current;
+    const articleId = selected.id;
+    const version = selected.draft.version;
+    setPreview(null);
+    setPreviewIssues([]);
+    setPreviewState("loading");
+
+    try {
+      const response = await getApiClient()
+        .admin.articles({ articleId })
+        .preview.post({ version });
+      if (previewGeneration !== previewRequestGeneration.current) return;
+      if (response.status === 200 && response.data) {
+        setPreview(response.data as RenderedArticleDraft);
+        setPreviewState("ready");
+        return;
+      }
+
+      if (response.status === 409) {
+        setPreviewState("conflict");
+        return;
+      }
+      const error: unknown = response.error?.value;
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "issues" in error &&
+        Array.isArray(error.issues)
+      ) {
+        const structuredIssues = error.issues.filter(isPublicationIssue);
+        setPreviewIssues(structuredIssues);
+        setPreviewState("invalid");
+        return;
+      }
+      setPreviewState("error");
+    } catch {
+      if (previewGeneration === previewRequestGeneration.current)
+        setPreviewState("error");
+    }
+  }
 
   return (
     <section
@@ -963,6 +1024,98 @@ function ArticleDraftManager() {
           </Button>
         </Form>
       ) : null}
+      <section
+        className="space-y-4 border-t border-default-200 pt-5"
+        aria-labelledby="saved-draft-preview-heading"
+      >
+        <div className="space-y-1">
+          <h3
+            id="saved-draft-preview-heading"
+            className="text-lg font-semibold"
+          >
+            Saved Draft Preview
+          </h3>
+          <p className="text-sm text-default-500">
+            Preview uses publication validation and renders only content already
+            confirmed by the server.
+          </p>
+        </div>
+        {selected ? (
+          <Button
+            fullWidth
+            type="button"
+            variant="secondary"
+            isPending={previewState === "loading"}
+            onPress={previewSavedDraft}
+          >
+            Preview saved Draft Version {selected.draft.version}
+          </Button>
+        ) : (
+          <p className="text-sm text-default-500">
+            Select an Article to preview an exact server-confirmed Draft
+            Version.
+          </p>
+        )}
+        {previewState === "conflict" ? (
+          <Alert status="warning" role="alert">
+            <Alert.Content>
+              <Alert.Title>Saved Draft Version changed</Alert.Title>
+              <Alert.Description>
+                Reload the Article before requesting another preview.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : previewState === "invalid" ? (
+          <Alert status="danger" role="alert">
+            <Alert.Content>
+              <Alert.Title>Saved Draft cannot be previewed</Alert.Title>
+              <Alert.Description>
+                <ul className="list-disc pl-5">
+                  {previewIssues.map((issue) => (
+                    <li key={`${issue.code}:${issue.path}`}>
+                      {issue.path}: {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : previewState === "error" ? (
+          <Alert status="danger" role="alert">
+            <Alert.Content>
+              <Alert.Title>Unable to load saved Draft preview</Alert.Title>
+              <Alert.Description>Please try again.</Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : null}
+        {previewState === "ready" && preview ? (
+          <div className="space-y-4">
+            <p className="text-sm text-default-500" role="status">
+              Showing saved Draft Version {preview.draftVersion} with Renderer
+              Version {preview.rendererVersion}.
+            </p>
+            <article
+              className="space-y-3 rounded-xl border border-default-200 p-4"
+              lang={preview.metadata.language}
+              aria-labelledby="saved-draft-preview-title"
+            >
+              <header className="space-y-1">
+                <h4
+                  id="saved-draft-preview-title"
+                  className="text-xl font-semibold"
+                >
+                  {preview.metadata.title}
+                </h4>
+                <p className="text-sm text-default-500">
+                  By {preview.metadata.byline.name} ·{" "}
+                  {preview.metadata.language}
+                </p>
+              </header>
+              <div dangerouslySetInnerHTML={{ __html: preview.html }} />
+            </article>
+          </div>
+        ) : null}
+      </section>
     </section>
   );
 }

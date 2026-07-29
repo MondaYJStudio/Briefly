@@ -7,6 +7,7 @@ import {
   readArticle,
   updateArticleDraft,
 } from "../articles/articles.server";
+import { renderSavedArticleDraft } from "../articles/article-publication.server";
 import {
   initializeAdministrator,
   installationIsInitialized,
@@ -226,6 +227,45 @@ function createApi(getBindings: () => RuntimeBindings) {
             result.reason === "slug-conflict"
               ? ("ARTICLE_SLUG_CONFLICT" as const)
               : ("ARTICLE_DRAFT_VERSION_CONFLICT" as const),
+        });
+      },
+      {
+        params: t.Object({ articleId: t.String({ format: "uuid" }) }),
+        body: t.Any(),
+      },
+    )
+    .post(
+      "/admin/articles/:articleId/preview",
+      async ({ body, params, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "private, no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        const result = await renderSavedArticleDraft(
+          bindings.DB,
+          params.articleId,
+          (body as { version?: unknown })?.version,
+          { resolveAsset: async () => null },
+        );
+        if (result.ok) return result.renderedDraft;
+        if (result.reason === "not-found")
+          return status(404, {
+            status: "error" as const,
+            code: "ARTICLE_NOT_FOUND" as const,
+          });
+        if (result.reason === "version-conflict")
+          return status(409, {
+            status: "error" as const,
+            code: "ARTICLE_DRAFT_VERSION_CONFLICT" as const,
+          });
+        return status(400, {
+          status: "error" as const,
+          code: "ARTICLE_PREVIEW_INVALID" as const,
+          issues: result.issues ?? [],
         });
       },
       {

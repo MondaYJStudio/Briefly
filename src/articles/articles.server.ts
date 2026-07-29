@@ -86,7 +86,7 @@ const draftInput = z
     tags: [...new Set(value.tags)],
   }));
 
-const persistedArticle = z.object({
+const persistedArticleBase = z.object({
   id: z.string().uuid(),
   current_publication_id: z.string().nullable(),
   article_created_at: z.number().int(),
@@ -119,11 +119,14 @@ const persistedArticle = z.object({
       }
     }),
   language: z.string().nullable(),
-  document: z.string().transform((value, context) => {
+  draft_created_at: z.number().int(),
+  draft_updated_at: z.number().int(),
+});
+
+function persistedArticleDocument<T>(parse: (input: unknown) => T) {
+  return z.string().transform((value, context) => {
     try {
-      const result = validateArticleDocument(JSON.parse(value));
-      if (result.ok) return result.document;
-      throw new Error();
+      return parse(JSON.parse(value));
     } catch {
       context.addIssue({
         code: "custom",
@@ -131,15 +134,65 @@ const persistedArticle = z.object({
       });
       return z.NEVER;
     }
+  });
+}
+
+const persistedArticle = persistedArticleBase.extend({
+  document: persistedArticleDocument((input) => {
+    const result = validateArticleDocument(input);
+    if (result.ok) return result.document;
+    throw new Error("Invalid Article document");
   }),
-  draft_created_at: z.number().int(),
-  draft_updated_at: z.number().int(),
+});
+
+const articleDocumentEnvelope = z
+  .object({
+    documentSchemaVersion: z.number(),
+    doc: z.unknown(),
+  })
+  .passthrough();
+
+const persistedArticleForRendering = persistedArticleBase.extend({
+  document: persistedArticleDocument((input) =>
+    articleDocumentEnvelope.parse(input),
+  ),
 });
 
 type ArticleRow = z.input<typeof persistedArticle>;
 
-function articleFromRow(input: ArticleRow): Article {
-  const row = persistedArticle.parse(input);
+type ArticleDraftMetadata = Pick<
+  Article["draft"],
+  "version" | "title" | "slug" | "summary" | "tags" | "byline" | "language"
+>;
+
+export class NonCanonicalArticleDraftMetadataError extends Error {
+  constructor() {
+    super("Article Draft metadata is not canonically persisted");
+    this.name = "NonCanonicalArticleDraftMetadataError";
+  }
+}
+
+function articleDraftMetadataFromRow(
+  row: z.output<typeof persistedArticleBase>,
+): ArticleDraftMetadata {
+  const parsed = draftInput.parse({
+    version: row.version,
+    title: row.title,
+    slug: row.slug,
+    summary: row.summary,
+    tags: row.tags,
+    byline: row.byline,
+    language: row.language,
+  });
+  const metadata = {
+    version: parsed.version,
+    title: parsed.title,
+    slug: parsed.slug,
+    summary: parsed.summary,
+    tags: parsed.tags,
+    byline: parsed.byline,
+    language: parsed.language,
+  };
   const persistedMetadata = {
     version: row.version,
     title: row.title,
@@ -149,10 +202,15 @@ function articleFromRow(input: ArticleRow): Article {
     byline: row.byline,
     language: row.language,
   };
-  const metadata = draftInput.parse(persistedMetadata);
   if (JSON.stringify(metadata) !== JSON.stringify(persistedMetadata)) {
-    throw new Error("Article Draft metadata is not canonically persisted");
+    throw new NonCanonicalArticleDraftMetadataError();
   }
+  return metadata;
+}
+
+function articleFromRow(input: ArticleRow): Article {
+  const row = persistedArticle.parse(input);
+  const metadata = articleDraftMetadataFromRow(row);
   return {
     id: row.id,
     currentPublicationId: row.current_publication_id,
@@ -237,6 +295,40 @@ export async function readArticle(
     .bind(articleId)
     .first<ArticleRow>();
   return row ? articleFromRow(row) : null;
+}
+
+export interface ArticleDraftRenderingSource {
+  id: string;
+  draft: ArticleDraftMetadata & {
+    document: {
+      documentSchemaVersion: number;
+      doc: unknown;
+    };
+  };
+}
+
+export async function readArticleDraftForRendering(
+  database: D1Database,
+  articleId: string,
+): Promise<ArticleDraftRenderingSource | null> {
+  const row = await database
+    .prepare(
+      `${articleSelection}
+       WHERE article.id = ? AND article.trashed_at IS NULL
+       LIMIT 1`,
+    )
+    .bind(articleId)
+    .first<ArticleRow>();
+  if (!row) return null;
+
+  const persisted = persistedArticleForRendering.parse(row);
+  return {
+    id: persisted.id,
+    draft: {
+      ...articleDraftMetadataFromRow(persisted),
+      document: persisted.document,
+    },
+  };
 }
 
 export async function updateArticleDraft(

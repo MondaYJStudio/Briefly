@@ -9,6 +9,10 @@ import {
 } from "@tiptap/static-renderer/pm/html-string";
 import { z } from "zod";
 
+import type { PublicationIssue } from "./articles";
+
+export type { PublicationIssue } from "./articles";
+
 const DOCUMENT_SCHEMA_VERSION = 1;
 export const PUBLICATION_RENDERER_VERSION = 1;
 const VIDEO_PROVIDER_POLICIES = {
@@ -377,12 +381,6 @@ export interface ResolvedPublicationAsset {
 
 export interface PublicationRendererDependencies {
   resolveAsset: (assetId: string) => Promise<ResolvedPublicationAsset | null>;
-}
-
-export interface PublicationIssue {
-  code: string;
-  path: string;
-  message: string;
 }
 
 export type PublicationRenderResult =
