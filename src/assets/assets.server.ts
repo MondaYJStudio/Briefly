@@ -9,6 +9,7 @@ import {
   type AssetMimeType,
   type AssetValidationIssue,
 } from "./assets";
+import { decodeImage } from "./image-decoder.server";
 
 const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10] as const;
 const jpegStartOfFrameMarkers = new Set([
@@ -372,12 +373,13 @@ function inspectAvif(bytes: Uint8Array): VerifiedImage | null {
   return { mimeType: "image/avif", ...dimensions };
 }
 
-function validateImage(
+async function validateImage(
   file: File,
   bytes: Uint8Array,
-):
+): Promise<
   | { ok: true; image: VerifiedImage }
-  | { ok: false; issues: AssetValidationIssue[] } {
+  | { ok: false; issues: AssetValidationIssue[] }
+> {
   const invalid = (message: string) => ({
     ok: false as const,
     issues: [{ path: "file" as const, message }],
@@ -413,6 +415,14 @@ function validateImage(
     return invalid(
       "Image dimensions must be at most 8192 px per side and 16777216 pixels total.",
     );
+  }
+  try {
+    const decoded = await decodeImage(image.mimeType, bytes);
+    if (decoded.width !== image.width || decoded.height !== image.height) {
+      return invalid("Decoded image dimensions do not match its container.");
+    }
+  } catch {
+    return invalid("The image pixel data could not be decoded.");
   }
   return { ok: true, image };
 }
@@ -455,7 +465,7 @@ export async function uploadAsset(
     };
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const verification = validateImage(file, bytes);
+  const verification = await validateImage(file, bytes);
   if (!verification.ok) return { ...verification, reason: "invalid" as const };
 
   const id = crypto.randomUUID();

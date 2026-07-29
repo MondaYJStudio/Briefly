@@ -3,5 +3,9 @@
   "compilerOptions": {
     "types": ["node", "@cloudflare/vitest-pool-workers/types"]
   },
-  "include": ["./**/*.ts", "../worker-configuration.d.ts"]
+  "include": [
+    "./**/*.ts",
+    "../src/wasm-modules.d.ts",
+    "../worker-configuration.d.ts"
+  ]
 }

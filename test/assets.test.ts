@@ -98,6 +98,56 @@ const fourByFourAvif = bytesFromBase64(
   "AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAAD5bWV0YQAAAAAAAAAvaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAFBpY3R1cmVIYW5kbGVyAAAAAA5waXRtAAAAAAABAAAAHmlsb2MAAAAARAAAAQABAAAAAQAAASEAAAAiAAAAKGlpbmYAAAAAAAEAAAAaaW5mZQIAAAAAAQAAYXYwMUNvbG9yAAAAAGppcHJwAAAAS2lwY28AAAAUaXNwZQAAAAAAAAAEAAAABAAAABBwaXhpAAAAAAMICAgAAAAMYXYxQ4EADAAAAAATY29scm5jbHgAAgACAAIAAAAAF2lwbWEAAAAAAAAAAQABBAECgwQAAAAqbWRhdAoJAAAAAI+JXyAIMhUQAJaAEECCAAAAAZ1MStNjMjf7f3A=",
 );
 
+function pngWithCorruptedPixelData(bytes: Uint8Array): Uint8Array {
+  const corrupted = new Uint8Array(bytes);
+  const view = new DataView(corrupted.buffer);
+  let offset = 8;
+  while (offset + 12 <= corrupted.byteLength) {
+    const chunkLength = view.getUint32(offset);
+    const dataOffset = offset + 8;
+    const chunkEnd = dataOffset + chunkLength;
+    const chunkType = new TextDecoder().decode(
+      corrupted.subarray(offset + 4, dataOffset),
+    );
+    if (chunkType === "IDAT") {
+      corrupted[dataOffset] ^= 0xff;
+      view.setUint32(chunkEnd, crc32(corrupted.subarray(offset + 4, chunkEnd)));
+      return corrupted;
+    }
+    offset = chunkEnd + 4;
+  }
+  throw new Error("Expected PNG image data");
+}
+
+const fakeJpegWithDimensions = Uint8Array.of(
+  0xff,
+  0xd8,
+  0xff,
+  0xc0,
+  0x00,
+  0x08,
+  0x08,
+  0x00,
+  0x01,
+  0x00,
+  0x01,
+  0x01,
+  0xff,
+  0xda,
+  0x00,
+  0x02,
+  0xff,
+  0xd9,
+);
+const fakeWebpWithDimensions = concatenate([
+  new TextEncoder().encode("RIFF"),
+  Uint8Array.of(22, 0, 0, 0),
+  new TextEncoder().encode("WEBPVP8 "),
+  Uint8Array.of(10, 0, 0, 0, 0, 0, 0, 0x9d, 0x01, 0x2a, 1, 0, 1, 0),
+]);
+const avifWithCorruptedPixelData = new Uint8Array(fourByFourAvif);
+avifWithCorruptedPixelData.fill(0, avifWithCorruptedPixelData.length - 30);
+
 function cookieFrom(response: Response): string {
   const setCookie = response.headers.get("set-cookie");
   if (!setCookie) throw new Error("Expected a session cookie");
@@ -430,6 +480,47 @@ describe("private Asset media library", () => {
         code: "ASSET_UPLOAD_INVALID",
         issues: [expect.objectContaining({ path: "file" })],
       });
+    }
+
+    const library = await SELF.fetch("http://briefly.test/api/admin/assets", {
+      headers: { cookie },
+    });
+    expect(await library.json()).toEqual({ assets: [] });
+  }, 15_000);
+
+  it("rejects valid-looking image containers whose pixels cannot be decoded", async () => {
+    const cookie = await initializeAndSignIn();
+    const rejectedFiles = [
+      {
+        name: "corrupt.png",
+        type: "image/png",
+        bytes: pngWithCorruptedPixelData(onePixelPng),
+      },
+      {
+        name: "fake.jpg",
+        type: "image/jpeg",
+        bytes: fakeJpegWithDimensions,
+      },
+      {
+        name: "fake.webp",
+        type: "image/webp",
+        bytes: fakeWebpWithDimensions,
+      },
+      {
+        name: "corrupt.avif",
+        type: "image/avif",
+        bytes: avifWithCorruptedPixelData,
+      },
+    ];
+
+    for (const candidate of rejectedFiles) {
+      const response = await upload(
+        cookie,
+        candidate.bytes,
+        candidate.name,
+        candidate.type,
+      );
+      expect(response.status, candidate.name).toBe(400);
     }
 
     const library = await SELF.fetch("http://briefly.test/api/admin/assets", {
