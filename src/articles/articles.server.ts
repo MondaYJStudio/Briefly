@@ -47,6 +47,10 @@ const language = z
 const pathReservedCharacter = /[:/?#\[\]@!$&'()*+,;=%\\]/u;
 const controlCharacter = /\p{Cc}/u;
 
+function slugKeyFor(value: string | null): string | null {
+  return value?.toLocaleLowerCase("und") ?? null;
+}
+
 const slug = z
   .string()
   .max(ARTICLE_SLUG_MAXIMUM_LENGTH)
@@ -140,15 +144,6 @@ type ArticleRow = z.input<typeof persistedArticle>;
 
 function articleFromRow(input: ArticleRow): Article {
   const row = persistedArticle.parse(input);
-  const metadata = draftInput.parse({
-    version: row.version,
-    title: row.title,
-    slug: row.slug,
-    summary: row.summary,
-    tags: row.tags,
-    byline: row.byline,
-    language: row.language,
-  });
   const persistedMetadata = {
     version: row.version,
     title: row.title,
@@ -158,6 +153,7 @@ function articleFromRow(input: ArticleRow): Article {
     byline: row.byline,
     language: row.language,
   };
+  const metadata = draftInput.parse(persistedMetadata);
   if (JSON.stringify(metadata) !== JSON.stringify(persistedMetadata)) {
     throw new Error("Article Draft metadata is not canonically persisted");
   }
@@ -265,15 +261,44 @@ export async function updateArticleDraft(
   }
 
   const value: ArticleDraftUpdate = parsed.data;
-  const slugKey = value.slug?.toLocaleLowerCase("und") ?? null;
+  const slugKey = slugKeyFor(value.slug);
   const now = Date.now();
-  try {
-    const updated = await database
+  const before = await readArticle(database, articleId);
+  if (!before) return { ok: false, reason: "not-found" };
+  if (before.draft.version !== value.version)
+    return { ok: false, reason: "conflict" };
+  const previousSlugKey = slugKeyFor(before.draft.slug);
+  const statements: D1PreparedStatement[] = [];
+  if (slugKey !== null) {
+    statements.push(
+      database
+        .prepare(
+          `INSERT INTO article_slug (slug_key, article_id, was_published)
+             SELECT ?, ?, 0
+             WHERE EXISTS (
+               SELECT 1 FROM article_draft
+               WHERE article_id = ? AND version = ?
+             )
+             ON CONFLICT (slug_key) DO NOTHING`,
+        )
+        .bind(slugKey, articleId, articleId, value.version),
+    );
+  }
+  const updateIndex = statements.length;
+  statements.push(
+    database
       .prepare(
         `UPDATE article_draft
          SET version = version + 1, title = ?, slug = ?, slug_key = ?,
              summary = ?, tags = ?, byline = ?, language = ?, updated_at = ?
          WHERE article_id = ? AND version = ?
+           AND (
+             ? IS NULL OR EXISTS (
+               SELECT 1 FROM article_slug
+               WHERE article_slug.slug_key = ?
+                 AND article_slug.article_id = article_draft.article_id
+             )
+           )
            AND EXISTS (
              SELECT 1 FROM article
              WHERE article.id = article_draft.article_id
@@ -292,20 +317,40 @@ export async function updateArticleDraft(
         now,
         articleId,
         value.version,
-      )
-      .first<{ version: number }>();
+        slugKey,
+        slugKey,
+      ),
+  );
+  if (previousSlugKey !== null && previousSlugKey !== slugKey) {
+    statements.push(
+      database
+        .prepare(
+          `DELETE FROM article_slug
+             WHERE slug_key = ? AND article_id = ? AND was_published = 0
+               AND NOT EXISTS (
+                 SELECT 1 FROM article_draft
+                 WHERE article_draft.slug_key = article_slug.slug_key
+                   AND article_draft.article_id = article_slug.article_id
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM publication
+                 WHERE publication.slug_key = article_slug.slug_key
+                   AND publication.article_id = article_slug.article_id
+               )`,
+        )
+        .bind(previousSlugKey, articleId),
+    );
+  }
+  const batch = await database.batch(statements);
+  const updated = batch[updateIndex]?.results[0] as
+    { version: number } | undefined;
 
-    if (!updated) {
-      const article = await readArticle(database, articleId);
-      return article
-        ? { ok: false, reason: "conflict" }
-        : { ok: false, reason: "not-found" };
-    }
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("UNIQUE constraint")) {
-      return { ok: false, reason: "slug-conflict" };
-    }
-    throw error;
+  if (!updated) {
+    const article = await readArticle(database, articleId);
+    if (!article) return { ok: false, reason: "not-found" };
+    return article.draft.version === value.version
+      ? { ok: false, reason: "slug-conflict" }
+      : { ok: false, reason: "conflict" };
   }
 
   await database

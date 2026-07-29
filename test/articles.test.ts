@@ -209,6 +209,11 @@ describe("Article Draft administration", () => {
         tags: ["saved"],
       },
     });
+    expect(
+      await env.DB.prepare(
+        "SELECT article_id FROM article_slug WHERE slug_key = 'stale-tab'",
+      ).first(),
+    ).toBeNull();
   }, 15_000);
 
   it("rejects Unicode-equivalent slug collisions and preserves both Drafts", async () => {
@@ -261,6 +266,139 @@ describe("Article Draft administration", () => {
       })
     ).json<{ draft: { version: number; slug: string | null } }>();
     expect(secondDraft.draft).toMatchObject({ version: 1, slug: null });
+  }, 15_000);
+
+  it("reserves the Current Publication locator and constrains its Article reference", async () => {
+    const cookie = await initializeAndSignIn();
+    const create = () =>
+      SELF.fetch("http://briefly.test/api/admin/articles", {
+        method: "POST",
+        headers: { cookie },
+      }).then((response) => response.json<{ id: string }>());
+    const first = await create();
+    const second = await create();
+    const metadata = {
+      title: "Publication locator",
+      summary: null,
+      tags: [],
+      byline: null,
+      language: null,
+    };
+    expect(
+      (
+        await SELF.fetch(
+          `http://briefly.test/api/admin/articles/${first.id}/draft`,
+          {
+            method: "PUT",
+            headers: { cookie, "content-type": "application/json" },
+            body: JSON.stringify({
+              ...metadata,
+              version: 1,
+              slug: "public-locator",
+            }),
+          },
+        )
+      ).status,
+    ).toBe(200);
+    const publicationId = crypto.randomUUID();
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE article_slug SET was_published = 1
+         WHERE slug_key = 'public-locator' AND article_id = ?`,
+      ).bind(first.id),
+      env.DB.prepare(
+        `INSERT INTO publication (id, article_id, slug, slug_key, created_at)
+         VALUES (?, ?, 'public-locator', 'public-locator', ?)`,
+      ).bind(publicationId, first.id, Date.now()),
+      env.DB.prepare(
+        "UPDATE article SET current_publication_id = ? WHERE id = ?",
+      ).bind(publicationId, first.id),
+    ]);
+    const repeatedPublicationId = crypto.randomUUID();
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO publication (id, article_id, slug, slug_key, created_at)
+         VALUES (?, ?, 'public-locator', 'public-locator', ?)`,
+      )
+        .bind(repeatedPublicationId, first.id, Date.now())
+        .run(),
+    ).resolves.toBeDefined();
+    expect(
+      (
+        await SELF.fetch(
+          `http://briefly.test/api/admin/articles/${first.id}/draft`,
+          {
+            method: "PUT",
+            headers: { cookie, "content-type": "application/json" },
+            body: JSON.stringify({
+              ...metadata,
+              version: 2,
+              slug: "new-draft-locator",
+            }),
+          },
+        )
+      ).status,
+    ).toBe(200);
+
+    const collision = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${second.id}/draft`,
+      {
+        method: "PUT",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          ...metadata,
+          version: 1,
+          slug: "public-locator",
+        }),
+      },
+    );
+    expect(collision.status).toBe(409);
+    expect(await collision.json()).toEqual({
+      status: "error",
+      code: "ARTICLE_SLUG_CONFLICT",
+    });
+
+    expect(
+      (
+        await SELF.fetch(
+          `http://briefly.test/api/admin/articles/${second.id}/draft`,
+          {
+            method: "PUT",
+            headers: { cookie, "content-type": "application/json" },
+            body: JSON.stringify({
+              ...metadata,
+              version: 1,
+              slug: "draft-owned",
+            }),
+          },
+        )
+      ).status,
+    ).toBe(200);
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO publication (id, article_id, slug, slug_key, created_at)
+         VALUES (?, ?, 'draft-owned', 'draft-owned', ?)`,
+      )
+        .bind(crypto.randomUUID(), first.id, Date.now())
+        .run(),
+    ).rejects.toThrow();
+    await expect(
+      env.DB.prepare(
+        `UPDATE publication
+         SET slug = 'draft-owned', slug_key = 'draft-owned'
+         WHERE id = ?`,
+      )
+        .bind(repeatedPublicationId)
+        .run(),
+    ).rejects.toThrow();
+
+    await expect(
+      env.DB.prepare(
+        "UPDATE article SET current_publication_id = ? WHERE id = ?",
+      )
+        .bind(publicationId, second.id)
+        .run(),
+    ).rejects.toThrow();
   }, 15_000);
 
   it.each([

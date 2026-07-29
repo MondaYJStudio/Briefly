@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnySQLiteColumn,
   check,
+  foreignKey,
   index,
   integer,
   sqliteTable,
@@ -17,7 +19,60 @@ export const article = sqliteTable(
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
     trashedAt: integer("trashed_at", { mode: "timestamp_ms" }),
   },
-  (table) => [index("article_trashed_at_idx").on(table.trashedAt)],
+  (table) => [
+    index("article_trashed_at_idx").on(table.trashedAt),
+    foreignKey({
+      columns: [table.currentPublicationId, table.id],
+      foreignColumns: [publication.id, publication.articleId],
+      name: "article_current_publication_belongs_to_article",
+    }),
+  ],
+);
+
+export const articleSlug = sqliteTable(
+  "article_slug",
+  {
+    slugKey: text("slug_key").primaryKey(),
+    articleId: text("article_id")
+      .notNull()
+      .references((): AnySQLiteColumn => article.id, { onDelete: "cascade" }),
+    wasPublished: integer("was_published", { mode: "boolean" })
+      .notNull()
+      .default(false),
+  },
+  (table) => [
+    uniqueIndex("article_slug_key_article_id_unique").on(
+      table.slugKey,
+      table.articleId,
+    ),
+    index("article_slug_article_id_idx").on(table.articleId),
+  ],
+);
+
+export const publication = sqliteTable(
+  "publication",
+  {
+    id: text("id").primaryKey(),
+    articleId: text("article_id")
+      .notNull()
+      .references((): AnySQLiteColumn => article.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    slugKey: text("slug_key").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("publication_id_article_id_unique").on(
+      table.id,
+      table.articleId,
+    ),
+    foreignKey({
+      columns: [table.slugKey, table.articleId],
+      foreignColumns: [articleSlug.slugKey, articleSlug.articleId],
+      name: "publication_slug_belongs_to_article",
+    }),
+    index("publication_slug_key_idx").on(table.slugKey),
+    index("publication_article_id_idx").on(table.articleId),
+  ],
 );
 
 export const articleDraft = sqliteTable(
@@ -42,7 +97,11 @@ export const articleDraft = sqliteTable(
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [
-    uniqueIndex("article_draft_slug_key_unique").on(table.slugKey),
+    foreignKey({
+      columns: [table.slugKey, table.articleId],
+      foreignColumns: [articleSlug.slugKey, articleSlug.articleId],
+      name: "article_draft_slug_belongs_to_article",
+    }),
     check("article_draft_version_positive", sql`${table.version} >= 1`),
   ],
 );

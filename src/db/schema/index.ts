@@ -7,6 +7,6 @@ export {
   user,
   verification,
 } from "./authentication";
-export { article, articleDraft } from "./articles";
+export { article, articleDraft, articleSlug, publication } from "./articles";
 export { runtimeMetadata } from "./runtime-metadata";
 export { siteSettings } from "./site-settings";
