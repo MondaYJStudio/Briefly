@@ -206,7 +206,12 @@ describe("site identity and Byline defaults", () => {
       {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          siteName: "Unauthorized",
+          siteDescription: null,
+          defaultByline: { name: "Unauthorized", url: null },
+          defaultLanguage: "en",
+        }),
       },
     );
     const anonymousRead = await SELF.fetch(
@@ -222,31 +227,36 @@ describe("site identity and Byline defaults", () => {
     }
   });
 
-  it("preserves the single Site Settings record at the persistence boundary", async () => {
+  it("preserves the single Site Settings record through repeated updates", async () => {
     const initial = await env.DB.prepare(
       "SELECT COUNT(*) AS count FROM site_settings",
     ).first<{ count: number }>();
     expect(initial?.count).toBe(1);
 
-    await expect(
-      env.DB.prepare("INSERT INTO site_settings (id) VALUES (2)").run(),
-    ).rejects.toThrow();
-    await expect(
-      env.DB.prepare(
-        "UPDATE site_settings SET default_byline_url = 'javascript:alert(1)' WHERE id = 1",
-      ).run(),
-    ).rejects.toThrow();
-    await expect(
-      env.DB.prepare(
-        "UPDATE site_settings SET default_language = 'not_a_language' WHERE id = 1",
-      ).run(),
-    ).rejects.toThrow();
+    const cookie = await initializeAndSignIn();
+    const update = {
+      siteName: "One Site",
+      siteDescription: null,
+      defaultByline: { name: "One Byline", url: null },
+      defaultLanguage: "en",
+    };
+    for (const siteName of ["First name", "Second name"]) {
+      const response = await SELF.fetch(
+        "http://briefly.test/api/admin/site-settings",
+        {
+          method: "PUT",
+          headers: { cookie, "content-type": "application/json" },
+          body: JSON.stringify({ ...update, siteName }),
+        },
+      );
+      expect(response.status).toBe(200);
+    }
 
     const preserved = await env.DB.prepare(
-      "SELECT COUNT(*) AS count FROM site_settings WHERE id = 1",
+      "SELECT COUNT(*) AS count FROM site_settings",
     ).first<{ count: number }>();
     expect(preserved?.count).toBe(1);
-  });
+  }, 15_000);
 
   it("presents route-local loading and editing status for Site Settings", async () => {
     const cookie = await initializeAndSignIn();

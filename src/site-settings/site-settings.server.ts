@@ -89,7 +89,11 @@ export type UpdateSiteSettingsResult =
 export async function readSiteSettings(
   database: D1Database,
 ): Promise<SiteSettings> {
-  const [row] = await drizzle(database).select().from(siteSettings).limit(1);
+  const [row] = await drizzle(database)
+    .select()
+    .from(siteSettings)
+    .where(eq(siteSettings.id, 1))
+    .limit(1);
   const parsed = persistedSiteSettings.parse(row);
   return {
     siteName: parsed.siteName,

@@ -15,6 +15,30 @@ import {
   updateSiteSettings,
 } from "../site-settings/site-settings.server";
 
+const siteSettingsContract = t.Object({
+  siteName: t.String(),
+  siteDescription: t.Any(),
+  defaultByline: t.Object({
+    name: t.String(),
+    url: t.Any(),
+  }),
+  defaultLanguage: t.String(),
+});
+const authenticationRequiredContract = t.Object({
+  status: t.Literal("error"),
+  code: t.Literal("AUTHENTICATION_REQUIRED"),
+});
+const siteSettingsInvalidContract = t.Object({
+  status: t.Literal("error"),
+  code: t.Literal("SITE_SETTINGS_INVALID"),
+  issues: t.Array(
+    t.Object({
+      path: t.String(),
+      message: t.String(),
+    }),
+  ),
+});
+
 function getValidatedWorkerBindings() {
   const configuration = validateRuntimeBindings(env);
   if (!configuration.ok) {
@@ -69,36 +93,56 @@ function createApi(getBindings: () => RuntimeBindings) {
 
       return Response.json({ authenticated: true }, { headers });
     })
-    .get("/admin/site-settings", async ({ request, set, status }) => {
-      const bindings = getBindings();
-      set.headers["cache-control"] = "no-store";
-      if (!(await administratorIsAuthenticated(bindings, request.headers)))
-        return status(401, {
-          status: "error" as const,
-          code: "AUTHENTICATION_REQUIRED" as const,
-        });
+    .get(
+      "/admin/site-settings",
+      async ({ request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
 
-      return readSiteSettings(bindings.DB);
-    })
-    .put("/admin/site-settings", async ({ body, request, set, status }) => {
-      const bindings = getBindings();
-      set.headers["cache-control"] = "no-store";
-      if (!(await administratorIsAuthenticated(bindings, request.headers)))
-        return status(401, {
-          status: "error" as const,
-          code: "AUTHENTICATION_REQUIRED" as const,
-        });
+        return readSiteSettings(bindings.DB);
+      },
+      {
+        response: {
+          200: siteSettingsContract,
+          401: authenticationRequiredContract,
+        },
+      },
+    )
+    .put(
+      "/admin/site-settings",
+      async ({ body, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
 
-      const result = await updateSiteSettings(bindings.DB, body);
-      if (!result.ok) {
-        return status(400, {
-          status: "error" as const,
-          code: "SITE_SETTINGS_INVALID" as const,
-          issues: result.issues,
-        });
-      }
-      return result.settings;
-    })
+        const result = await updateSiteSettings(bindings.DB, body);
+        if (!result.ok) {
+          return status(400, {
+            status: "error" as const,
+            code: "SITE_SETTINGS_INVALID" as const,
+            issues: result.issues,
+          });
+        }
+        return result.settings;
+      },
+      {
+        body: siteSettingsContract,
+        response: {
+          200: siteSettingsContract,
+          400: siteSettingsInvalidContract,
+          401: authenticationRequiredContract,
+        },
+      },
+    )
     .post(
       "/initialize",
       async ({ body, set, status }) => {

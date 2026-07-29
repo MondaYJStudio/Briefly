@@ -46,7 +46,7 @@ function Admin() {
       .then((response) => {
         if (response.status !== 200 || !response.data)
           throw new Error("Site Settings unavailable");
-        const loaded = response.data as unknown as SiteSettings;
+        const loaded: SiteSettings = response.data;
         if (active) {
           setSettings(loaded);
           setSettingsState("ready");
@@ -108,13 +108,16 @@ function Admin() {
       const response =
         await getApiClient().admin["site-settings"].put(settings);
       if (response.status !== 200 || !response.data) {
-        const error = response.error?.value as
-          { issues?: { message: string }[] } | undefined;
-        setSettingsIssues(error?.issues?.map((issue) => issue.message) ?? []);
+        const error = response.error?.value;
+        setSettingsIssues(
+          error && "issues" in error
+            ? error.issues.map((issue) => issue.message)
+            : [],
+        );
         setSettingsState("error");
         return;
       }
-      setSettings(response.data as unknown as SiteSettings);
+      setSettings(response.data);
       setSettingsState("saved");
     } catch {
       setSettingsState("error");

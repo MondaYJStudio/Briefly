@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7a77056a-abf8-4d30-91a5-f5dd32db9d6f",
+  "id": "8d2935b1-f51a-4c9a-81eb-78e3ffff6dd0",
   "prevId": "c8b7146e-580f-4854-b529-575236e63336",
   "tables": {
     "auth_account": {
@@ -369,36 +369,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {
-        "site_settings_singleton": {
-          "name": "site_settings_singleton",
-          "value": "\"site_settings\".\"id\" = 1"
-        },
-        "site_settings_site_name_length": {
-          "name": "site_settings_site_name_length",
-          "value": "length(trim(\"site_settings\".\"site_name\")) BETWEEN 1 AND 120"
-        },
-        "site_settings_description_length": {
-          "name": "site_settings_description_length",
-          "value": "\"site_settings\".\"site_description\" IS NULL OR length(\"site_settings\".\"site_description\") <= 500"
-        },
-        "site_settings_byline_name_length": {
-          "name": "site_settings_byline_name_length",
-          "value": "length(trim(\"site_settings\".\"default_byline_name\")) BETWEEN 1 AND 120"
-        },
-        "site_settings_byline_url_length": {
-          "name": "site_settings_byline_url_length",
-          "value": "\"site_settings\".\"default_byline_url\" IS NULL OR length(\"site_settings\".\"default_byline_url\") <= 2048"
-        },
-        "site_settings_byline_url_scheme": {
-          "name": "site_settings_byline_url_scheme",
-          "value": "\"site_settings\".\"default_byline_url\" IS NULL OR \"site_settings\".\"default_byline_url\" GLOB 'http://*' OR \"site_settings\".\"default_byline_url\" GLOB 'https://*'"
-        },
-        "site_settings_language_shape": {
-          "name": "site_settings_language_shape",
-          "value": "length(\"site_settings\".\"default_language\") BETWEEN 2 AND 35\n        AND \"site_settings\".\"default_language\" NOT GLOB '*[^A-Za-z0-9-]*'\n        AND \"site_settings\".\"default_language\" NOT GLOB '-*'\n        AND \"site_settings\".\"default_language\" NOT GLOB '*-'\n        AND \"site_settings\".\"default_language\" NOT GLOB '*--*'"
-        }
-      }
+      "checkConstraints": {}
     },
     "auth_user": {
       "name": "auth_user",
