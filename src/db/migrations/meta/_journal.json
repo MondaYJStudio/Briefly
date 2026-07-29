@@ -15,6 +15,13 @@
       "when": 1785251114132,
       "tag": "0001_authentication",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785294056142,
+      "tag": "0002_site_settings",
+      "breakpoints": true
     }
   ]
 }

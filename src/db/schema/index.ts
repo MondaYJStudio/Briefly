@@ -8,3 +8,4 @@ export {
   verification,
 } from "./authentication";
 export { runtimeMetadata } from "./runtime-metadata";
+export { siteSettings } from "./site-settings";

@@ -10,6 +10,10 @@ import {
   validateRuntimeBindings,
   type RuntimeBindings,
 } from "../env/runtime.server";
+import {
+  readSiteSettings,
+  updateSiteSettings,
+} from "../site-settings/site-settings.server";
 
 function getValidatedWorkerBindings() {
   const configuration = validateRuntimeBindings(env);
@@ -17,6 +21,19 @@ function getValidatedWorkerBindings() {
     throw new Error("Validated Worker bindings are unavailable");
   }
   return configuration.bindings;
+}
+
+async function administratorIsAuthenticated(
+  bindings: RuntimeBindings,
+  headers: Headers,
+): Promise<boolean> {
+  const { createAuth } = await import("../auth/auth.server");
+  return Boolean(
+    await createAuth(bindings).api.getSession({
+      headers,
+      query: { disableRefresh: true },
+    }),
+  );
 }
 
 function createApi(getBindings: () => RuntimeBindings) {
@@ -51,6 +68,36 @@ function createApi(getBindings: () => RuntimeBindings) {
       }
 
       return Response.json({ authenticated: true }, { headers });
+    })
+    .get("/admin/site-settings", async ({ request, set, status }) => {
+      const bindings = getBindings();
+      set.headers["cache-control"] = "no-store";
+      if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        return status(401, {
+          status: "error" as const,
+          code: "AUTHENTICATION_REQUIRED" as const,
+        });
+
+      return readSiteSettings(bindings.DB);
+    })
+    .put("/admin/site-settings", async ({ body, request, set, status }) => {
+      const bindings = getBindings();
+      set.headers["cache-control"] = "no-store";
+      if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        return status(401, {
+          status: "error" as const,
+          code: "AUTHENTICATION_REQUIRED" as const,
+        });
+
+      const result = await updateSiteSettings(bindings.DB, body);
+      if (!result.ok) {
+        return status(400, {
+          status: "error" as const,
+          code: "SITE_SETTINGS_INVALID" as const,
+          issues: result.issues,
+        });
+      }
+      return result.settings;
     })
     .post(
       "/initialize",
