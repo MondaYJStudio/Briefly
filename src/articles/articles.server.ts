@@ -81,6 +81,7 @@ const draftInput = z
     language: language.nullable(),
     document: z.unknown().optional(),
   })
+  .strict()
   .transform((value) => ({
     ...value,
     tags: [...new Set(value.tags)],

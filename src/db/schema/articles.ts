@@ -15,6 +15,7 @@ export const article = sqliteTable(
   {
     id: text("id").primaryKey(),
     currentPublicationId: text("current_publication_id"),
+    publishedAt: integer("published_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
     trashedAt: integer("trashed_at", { mode: "timestamp_ms" }),
@@ -58,12 +59,44 @@ export const publication = sqliteTable(
       .references((): AnySQLiteColumn => article.id, { onDelete: "cascade" }),
     slug: text("slug").notNull(),
     slugKey: text("slug_key").notNull(),
+    publicationNumber: integer("publication_number").notNull().default(1),
+    title: text("title").notNull().default(""),
+    summary: text("summary"),
+    tags: text("tags", { mode: "json" })
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    byline: text("byline", { mode: "json" })
+      .$type<{ name: string; url: string | null }>()
+      .notNull()
+      .default({ name: "", url: null }),
+    language: text("language").notNull().default(""),
+    cover: text("cover", { mode: "json" }).$type<unknown | null>(),
+    documentSchemaVersion: integer("document_schema_version")
+      .notNull()
+      .default(1),
+    document: text("document", { mode: "json" })
+      .$type<unknown>()
+      .notNull()
+      .default({
+        documentSchemaVersion: 1,
+        doc: { type: "doc", content: [{ type: "paragraph" }] },
+      }),
+    rendererVersion: integer("renderer_version").notNull().default(1),
+    html: text("html").notNull().default(""),
+    publishedAt: integer("published_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`0`),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [
     uniqueIndex("publication_id_article_id_unique").on(
       table.id,
       table.articleId,
+    ),
+    uniqueIndex("publication_article_number_unique").on(
+      table.articleId,
+      table.publicationNumber,
     ),
     foreignKey({
       columns: [table.slugKey, table.articleId],

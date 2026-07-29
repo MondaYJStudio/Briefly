@@ -84,3 +84,17 @@ export interface ArticleDraftUpdate {
   language: string | null;
   document: ArticleDocument;
 }
+
+export interface PublicArticle {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string | null;
+  tags: string[];
+  byline: Byline;
+  language: string;
+  cover: null;
+  publishedAt: string;
+  updatedAt: string;
+  html: string;
+}

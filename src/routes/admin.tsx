@@ -430,6 +430,10 @@ function ArticleDraftManager() {
     "idle" | "loading" | "ready" | "invalid" | "conflict" | "error"
   >("idle");
   const previewRequestGeneration = useRef(0);
+  const [publishState, setPublishState] = useState<
+    "ready" | "publishing" | "published" | "invalid" | "conflict" | "error"
+  >("ready");
+  const [publicationIssues, setPublicationIssues] = useState<string[]>([]);
 
   function resetPreview() {
     previewRequestGeneration.current += 1;
@@ -480,6 +484,7 @@ function ArticleDraftManager() {
       selectServerDraft(response.data);
       setConflictCopy(null);
       setState("ready");
+      setPublishState("ready");
     } catch {
       setState("failed");
     }
@@ -494,6 +499,7 @@ function ArticleDraftManager() {
         throw new Error("Article unavailable");
       selectServerDraft(response.data);
       setState("ready");
+      setPublishState("ready");
     } catch {
       setState("failed");
     }
@@ -529,6 +535,7 @@ function ArticleDraftManager() {
         setArticles((current) =>
           current.map((article) => (article.id === next.id ? next : article)),
         );
+        setPublishState("ready");
         confirmedRevisionRef.current = capturedRevision;
         setConfirmedRevision(capturedRevision);
         setConflictCopy(null);
@@ -606,6 +613,7 @@ function ArticleDraftManager() {
     setRevision(nextRevision);
     setIssues([]);
     setState("dirty");
+    setPublishState("ready");
   }
 
   async function reloadDraft() {
@@ -623,6 +631,7 @@ function ArticleDraftManager() {
         ),
       );
       setState("ready");
+      setPublishState("ready");
     } catch {
       setState("failed");
     }
@@ -700,6 +709,88 @@ function ArticleDraftManager() {
     } catch {
       if (previewGeneration === previewRequestGeneration.current)
         setPreviewState("error");
+    }
+  }
+
+  async function publishDraft() {
+    const snapshot = selectedRef.current;
+    const capturedRevision = revisionRef.current;
+    const publishable =
+      snapshot !== null &&
+      revisionRef.current === confirmedRevisionRef.current &&
+      ["ready", "saved"].includes(state);
+    if (
+      !snapshot ||
+      !publishable ||
+      snapshot.currentPublicationId !== null ||
+      publishState === "publishing" ||
+      publishState === "published"
+    ) {
+      return;
+    }
+    if (
+      !globalThis.confirm(
+        `Publish saved Draft Version ${snapshot.draft.version}? This makes it immediately public.`,
+      )
+    ) {
+      return;
+    }
+
+    setPublishState("publishing");
+    setPublicationIssues([]);
+    try {
+      const response = await getApiClient()
+        .admin.articles({ articleId: snapshot.id })
+        .publications.post({ draftVersion: snapshot.draft.version });
+      if (response.status === 201 && response.data) {
+        if (selectedRef.current?.id === snapshot.id)
+          setPublishState("published");
+        try {
+          const refreshed = await getApiClient()
+            .admin.articles({ articleId: snapshot.id })
+            .get();
+          if (refreshed.status === 200 && refreshed.data) {
+            const local = selectedRef.current;
+            const stillSelected = local?.id === refreshed.data.id;
+            const localChanged =
+              stillSelected && revisionRef.current !== capturedRevision;
+            const next =
+              localChanged && local
+                ? preserveLocalDraft(refreshed.data, local)
+                : refreshed.data;
+            if (stillSelected) {
+              if (localChanged) {
+                selectedRef.current = next;
+                setSelected(next);
+              } else {
+                selectServerDraft(next);
+              }
+            }
+            setArticles((current) =>
+              current.map((article) =>
+                article.id === next.id ? next : article,
+              ),
+            );
+          }
+        } catch {
+          // The publish response already confirms public visibility. A private
+          // administration refresh must not turn that success into an error.
+        }
+        return;
+      }
+
+      const error = response.error?.value;
+      if (selectedRef.current?.id !== snapshot.id) return;
+      if (response.status === 409) {
+        setPublishState("conflict");
+      } else if (error && "issues" in error) {
+        setPublicationIssues(error.issues.map((issue) => issue.message));
+        setPublishState("invalid");
+      } else {
+        setPublishState("error");
+      }
+    } catch {
+      if (selectedRef.current?.id === snapshot.id) setPublishState("error");
     }
   }
 
@@ -853,6 +944,46 @@ function ArticleDraftManager() {
             value={JSON.stringify(conflictCopy, null, 2)}
           />
         </details>
+      ) : null}
+      {publishState === "published" ? (
+        <Alert status="success" role="status">
+          <Alert.Content>
+            <Alert.Title>Article published</Alert.Title>
+            <Alert.Description>
+              The new public Article is available now.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : publishState === "invalid" ? (
+        <Alert status="danger" role="alert">
+          <Alert.Content>
+            <Alert.Title>Publication validation failed</Alert.Title>
+            <Alert.Description>
+              <ul className="list-disc pl-5">
+                {publicationIssues.map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : publishState === "conflict" ? (
+        <Alert status="warning" role="alert">
+          <Alert.Content>
+            <Alert.Title>Publication conflict</Alert.Title>
+            <Alert.Description>
+              Reload the latest server-confirmed Draft Version before
+              publishing.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : publishState === "error" ? (
+        <Alert status="danger" role="alert">
+          <Alert.Content>
+            <Alert.Title>Unable to publish Article</Alert.Title>
+            <Alert.Description>Please try again.</Alert.Description>
+          </Alert.Content>
+        </Alert>
       ) : null}
       <Button
         fullWidth
@@ -1116,6 +1247,24 @@ function ArticleDraftManager() {
           </div>
         ) : null}
       </section>
+      <p className="text-sm text-default-500">
+        Publishing is available only for a server-confirmed Draft Version and
+        requires deliberate confirmation.
+      </p>
+      <Button
+        fullWidth
+        type="button"
+        isDisabled={
+          !selected ||
+          selected.currentPublicationId !== null ||
+          !serverConfirmed ||
+          publishState === "published"
+        }
+        isPending={publishState === "publishing"}
+        onPress={publishDraft}
+      >
+        Publish saved Draft
+      </Button>
     </section>
   );
 }

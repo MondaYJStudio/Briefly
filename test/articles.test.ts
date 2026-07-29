@@ -710,8 +710,9 @@ describe("Article Draft administration", () => {
     const repeatedPublicationId = crypto.randomUUID();
     await expect(
       env.DB.prepare(
-        `INSERT INTO publication (id, article_id, slug, slug_key, created_at)
-         VALUES (?, ?, 'public-locator', 'public-locator', ?)`,
+        `INSERT INTO publication
+           (id, article_id, slug, slug_key, publication_number, created_at)
+         VALUES (?, ?, 'public-locator', 'public-locator', 2, ?)`,
       )
         .bind(repeatedPublicationId, first.id, Date.now())
         .run(),

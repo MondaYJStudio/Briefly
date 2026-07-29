@@ -9,6 +9,10 @@ import {
 } from "../articles/articles.server";
 import { renderSavedArticleDraft } from "../articles/article-publication.server";
 import {
+  publishArticle,
+  readPublicArticle,
+} from "../articles/publications.server";
+import {
   initializeAdministrator,
   installationIsInitialized,
 } from "../auth/initialization.server";
@@ -65,6 +69,41 @@ async function administratorIsAuthenticated(
       query: { disableRefresh: true },
     }),
   );
+}
+
+async function publicArticleResponse(
+  database: D1Database,
+  request: Request,
+  slug: string,
+  head = false,
+): Promise<Response> {
+  const headers = new Headers({
+    "access-control-allow-origin": "*",
+    "cache-control": "public, max-age=0, must-revalidate",
+  });
+  const published = await readPublicArticle(database, slug);
+  if (!published) {
+    return head
+      ? new Response(null, { status: 404, headers })
+      : Response.json(
+          { status: "error", code: "ARTICLE_NOT_FOUND" },
+          { status: 404, headers },
+        );
+  }
+
+  const etag = `"${published.publicationId}"`;
+  headers.set("etag", etag);
+  const matches = request.headers
+    .get("if-none-match")
+    ?.split(",")
+    .map((candidate) => candidate.trim())
+    .some((candidate) => candidate === etag || candidate === "*");
+  if (matches) return new Response(null, { status: 304, headers });
+  if (head) {
+    headers.set("content-type", "application/json");
+    return new Response(null, { headers });
+  }
+  return Response.json(published.article, { headers });
 }
 
 function createApi(getBindings: () => RuntimeBindings) {
@@ -272,6 +311,61 @@ function createApi(getBindings: () => RuntimeBindings) {
         params: t.Object({ articleId: t.String({ format: "uuid" }) }),
         body: t.Any(),
       },
+    )
+    .post(
+      "/admin/articles/:articleId/publications",
+      async ({ body, params, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        let result: Awaited<ReturnType<typeof publishArticle>>;
+        try {
+          result = await publishArticle(
+            bindings.DB,
+            params.articleId,
+            body.draftVersion,
+          );
+        } catch {
+          return status(500, {
+            status: "error" as const,
+            code: "INTERNAL_ERROR" as const,
+          });
+        }
+        if (result.ok) return status(201, result.article);
+        if (result.reason === "invalid")
+          return status(400, {
+            status: "error" as const,
+            code: "PUBLICATION_INVALID" as const,
+            issues: result.issues,
+          });
+        if (result.reason === "not-found")
+          return status(404, {
+            status: "error" as const,
+            code: "ARTICLE_NOT_FOUND" as const,
+          });
+        return status(409, {
+          status: "error" as const,
+          code:
+            result.reason === "already-published"
+              ? ("ARTICLE_ALREADY_PUBLISHED" as const)
+              : ("ARTICLE_DRAFT_VERSION_CONFLICT" as const),
+        });
+      },
+      {
+        params: t.Object({ articleId: t.String({ format: "uuid" }) }),
+        body: t.Object({ draftVersion: t.Number({ minimum: 1 }) }),
+      },
+    )
+    .get("/articles/:slug", ({ params, request }) =>
+      publicArticleResponse(getBindings().DB, request, params.slug),
+    )
+    .head("/articles/:slug", ({ params, request }) =>
+      publicArticleResponse(getBindings().DB, request, params.slug, true),
     )
     .post(
       "/initialize",
