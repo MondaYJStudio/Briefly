@@ -1,3 +1,5 @@
+import type { JSONContent } from "@tiptap/core";
+
 import type { Byline } from "../site-settings/site-settings";
 
 export const ARTICLE_TITLE_MAXIMUM_LENGTH = 300;
@@ -5,12 +7,13 @@ export const ARTICLE_SLUG_MAXIMUM_LENGTH = 200;
 export const ARTICLE_SUMMARY_MAXIMUM_LENGTH = 1_000;
 export const ARTICLE_TAG_MAXIMUM_LENGTH = 80;
 export const ARTICLE_TAGS_MAXIMUM_COUNT = 20;
+export const ARTICLE_DRAFT_AUTOSAVE_DEBOUNCE_MS = 1_000;
 
 export interface ArticleDocument {
   documentSchemaVersion: 1;
   doc: {
     type: "doc";
-    content: Array<{ type: "paragraph" }>;
+    content: JSONContent[];
   };
 }
 
@@ -43,4 +46,5 @@ export interface ArticleDraftUpdate {
   tags: string[];
   byline: Byline | null;
   language: string | null;
+  document: ArticleDocument;
 }

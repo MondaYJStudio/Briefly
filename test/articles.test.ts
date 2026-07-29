@@ -148,6 +148,276 @@ describe("Article Draft administration", () => {
     expect(await listed.json()).toEqual({ articles: [expected] });
   }, 15_000);
 
+  it("persists a supported text-rich document with metadata in one versioned save", async () => {
+    const cookie = await initializeAndSignIn();
+    const created = await (
+      await SELF.fetch("http://briefly.test/api/admin/articles", {
+        method: "POST",
+        headers: { cookie },
+      })
+    ).json<{ id: string }>();
+    const document = {
+      documentSchemaVersion: 1,
+      doc: {
+        type: "doc",
+        content: [
+          {
+            type: "heading",
+            attrs: { level: 2 },
+            content: [{ type: "text", text: "A durable Draft" }],
+          },
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "Rich ", marks: [{ type: "bold" }] },
+              {
+                type: "text",
+                text: "content",
+                marks: [
+                  {
+                    type: "link",
+                    attrs: { href: "https://example.com/reference" },
+                  },
+                ],
+              },
+              { type: "hardBreak" },
+              { type: "text", text: "survives." },
+            ],
+          },
+          {
+            type: "codeBlock",
+            attrs: { language: "typescript" },
+            content: [{ type: "text", text: "const durable = true;" }],
+          },
+          {
+            type: "heading",
+            attrs: { level: 3 },
+            content: [{ type: "text", text: "Lists" }],
+          },
+          {
+            type: "bulletList",
+            content: [
+              {
+                type: "listItem",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [
+                      {
+                        type: "text",
+                        text: "Bullet",
+                        marks: [{ type: "italic" }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: "orderedList",
+            attrs: { start: 1 },
+            content: [
+              {
+                type: "listItem",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [
+                      {
+                        type: "text",
+                        text: "Ordered",
+                        marks: [{ type: "strike" }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: "heading",
+            attrs: { level: 4 },
+            content: [{ type: "text", text: "Quote" }],
+          },
+          {
+            type: "blockquote",
+            content: [
+              {
+                type: "paragraph",
+                content: [
+                  {
+                    type: "text",
+                    text: "Inline code",
+                    marks: [{ type: "code" }],
+                  },
+                ],
+              },
+            ],
+          },
+          { type: "horizontalRule" },
+        ],
+      },
+    };
+
+    const response = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${created.id}/draft`,
+      {
+        method: "PUT",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          version: 1,
+          title: "Saved together",
+          slug: null,
+          summary: null,
+          tags: [],
+          byline: null,
+          language: null,
+          document,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      draft: { version: 2, title: "Saved together", document },
+    });
+    const loaded = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${created.id}`,
+      { headers: { cookie } },
+    );
+    expect(await loaded.json()).toMatchObject({
+      draft: { version: 2, title: "Saved together", document },
+    });
+  }, 15_000);
+
+  it.each([
+    [
+      "raw HTML",
+      {
+        documentSchemaVersion: 1,
+        doc: { type: "doc", content: [{ type: "html", content: [] }] },
+      },
+    ],
+    [
+      "an h1 body heading",
+      {
+        documentSchemaVersion: 1,
+        doc: {
+          type: "doc",
+          content: [{ type: "heading", attrs: { level: 1 } }],
+        },
+      },
+    ],
+    [
+      "arbitrary iframe data",
+      {
+        documentSchemaVersion: 1,
+        doc: {
+          type: "doc",
+          content: [
+            {
+              type: "iframe",
+              attrs: { src: "https://attacker.example/embed" },
+            },
+          ],
+        },
+      },
+    ],
+    [
+      "an unknown node",
+      {
+        documentSchemaVersion: 1,
+        doc: { type: "doc", content: [{ type: "table" }] },
+      },
+    ],
+    [
+      "an executable link",
+      {
+        documentSchemaVersion: 1,
+        doc: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                {
+                  type: "text",
+                  text: "unsafe",
+                  marks: [
+                    { type: "link", attrs: { href: "javascript:alert(1)" } },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+    [
+      "an unsupported schema version",
+      {
+        documentSchemaVersion: 2,
+        doc: { type: "doc", content: [{ type: "paragraph" }] },
+      },
+    ],
+  ])(
+    "rejects %s without advancing the saved Draft",
+    async (_description, document) => {
+      const cookie = await initializeAndSignIn();
+      const created = await (
+        await SELF.fetch("http://briefly.test/api/admin/articles", {
+          method: "POST",
+          headers: { cookie },
+        })
+      ).json<{ id: string }>();
+
+      const rejected = await SELF.fetch(
+        `http://briefly.test/api/admin/articles/${created.id}/draft`,
+        {
+          method: "PUT",
+          headers: { cookie, "content-type": "application/json" },
+          body: JSON.stringify({
+            version: 1,
+            title: "Must not persist",
+            slug: null,
+            summary: null,
+            tags: [],
+            byline: null,
+            language: null,
+            document,
+          }),
+        },
+      );
+
+      expect(rejected.status).toBe(400);
+      expect(await rejected.json()).toMatchObject({
+        status: "error",
+        code: "ARTICLE_DRAFT_INVALID",
+        issues: [
+          expect.objectContaining({
+            path: expect.stringMatching(/^document\./),
+          }),
+        ],
+      });
+      const preserved = await SELF.fetch(
+        `http://briefly.test/api/admin/articles/${created.id}`,
+        { headers: { cookie } },
+      );
+      expect(await preserved.json()).toMatchObject({
+        draft: {
+          version: 1,
+          title: "",
+          document: {
+            documentSchemaVersion: 1,
+            doc: { type: "doc", content: [{ type: "paragraph" }] },
+          },
+        },
+      });
+    },
+    15_000,
+  );
+
   it("rejects a stale Draft Version without mutating the newer saved Draft", async () => {
     const cookie = await initializeAndSignIn();
     const created = await (
@@ -164,6 +434,18 @@ describe("Article Draft administration", () => {
       tags: ["saved"],
       byline: null,
       language: null,
+      document: {
+        documentSchemaVersion: 1,
+        doc: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "Saved from the first tab" }],
+            },
+          ],
+        },
+      },
     };
     expect(
       (
@@ -187,6 +469,18 @@ describe("Article Draft administration", () => {
           ...firstTab,
           title: "Silently overwritten",
           slug: "stale-tab",
+          document: {
+            documentSchemaVersion: 1,
+            doc: {
+              type: "doc",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "Stale local body" }],
+                },
+              ],
+            },
+          },
         }),
       },
     );
@@ -207,6 +501,7 @@ describe("Article Draft administration", () => {
         slug: "first-tab",
         summary: "Durable",
         tags: ["saved"],
+        document: firstTab.document,
       },
     });
     expect(
@@ -481,8 +776,9 @@ describe("Article Draft administration", () => {
     expect(html).toContain("Create Article Draft");
     expect(html).toContain("Loading Article Drafts");
     expect(html).toContain(
-      "Create incomplete Articles and explicitly save versioned metadata.",
+      "Create incomplete Articles and autosave complete versioned Drafts.",
     );
+    expect(html).toContain("The text-rich editor loads after hydration");
   }, 15_000);
 
   it("rejects a malformed persisted Draft envelope instead of trusting stored JSON", async () => {

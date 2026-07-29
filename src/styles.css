@@ -20,3 +20,32 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+.article-editor__content > * + * {
+  margin-top: 0.75rem;
+}
+
+.article-editor__content ul,
+.article-editor__content ol {
+  padding-inline-start: 1.5rem;
+}
+
+.article-editor__content ul {
+  list-style: disc;
+}
+
+.article-editor__content ol {
+  list-style: decimal;
+}
+
+.article-editor__content blockquote {
+  border-inline-start: 0.25rem solid var(--border);
+  padding-inline-start: 1rem;
+}
+
+.article-editor__content pre {
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  background: var(--surface-secondary);
+  padding: 0.75rem;
+}

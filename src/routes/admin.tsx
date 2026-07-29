@@ -7,10 +7,27 @@ import {
   Spinner,
   TextArea,
 } from "@heroui/react";
-import { createFileRoute } from "@tanstack/react-router";
-import { type FormEvent, useEffect, useState } from "react";
+import {
+  ClientOnly,
+  createFileRoute,
+  useBlocker,
+} from "@tanstack/react-router";
+import {
+  type FormEvent,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
-import type { Article, ArticleDraftUpdate } from "../articles/articles";
+import {
+  ARTICLE_DRAFT_AUTOSAVE_DEBOUNCE_MS,
+  type Article,
+  type ArticleDraftUpdate,
+} from "../articles/articles";
+import type { ArticleEditorProps } from "./-article-editor";
 import {
   AuthenticationField,
   AuthenticationSurface,
@@ -26,6 +43,11 @@ import {
 } from "../site-settings/site-settings";
 
 export const Route = createFileRoute("/admin")({ component: Admin });
+
+const ArticleEditor = lazy(async () => {
+  const module = await import("./-article-editor");
+  return { default: module.ArticleEditor };
+});
 
 function Admin() {
   const [signOutState, setSignOutState] = useState<
@@ -342,20 +364,73 @@ function Admin() {
   );
 }
 
+type DraftSaveState =
+  | "loading"
+  | "ready"
+  | "creating"
+  | "dirty"
+  | "saving"
+  | "saved"
+  | "invalid"
+  | "conflict"
+  | "failed"
+  | "offline";
+
+function draftUpdateFromArticle(
+  article: Article,
+  version = article.draft.version,
+): ArticleDraftUpdate {
+  return {
+    version,
+    title: article.draft.title,
+    slug: article.draft.slug,
+    summary: article.draft.summary,
+    tags: article.draft.tags,
+    byline: article.draft.byline,
+    language: article.draft.language,
+    document: article.draft.document,
+  };
+}
+
+function preserveLocalDraft(server: Article, local: Article): Article {
+  return {
+    ...server,
+    draft: {
+      ...server.draft,
+      title: local.draft.title,
+      slug: local.draft.slug,
+      summary: local.draft.summary,
+      tags: local.draft.tags,
+      byline: local.draft.byline,
+      language: local.draft.language,
+      document: local.draft.document,
+    },
+  };
+}
+
 function ArticleDraftManager() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [selected, setSelected] = useState<Article | null>(null);
-  const [state, setState] = useState<
-    | "loading"
-    | "ready"
-    | "creating"
-    | "saving"
-    | "saved"
-    | "invalid"
-    | "conflict"
-    | "error"
-  >("loading");
+  const [state, setState] = useState<DraftSaveState>("loading");
   const [issues, setIssues] = useState<string[]>([]);
+  const [revision, setRevision] = useState(0);
+  const [confirmedRevision, setConfirmedRevision] = useState(0);
+  const [conflictCopy, setConflictCopy] = useState<ArticleDraftUpdate | null>(
+    null,
+  );
+  const selectedRef = useRef<Article | null>(null);
+  const revisionRef = useRef(0);
+  const confirmedRevisionRef = useRef(0);
+  const savingRef = useRef(false);
+
+  function selectServerDraft(article: Article) {
+    selectedRef.current = article;
+    revisionRef.current = 0;
+    confirmedRevisionRef.current = 0;
+    setSelected(article);
+    setRevision(0);
+    setConfirmedRevision(0);
+  }
 
   useEffect(() => {
     let active = true;
@@ -370,7 +445,7 @@ function ArticleDraftManager() {
         }
       })
       .catch(() => {
-        if (active) setState("error");
+        if (active) setState("failed");
       });
     return () => {
       active = false;
@@ -385,10 +460,11 @@ function ArticleDraftManager() {
       if (response.status !== 201 || !response.data)
         throw new Error("Article creation failed");
       setArticles((current) => [response.data, ...current]);
-      setSelected(response.data);
+      selectServerDraft(response.data);
+      setConflictCopy(null);
       setState("ready");
     } catch {
-      setState("error");
+      setState("failed");
     }
   }
 
@@ -399,81 +475,216 @@ function ArticleDraftManager() {
       const response = await getApiClient().admin.articles({ articleId }).get();
       if (response.status !== 200 || !response.data)
         throw new Error("Article unavailable");
-      setSelected(response.data);
+      selectServerDraft(response.data);
       setState("ready");
     } catch {
-      setState("error");
+      setState("failed");
     }
   }
 
-  async function saveDraft(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selected) return;
+  const persistCurrentDraft = useCallback(async (version?: number) => {
+    const snapshot = selectedRef.current;
+    if (!snapshot || savingRef.current) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setState("offline");
+      return;
+    }
+
+    const capturedRevision = revisionRef.current;
+    const input = draftUpdateFromArticle(snapshot, version);
+    savingRef.current = true;
     setState("saving");
     setIssues([]);
-    const input: ArticleDraftUpdate = {
-      version: selected.draft.version,
-      title: selected.draft.title,
-      slug: selected.draft.slug,
-      summary: selected.draft.summary,
-      tags: selected.draft.tags,
-      byline: selected.draft.byline,
-      language: selected.draft.language,
-    };
 
     try {
       const response = await getApiClient()
-        .admin.articles({ articleId: selected.id })
+        .admin.articles({ articleId: snapshot.id })
         .draft.put(input);
       if (response.status === 200 && response.data) {
-        setSelected(response.data);
+        const local = selectedRef.current;
+        const localChanged = revisionRef.current !== capturedRevision;
+        const next =
+          localChanged && local?.id === response.data.id
+            ? preserveLocalDraft(response.data, local)
+            : response.data;
+        selectedRef.current = next;
+        setSelected(next);
         setArticles((current) =>
-          current.map((article) =>
-            article.id === response.data.id ? response.data : article,
-          ),
+          current.map((article) => (article.id === next.id ? next : article)),
         );
-        setState("saved");
+        confirmedRevisionRef.current = capturedRevision;
+        setConfirmedRevision(capturedRevision);
+        setConflictCopy(null);
+        setState(localChanged ? "dirty" : "saved");
         return;
       }
 
       const error = response.error?.value;
       if (response.status === 409) {
+        setConflictCopy(input);
         setState("conflict");
       } else if (error && "issues" in error) {
         setIssues(error.issues.map((issue) => issue.message));
         setState("invalid");
       } else {
-        setState("error");
+        setState("failed");
       }
     } catch {
-      setState("error");
+      setState(
+        typeof navigator !== "undefined" && !navigator.onLine
+          ? "offline"
+          : "failed",
+      );
+    } finally {
+      savingRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (state !== "dirty" || revision === confirmedRevision) return;
+    const timer = globalThis.setTimeout(() => {
+      void persistCurrentDraft();
+    }, ARTICLE_DRAFT_AUTOSAVE_DEBOUNCE_MS);
+    return () => globalThis.clearTimeout(timer);
+  }, [confirmedRevision, persistCurrentDraft, revision, state]);
+
+  useEffect(() => {
+    function markOffline() {
+      if (revisionRef.current !== confirmedRevisionRef.current)
+        setState("offline");
+    }
+    function markOnline() {
+      setState((current) => (current === "offline" ? "failed" : current));
+    }
+    globalThis.addEventListener("offline", markOffline);
+    globalThis.addEventListener("online", markOnline);
+    return () => {
+      globalThis.removeEventListener("offline", markOffline);
+      globalThis.removeEventListener("online", markOnline);
+    };
+  }, []);
+
+  function updateDraft(changes: Partial<Article["draft"]>) {
+    const current = selectedRef.current;
+    if (!current) return;
+    const next = { ...current, draft: { ...current.draft, ...changes } };
+    const nextRevision = revisionRef.current + 1;
+    selectedRef.current = next;
+    revisionRef.current = nextRevision;
+    setSelected(next);
+    setRevision(nextRevision);
+    setIssues([]);
+    setState("dirty");
+  }
+
+  async function reloadDraft() {
+    const articleId = selectedRef.current?.id;
+    if (!articleId) return;
+    setState("loading");
+    try {
+      const response = await getApiClient().admin.articles({ articleId }).get();
+      if (response.status !== 200 || !response.data)
+        throw new Error("Article unavailable");
+      selectServerDraft(response.data);
+      setArticles((current) =>
+        current.map((article) =>
+          article.id === response.data.id ? response.data : article,
+        ),
+      );
+      setState("ready");
+    } catch {
+      setState("failed");
     }
   }
 
-  function updateDraft(changes: Partial<Article["draft"]>) {
-    setSelected((current) =>
-      current
-        ? { ...current, draft: { ...current.draft, ...changes } }
-        : current,
-    );
-    setState("ready");
+  async function retryConflict() {
+    const local = selectedRef.current;
+    if (!local) return;
+    setState("loading");
+    try {
+      const response = await getApiClient()
+        .admin.articles({
+          articleId: local.id,
+        })
+        .get();
+      if (response.status !== 200 || !response.data)
+        throw new Error("Article unavailable");
+      const retry = preserveLocalDraft(response.data, local);
+      selectedRef.current = retry;
+      setSelected(retry);
+      await persistCurrentDraft(response.data.draft.version);
+    } catch {
+      setState("failed");
+    }
   }
 
+  const hasUnsavedChanges = revision !== confirmedRevision;
+  const serverConfirmed =
+    selected !== null &&
+    !hasUnsavedChanges &&
+    ["ready", "saved"].includes(state);
+  const blocker = useBlocker({
+    shouldBlockFn: () => hasUnsavedChanges,
+    enableBeforeUnload: hasUnsavedChanges,
+    withResolver: true,
+  });
+
   return (
-    <section className="space-y-5" aria-labelledby="article-drafts-heading">
+    <section
+      className="space-y-5"
+      aria-labelledby="article-drafts-heading"
+      data-server-confirmed={serverConfirmed}
+    >
       <div className="space-y-1">
         <h2 id="article-drafts-heading" className="text-xl font-semibold">
           Article Drafts
         </h2>
         <p className="text-sm text-default-500">
-          Create incomplete Articles and explicitly save versioned metadata.
+          Create incomplete Articles and autosave complete versioned Drafts. The
+          text-rich editor loads after hydration while this shell remains
+          server-rendered.
         </p>
       </div>
-      {state === "error" ? (
+      {blocker.status === "blocked" ? (
+        <Alert status="warning" role="alert">
+          <Alert.Content>
+            <Alert.Title>Unsaved local changes</Alert.Title>
+            <Alert.Description>
+              Leaving now discards changes that the server has not confirmed.
+              <div className="mt-3 flex gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onPress={blocker.reset}
+                >
+                  Stay here
+                </Button>
+                <Button type="button" onPress={blocker.proceed}>
+                  Leave without saving
+                </Button>
+              </div>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : null}
+      {state === "failed" ? (
         <Alert status="danger" role="alert">
           <Alert.Content>
-            <Alert.Title>Unable to manage Article Drafts</Alert.Title>
-            <Alert.Description>Please try again.</Alert.Description>
+            <Alert.Title>Draft save failed</Alert.Title>
+            <Alert.Description>
+              Your current-tab changes are still available but are not durable.
+              <div className="mt-3 flex gap-2">
+                <Button
+                  type="button"
+                  onPress={() => void persistCurrentDraft()}
+                >
+                  Retry save
+                </Button>
+                <Button type="button" variant="secondary" onPress={reloadDraft}>
+                  Reload server Draft
+                </Button>
+              </div>
+            </Alert.Description>
           </Alert.Content>
         </Alert>
       ) : state === "conflict" ? (
@@ -481,30 +692,83 @@ function ArticleDraftManager() {
           <Alert.Content>
             <Alert.Title>Draft conflict</Alert.Title>
             <Alert.Description>
-              A newer Draft Version is already saved. Reload it before saving
-              again.
+              A newer Draft Version is already saved. No automatic rich-text
+              merge or overwrite was attempted.
+              <div className="mt-3 flex gap-2">
+                <Button type="button" onPress={retryConflict}>
+                  Deliberately retry local Draft
+                </Button>
+                <Button type="button" variant="secondary" onPress={reloadDraft}>
+                  Reload server Draft
+                </Button>
+              </div>
             </Alert.Description>
           </Alert.Content>
         </Alert>
       ) : state === "invalid" ? (
         <Alert status="danger" role="alert">
           <Alert.Content>
-            <Alert.Title>Draft metadata is invalid</Alert.Title>
+            <Alert.Title>Draft is invalid</Alert.Title>
             <Alert.Description>
               <ul className="list-disc pl-5">
                 {issues.map((issue) => (
                   <li key={issue}>{issue}</li>
                 ))}
               </ul>
+              <Button
+                className="mt-3"
+                type="button"
+                onPress={() => void persistCurrentDraft()}
+              >
+                Retry save
+              </Button>
             </Alert.Description>
           </Alert.Content>
         </Alert>
+      ) : state === "offline" ? (
+        <Alert status="warning" role="alert">
+          <Alert.Content>
+            <Alert.Title>Offline — Draft not saved</Alert.Title>
+            <Alert.Description>
+              Changes remain only in this tab. Briefly does not promise offline
+              durability or synchronization. Reconnect, then retry.
+              <Button
+                className="mt-3"
+                type="button"
+                onPress={() => void persistCurrentDraft()}
+              >
+                Retry save
+              </Button>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : state === "saving" ? (
+        <p className="text-sm text-default-600" role="status">
+          Saving complete Draft…
+        </p>
+      ) : state === "dirty" ? (
+        <p className="text-sm text-default-600" role="status">
+          Unsaved changes — autosaving after 1 second of inactivity…
+        </p>
       ) : state === "saved" ? (
         <Alert status="success" role="status">
           <Alert.Content>
-            <Alert.Title>Draft metadata saved</Alert.Title>
+            <Alert.Title>Complete Draft saved</Alert.Title>
           </Alert.Content>
         </Alert>
+      ) : null}
+      {conflictCopy ? (
+        <details>
+          <summary className="cursor-pointer font-medium">
+            Copy the preserved local Draft JSON
+          </summary>
+          <TextArea
+            className="mt-3 font-mono"
+            aria-label="Preserved unsaved local Draft JSON"
+            readOnly
+            value={JSON.stringify(conflictCopy, null, 2)}
+          />
+        </details>
       ) : null}
       <Button
         fullWidth
@@ -529,6 +793,7 @@ function ArticleDraftManager() {
                 fullWidth
                 type="button"
                 variant="secondary"
+                isDisabled={hasUnsavedChanges && selected?.id !== article.id}
                 onPress={() => loadDraft(article.id)}
               >
                 {article.draft.title || "Untitled Article"} · Version{" "}
@@ -539,10 +804,21 @@ function ArticleDraftManager() {
         </ul>
       )}
       {selected ? (
-        <Form className="space-y-4" onSubmit={saveDraft}>
+        <Form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void persistCurrentDraft();
+          }}
+        >
           <p className="text-sm text-default-500">
             Draft Version {selected.draft.version}
           </p>
+          <output className="text-sm" data-server-confirmed={serverConfirmed}>
+            {serverConfirmed
+              ? "Latest client state is server-confirmed."
+              : "Latest client state is not server-confirmed."}
+          </output>
           <SettingsField label="Title" htmlFor="articleTitle">
             <Input
               fullWidth
@@ -646,12 +922,32 @@ function ArticleDraftManager() {
               }
             />
           </SettingsField>
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold">Text-rich Draft editor</h3>
+            <ClientOnly fallback={<ArticleEditorFallback />}>
+              <Suspense fallback={<ArticleEditorFallback />}>
+                <ArticleEditor
+                  key={selected.id}
+                  document={selected.draft.document}
+                  onChange={(document) => updateDraft({ document })}
+                />
+              </Suspense>
+            </ClientOnly>
+          </div>
           <Button fullWidth type="submit" isPending={state === "saving"}>
-            Save Draft metadata
+            Save complete Draft now
           </Button>
         </Form>
       ) : null}
     </section>
+  );
+}
+
+function ArticleEditorFallback() {
+  return (
+    <div className="rounded-xl border border-default-200 p-4" role="status">
+      Loading the text-rich editor…
+    </div>
   );
 }
 

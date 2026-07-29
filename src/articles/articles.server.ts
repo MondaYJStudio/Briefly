@@ -7,8 +7,8 @@ import {
   ARTICLE_TAGS_MAXIMUM_COUNT,
   ARTICLE_TITLE_MAXIMUM_LENGTH,
   type Article,
-  type ArticleDraftUpdate,
 } from "./articles";
+import { validateArticleDocument } from "./article-document";
 
 const emptyDocument = {
   documentSchemaVersion: 1,
@@ -78,6 +78,7 @@ const draftInput = z
     tags: z.array(tag).max(ARTICLE_TAGS_MAXIMUM_COUNT),
     byline: byline.nullable(),
     language: language.nullable(),
+    document: z.unknown().optional(),
   })
   .transform((value) => ({
     ...value,
@@ -119,15 +120,9 @@ const persistedArticle = z.object({
   language: z.string().nullable(),
   document: z.string().transform((value, context) => {
     try {
-      return z
-        .object({
-          documentSchemaVersion: z.literal(1),
-          doc: z.object({
-            type: z.literal("doc"),
-            content: z.array(z.object({ type: z.literal("paragraph") })),
-          }),
-        })
-        .parse(JSON.parse(value));
+      const result = validateArticleDocument(JSON.parse(value));
+      if (result.ok) return result.document;
+      throw new Error();
     } catch {
       context.addIssue({
         code: "custom",
@@ -260,13 +255,26 @@ export async function updateArticleDraft(
     };
   }
 
-  const value: ArticleDraftUpdate = parsed.data;
+  const value = parsed.data;
   const slugKey = slugKeyFor(value.slug);
   const now = Date.now();
   const before = await readArticle(database, articleId);
   if (!before) return { ok: false, reason: "not-found" };
   if (before.draft.version !== value.version)
     return { ok: false, reason: "conflict" };
+  const documentResult = validateArticleDocument(
+    value.document ?? before.draft.document,
+  );
+  if (!documentResult.ok) {
+    return {
+      ok: false,
+      reason: "invalid",
+      issues: documentResult.issues.map((issue) => ({
+        path: `document.${issue.path}`,
+        message: issue.message,
+      })),
+    };
+  }
   const previousSlugKey = slugKeyFor(before.draft.slug);
   const statements: D1PreparedStatement[] = [];
   if (slugKey !== null) {
@@ -290,7 +298,8 @@ export async function updateArticleDraft(
       .prepare(
         `UPDATE article_draft
          SET version = version + 1, title = ?, slug = ?, slug_key = ?,
-             summary = ?, tags = ?, byline = ?, language = ?, updated_at = ?
+             summary = ?, tags = ?, byline = ?, language = ?, document = ?,
+             updated_at = ?
          WHERE article_id = ? AND version = ?
            AND (
              ? IS NULL OR EXISTS (
@@ -314,6 +323,7 @@ export async function updateArticleDraft(
         JSON.stringify(value.tags),
         value.byline === null ? null : JSON.stringify(value.byline),
         value.language,
+        JSON.stringify(documentResult.document),
         now,
         articleId,
         value.version,
