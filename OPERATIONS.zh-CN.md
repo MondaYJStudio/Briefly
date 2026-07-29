@@ -33,6 +33,22 @@ Briefly 仅支持本地/测试环境和一个生产环境，不会创建或记�
 
 Briefly 处于 0.x 生命周期。发布说明必须明确指出任何破坏性 API 行为或迁移要求。补丁版本不得有意破坏已发布的 API 契约或受支持的迁移路径。必要的破坏性变更应进入合适的非补丁版本，并在部署前说明运维操作。
 
+## 私有 Asset 上传
+
+认证媒体库接受 JPEG、PNG、WebP 和 AVIF 图片。系统不信任文件扩展名：声明的 MIME 类型必须与结构验证后的图片字节一致。SVG、GIF、HTML、文档、压缩包、音频、视频和任意二进制文件都会被拒绝。
+
+每次上传采用以下精确边界：
+
+- 编码文件大小：最多 8 MiB（8,388,608 字节）；
+- 宽或高：每边最多 8,192 像素；
+- 总尺寸：最多 16,777,216 像素。
+
+这些应用限制有意低于平台上限。Cloudflare 文档规定，所有套餐的 Worker 请求体限制均至少为 [100 MB](https://developers.cloudflare.com/workers/platform/limits/#request-limits)，[isolate 内存限制为 128 MB](https://developers.cloudflare.com/workers/platform/limits/#worker-limits)，而 R2 [单次上传限制为 5 GiB](https://developers.cloudflare.com/r2/platform/limits/#r2-limits)。达到像素上限的图片按每像素四字节展开后约占 64 MiB，可为 multipart 解析、JavaScript/Wasm 运行时状态、验证和并发请求开销保留其余 Worker 内存。
+
+必须保持 R2 绑定私有。未发布对象只能通过认证应用路由 `/media/private/:assetId` 交付；响应带有 `private, no-store` 和 `nosniff`。浏览器可见 API 只公开不透明的 Asset ID 和安全元数据，绝不公开原始 R2 对象键。对象键保密不是授权边界，运维人员不得为私有 Asset 增加直接或匿名存储桶交付。
+
+上传先进入 `uploading` 状态，只有 R2 存储和 D1 的 `ready` 转换都成功后才可选择。失败记录不会出现在媒体库中，并保留机器可读的故障码。`R2_PUT_FAILED` 表示对象未成功写入；`D1_FINALIZE_FAILED` 表示 D1 无法完成收尾后，已上传对象已被删除；`D1_FINALIZE_AND_R2_CLEANUP_FAILED` 表示记录已隐藏，但对象可能仍需运维清理或稍后重试。应根据 D1 状态和存储操作结果诊断；日志绝不能包含图片字节、原始对象键、Cookie 或签名存储数据。
+
 ## 故障诊断
 
 | 故障                   | 含义与处理                                                                                                                                                                                                                            |

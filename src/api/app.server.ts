@@ -12,6 +12,7 @@ import {
   publishArticle,
   readPublicArticle,
 } from "../articles/publications.server";
+import { listAssets, uploadAsset } from "../assets/assets.server";
 import {
   initializeAdministrator,
   installationIsInitialized,
@@ -275,6 +276,47 @@ function createApi(getBindings: () => RuntimeBindings) {
         params: t.Object({ articleId: t.String({ format: "uuid" }) }),
         body: t.Any(),
       },
+    )
+    .get("/admin/assets", async ({ request, set, status }) => {
+      const bindings = getBindings();
+      set.headers["cache-control"] = "no-store";
+      if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        return status(401, {
+          status: "error" as const,
+          code: "AUTHENTICATION_REQUIRED" as const,
+        });
+
+      return { assets: await listAssets(bindings.DB) };
+    })
+    .post(
+      "/admin/assets",
+      async ({ body, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        const result = await uploadAsset(
+          bindings.DB,
+          bindings.MEDIA_BUCKET,
+          body.file,
+        );
+        if (result.ok) return status(201, result.asset);
+        return result.reason === "invalid"
+          ? status(400, {
+              status: "error" as const,
+              code: "ASSET_UPLOAD_INVALID" as const,
+              issues: result.issues,
+            })
+          : status(503, {
+              status: "error" as const,
+              code: "ASSET_UPLOAD_FAILED" as const,
+            });
+      },
+      { body: t.Object({ file: t.File() }) },
     )
     .post(
       "/admin/articles/:articleId/preview",

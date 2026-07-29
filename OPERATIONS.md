@@ -33,6 +33,22 @@ For a rename or destructive change, first expand the schema and deploy code that
 
 Briefly is in the 0.x lifecycle. Release notes must explicitly call out any breaking API behavior or migration requirement. A patch release must not intentionally break the published API contract or the supported migration path. Put a necessary breaking change in an appropriate non-patch release and explain operator action before deployment.
 
+## Private Asset uploads
+
+The authenticated media library accepts JPEG, PNG, WebP, and AVIF images. It does not trust the filename extension: the declared MIME type must match the structurally verified image bytes. SVG, GIF, HTML, documents, archives, audio, video, and arbitrary binary files are rejected.
+
+Each upload is limited to exactly these boundaries:
+
+- encoded file size: at most 8 MiB (8,388,608 bytes);
+- width or height: at most 8,192 pixels per side;
+- total dimensions: at most 16,777,216 pixels.
+
+These application limits are intentionally below the platform ceilings. Cloudflare documents a Worker request-body limit of at least [100 MB on every plan](https://developers.cloudflare.com/workers/platform/limits/#request-limits), an [isolate memory limit of 128 MB](https://developers.cloudflare.com/workers/platform/limits/#worker-limits), and an R2 [single-upload limit of 5 GiB](https://developers.cloudflare.com/r2/platform/limits/#r2-limits). A maximum-size image expands to about 64 MiB at four bytes per pixel, leaving the remainder of the Worker limit for multipart parsing, JavaScript/Wasm runtime state, validation, and concurrent request overhead.
+
+Keep the R2 binding private. A never-published object is delivered only through the authenticated `/media/private/:assetId` application route, whose response is marked `private, no-store` and `nosniff`. Browser-visible APIs expose the opaque Asset ID and safe metadata, never the raw R2 object key. Object-key secrecy is not an authorization boundary, and operators must not add direct or anonymous bucket delivery for private Assets.
+
+Uploads pass through an `uploading` state and become selectable only after both R2 storage and the D1 `ready` transition succeed. Failed rows remain hidden from the media library and carry a machine-readable failure code. `R2_PUT_FAILED` means no object was committed; `D1_FINALIZE_FAILED` means the uploaded object was removed after D1 could not finalize; `D1_FINALIZE_AND_R2_CLEANUP_FAILED` means the row is hidden but its object may still require operator cleanup or a later retry. Diagnose these states from D1 and storage operation results. Logs must never include image bytes, raw object keys, cookies, or signed storage data.
+
 ## Diagnosing failures
 
 | Failure                    | Meaning and response                                                                                                                                                                                                                                                                                      |

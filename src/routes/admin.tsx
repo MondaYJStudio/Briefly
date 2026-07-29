@@ -30,6 +30,7 @@ import {
   type PublicationIssue,
   type RenderedArticleDraft,
 } from "../articles/articles";
+import { AssetMediaLibrary } from "../assets/asset-media-library";
 import {
   AuthenticationField,
   AuthenticationSurface,
@@ -315,6 +316,7 @@ function Admin() {
           </Alert>
         )}
       </section>
+      <AssetMediaLibrary />
       <ArticleDraftManager />
       <Form className="space-y-5" onSubmit={changePassword}>
         <h2 className="text-xl font-semibold">Change password</h2>

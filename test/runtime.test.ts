@@ -231,6 +231,25 @@ describe("Worker HTTP runtime", () => {
     }
   });
 
+  it("reports a missing private Asset schema capability", async () => {
+    await env.DB.prepare("ALTER TABLE asset RENAME TO asset_unavailable").run();
+
+    try {
+      const response = await SELF.fetch("http://briefly.test/health");
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({
+        status: "error",
+        code: "SCHEMA_INCOMPATIBLE",
+        schema: { status: "incompatible" },
+      });
+    } finally {
+      await env.DB.prepare(
+        "ALTER TABLE asset_unavailable RENAME TO asset",
+      ).run();
+    }
+  });
+
   it("distinguishes unavailable R2 storage from a schema mismatch", async () => {
     const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
     const unavailableBucket = {

@@ -36,6 +36,13 @@
       "when": 1785307663681,
       "tag": "0004_pink_puff_adder",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1785372589503,
+      "tag": "0005_assets",
+      "breakpoints": true
     }
   ]
 }

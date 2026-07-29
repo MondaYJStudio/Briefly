@@ -8,5 +8,6 @@ export {
   verification,
 } from "./authentication";
 export { article, articleDraft, articleSlug, publication } from "./articles";
+export { asset } from "./assets";
 export { runtimeMetadata } from "./runtime-metadata";
 export { siteSettings } from "./site-settings";

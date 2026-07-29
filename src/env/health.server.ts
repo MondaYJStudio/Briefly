@@ -64,12 +64,20 @@ export async function checkRuntimeHealth(
             FROM auth_verification) AS verificationColumns,
          (SELECT COUNT(key) + COUNT(attempts) + COUNT(reset_at)
             FROM auth_rate_limit) AS rateLimitColumns,
+         (SELECT COUNT(id) + COUNT(original_filename) + COUNT(mime_type) +
+                 COUNT(byte_size) + COUNT(width) + COUNT(height) +
+                 COUNT(uploaded_at) + COUNT(object_key) +
+                 COUNT(lifecycle_state) + COUNT(failure_code) +
+                 COUNT(public_asset_id)
+            FROM asset) AS assetColumns,
          (SELECT COUNT(*) FROM sqlite_master
             WHERE type = 'index'
               AND name IN (
                 'auth_user_singleton_unique',
                 'auth_user_email_unique',
-                'auth_session_token_unique'
+                'auth_session_token_unique',
+                'asset_object_key_unique',
+                'asset_public_asset_id_unique'
               )) AS requiredIndexCount,
          (SELECT COUNT(*) FROM sqlite_master
             WHERE type = 'table' AND name = 'installation'
@@ -77,21 +85,28 @@ export async function checkRuntimeHealth(
               AND sql LIKE '%installation_valid_state%') AS installationConstraints,
          (SELECT COUNT(*) FROM sqlite_master
             WHERE type = 'table' AND name = 'auth_user'
-              AND sql LIKE '%auth_user_singleton%') AS userConstraints`,
+              AND sql LIKE '%auth_user_singleton%') AS userConstraints,
+         (SELECT COUNT(*) FROM sqlite_master
+            WHERE type = 'table' AND name = 'asset'
+              AND sql LIKE '%asset_byte_size_positive%'
+              AND sql LIKE '%asset_width_positive%'
+              AND sql LIKE '%asset_height_positive%') AS assetConstraints`,
     ).first<{
       installationState: string | null;
       requiredIndexCount: number;
       installationConstraints: number;
       userConstraints: number;
+      assetConstraints: number;
     }>();
     if (
       !authentication ||
       !["uninitialized", "initialized"].includes(
         authentication.installationState ?? "",
       ) ||
-      authentication.requiredIndexCount !== 3 ||
+      authentication.requiredIndexCount !== 5 ||
       authentication.installationConstraints !== 1 ||
-      authentication.userConstraints !== 1
+      authentication.userConstraints !== 1 ||
+      authentication.assetConstraints !== 1
     ) {
       return { ok: false, code: "SCHEMA_INCOMPATIBLE" };
     }
