@@ -2,6 +2,12 @@ import { env } from "cloudflare:workers";
 import { Elysia, t } from "elysia";
 
 import {
+  createArticle,
+  listArticles,
+  readArticle,
+  updateArticleDraft,
+} from "../articles/articles.server";
+import {
   initializeAdministrator,
   installationIsInitialized,
 } from "../auth/initialization.server";
@@ -141,6 +147,90 @@ function createApi(getBindings: () => RuntimeBindings) {
           400: siteSettingsInvalidContract,
           401: authenticationRequiredContract,
         },
+      },
+    )
+    .post("/admin/articles", async ({ request, set, status }) => {
+      const bindings = getBindings();
+      set.headers["cache-control"] = "no-store";
+      if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        return status(401, {
+          status: "error" as const,
+          code: "AUTHENTICATION_REQUIRED" as const,
+        });
+
+      return status(201, await createArticle(bindings.DB));
+    })
+    .get("/admin/articles", async ({ request, set, status }) => {
+      const bindings = getBindings();
+      set.headers["cache-control"] = "no-store";
+      if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        return status(401, {
+          status: "error" as const,
+          code: "AUTHENTICATION_REQUIRED" as const,
+        });
+
+      return { articles: await listArticles(bindings.DB) };
+    })
+    .get(
+      "/admin/articles/:articleId",
+      async ({ params, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        const article = await readArticle(bindings.DB, params.articleId);
+        return article
+          ? article
+          : status(404, {
+              status: "error" as const,
+              code: "ARTICLE_NOT_FOUND" as const,
+            });
+      },
+      { params: t.Object({ articleId: t.String({ format: "uuid" }) }) },
+    )
+    .put(
+      "/admin/articles/:articleId/draft",
+      async ({ body, params, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        const result = await updateArticleDraft(
+          bindings.DB,
+          params.articleId,
+          body,
+        );
+        if (result.ok) return result.article;
+        if (result.reason === "invalid")
+          return status(400, {
+            status: "error" as const,
+            code: "ARTICLE_DRAFT_INVALID" as const,
+            issues: result.issues,
+          });
+        if (result.reason === "not-found")
+          return status(404, {
+            status: "error" as const,
+            code: "ARTICLE_NOT_FOUND" as const,
+          });
+        return status(409, {
+          status: "error" as const,
+          code:
+            result.reason === "slug-conflict"
+              ? ("ARTICLE_SLUG_CONFLICT" as const)
+              : ("ARTICLE_DRAFT_VERSION_CONFLICT" as const),
+        });
+      },
+      {
+        params: t.Object({ articleId: t.String({ format: "uuid" }) }),
+        body: t.Any(),
       },
     )
     .post(
