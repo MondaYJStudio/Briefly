@@ -11,6 +11,8 @@ import {
   type ArticleDocument,
 } from "./articles";
 
+const ARTICLE_LINK_MAXIMUM_LENGTH = 2_048;
+const ORDERED_LIST_START_MAXIMUM = 1_000_000;
 const codeBlockLanguage = z.string().regex(/^[a-z0-9][a-z0-9+#.-]{0,31}$/iu, {
   message: "Code block language must be a short language identifier.",
 });
@@ -20,6 +22,7 @@ export function isAllowedCodeBlockLanguage(value: string): boolean {
 }
 
 export function isAllowedArticleLink(value: string): boolean {
+  if (value.length > ARTICLE_LINK_MAXIMUM_LENGTH) return false;
   if (/[\u0000-\u0020\u007f]/u.test(value)) return false;
 
   try {
@@ -66,7 +69,11 @@ const ArticleOrderedList = OrderedList.extend({
             element.getAttribute("start") ?? "1",
             10,
           );
-          return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : 1;
+          return Number.isSafeInteger(parsed) &&
+            parsed >= 1 &&
+            parsed <= ORDERED_LIST_START_MAXIMUM
+            ? parsed
+            : 1;
         },
         renderHTML: (attributes) =>
           attributes.start === 1 ? {} : { start: attributes.start },
@@ -102,7 +109,12 @@ const linkMarkSchema = z
   .object({
     type: z.literal("link"),
     attrs: z
-      .object({ href: z.string().max(2_048).refine(isAllowedArticleLink) })
+      .object({
+        href: z
+          .string()
+          .max(ARTICLE_LINK_MAXIMUM_LENGTH)
+          .refine(isAllowedArticleLink),
+      })
       .strict(),
   })
   .strict();
@@ -161,7 +173,9 @@ const blockNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
       .object({
         type: z.literal("orderedList"),
         attrs: z
-          .object({ start: z.number().int().min(1).max(1_000_000) })
+          .object({
+            start: z.number().int().min(1).max(ORDERED_LIST_START_MAXIMUM),
+          })
           .strict(),
         content: z.array(listItemNodeSchema).min(1),
       })

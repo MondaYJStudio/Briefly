@@ -817,7 +817,7 @@ function ArticleDraftManager() {
                 fullWidth
                 type="button"
                 variant="secondary"
-                isDisabled={hasUnsavedChanges && selected?.id !== article.id}
+                isDisabled={hasUnsavedChanges}
                 onPress={() => loadDraft(article.id)}
               >
                 {article.draft.title || "Untitled Article"} · Version{" "}
