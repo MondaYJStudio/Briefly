@@ -8,9 +8,10 @@ export const ARTICLE_SUMMARY_MAXIMUM_LENGTH = 1_000;
 export const ARTICLE_TAG_MAXIMUM_LENGTH = 80;
 export const ARTICLE_TAGS_MAXIMUM_COUNT = 20;
 export const ARTICLE_DRAFT_AUTOSAVE_DEBOUNCE_MS = 1_000;
+export const ARTICLE_DOCUMENT_SCHEMA_VERSION = 1 as const;
 
 export interface ArticleDocument {
-  documentSchemaVersion: 1;
+  documentSchemaVersion: typeof ARTICLE_DOCUMENT_SCHEMA_VERSION;
   doc: {
     type: "doc";
     content: JSONContent[];

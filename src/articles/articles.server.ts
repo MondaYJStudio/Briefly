@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  ARTICLE_DOCUMENT_SCHEMA_VERSION,
   ARTICLE_SLUG_MAXIMUM_LENGTH,
   ARTICLE_SUMMARY_MAXIMUM_LENGTH,
   ARTICLE_TAG_MAXIMUM_LENGTH,
@@ -11,7 +12,7 @@ import {
 import { validateArticleDocument } from "./article-document";
 
 const emptyDocument = {
-  documentSchemaVersion: 1,
+  documentSchemaVersion: ARTICLE_DOCUMENT_SCHEMA_VERSION,
   doc: { type: "doc", content: [{ type: "paragraph" }] },
 } as const;
 
@@ -351,23 +352,44 @@ export async function updateArticleDraft(
         .bind(previousSlugKey, articleId),
     );
   }
+  statements.push(
+    database
+      .prepare(
+        `UPDATE article
+         SET updated_at = ?
+         WHERE id = ?
+           AND EXISTS (
+             SELECT 1 FROM article_draft
+             WHERE article_draft.article_id = article.id
+               AND article_draft.version = ?
+               AND article_draft.updated_at = ?
+           )`,
+      )
+      .bind(now, articleId, value.version + 1, now),
+  );
+  const readIndex = statements.length;
+  statements.push(
+    database
+      .prepare(
+        `${articleSelection}
+         WHERE article.id = ? AND article.trashed_at IS NULL
+         LIMIT 1`,
+      )
+      .bind(articleId),
+  );
   const batch = await database.batch(statements);
   const updated = batch[updateIndex]?.results[0] as
     { version: number } | undefined;
+  const row = batch[readIndex]?.results[0] as ArticleRow | undefined;
+  const article = row ? articleFromRow(row) : null;
 
   if (!updated) {
-    const article = await readArticle(database, articleId);
     if (!article) return { ok: false, reason: "not-found" };
     return article.draft.version === value.version
       ? { ok: false, reason: "slug-conflict" }
       : { ok: false, reason: "conflict" };
   }
 
-  await database
-    .prepare("UPDATE article SET updated_at = ? WHERE id = ?")
-    .bind(now, articleId)
-    .run();
-  const article = await readArticle(database, articleId);
   if (!article) throw new Error("Updated Article could not be read");
   return { ok: true, article };
 }

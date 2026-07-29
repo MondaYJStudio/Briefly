@@ -27,7 +27,6 @@ import {
   type Article,
   type ArticleDraftUpdate,
 } from "../articles/articles";
-import type { ArticleEditorProps } from "./-article-editor";
 import {
   AuthenticationField,
   AuthenticationSurface,
@@ -364,7 +363,7 @@ function Admin() {
   );
 }
 
-type DraftSaveState =
+type ArticleDraftManagerState =
   | "loading"
   | "ready"
   | "creating"
@@ -373,22 +372,27 @@ type DraftSaveState =
   | "saved"
   | "invalid"
   | "conflict"
+  | "slug-conflict"
   | "failed"
   | "offline";
 
-function draftUpdateFromArticle(
-  article: Article,
-  version = article.draft.version,
+type EditableArticleDraft = Pick<
+  Article["draft"],
+  "title" | "slug" | "summary" | "tags" | "byline" | "language" | "document"
+>;
+
+function editableArticleDraft(draft: Article["draft"]): EditableArticleDraft {
+  const { title, slug, summary, tags, byline, language, document } = draft;
+  return { title, slug, summary, tags, byline, language, document };
+}
+
+function draftUpdate(
+  draft: Article["draft"],
+  version = draft.version,
 ): ArticleDraftUpdate {
   return {
     version,
-    title: article.draft.title,
-    slug: article.draft.slug,
-    summary: article.draft.summary,
-    tags: article.draft.tags,
-    byline: article.draft.byline,
-    language: article.draft.language,
-    document: article.draft.document,
+    ...editableArticleDraft(draft),
   };
 }
 
@@ -397,13 +401,7 @@ function preserveLocalDraft(server: Article, local: Article): Article {
     ...server,
     draft: {
       ...server.draft,
-      title: local.draft.title,
-      slug: local.draft.slug,
-      summary: local.draft.summary,
-      tags: local.draft.tags,
-      byline: local.draft.byline,
-      language: local.draft.language,
-      document: local.draft.document,
+      ...editableArticleDraft(local.draft),
     },
   };
 }
@@ -411,10 +409,11 @@ function preserveLocalDraft(server: Article, local: Article): Article {
 function ArticleDraftManager() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [selected, setSelected] = useState<Article | null>(null);
-  const [state, setState] = useState<DraftSaveState>("loading");
+  const [state, setState] = useState<ArticleDraftManagerState>("loading");
   const [issues, setIssues] = useState<string[]>([]);
   const [revision, setRevision] = useState(0);
   const [confirmedRevision, setConfirmedRevision] = useState(0);
+  const [editorGeneration, setEditorGeneration] = useState(0);
   const [conflictCopy, setConflictCopy] = useState<ArticleDraftUpdate | null>(
     null,
   );
@@ -430,6 +429,7 @@ function ArticleDraftManager() {
     setSelected(article);
     setRevision(0);
     setConfirmedRevision(0);
+    setEditorGeneration((current) => current + 1);
   }
 
   useEffect(() => {
@@ -491,7 +491,7 @@ function ArticleDraftManager() {
     }
 
     const capturedRevision = revisionRef.current;
-    const input = draftUpdateFromArticle(snapshot, version);
+    const input = draftUpdate(snapshot.draft, version);
     savingRef.current = true;
     setState("saving");
     setIssues([]);
@@ -520,8 +520,21 @@ function ArticleDraftManager() {
       }
 
       const error = response.error?.value;
-      if (response.status === 409) {
-        setConflictCopy(input);
+      if (
+        response.status === 409 &&
+        error &&
+        "code" in error &&
+        error.code === "ARTICLE_SLUG_CONFLICT"
+      ) {
+        setConflictCopy(null);
+        setState("slug-conflict");
+      } else if (response.status === 409) {
+        const local = selectedRef.current;
+        setConflictCopy(
+          local?.id === snapshot.id
+            ? draftUpdate(local.draft, input.version)
+            : input,
+        );
         setState("conflict");
       } else if (error && "issues" in error) {
         setIssues(error.issues.map((issue) => issue.message));
@@ -705,6 +718,16 @@ function ArticleDraftManager() {
             </Alert.Description>
           </Alert.Content>
         </Alert>
+      ) : state === "slug-conflict" ? (
+        <Alert status="warning" role="alert">
+          <Alert.Content>
+            <Alert.Title>Slug is already claimed</Alert.Title>
+            <Alert.Description>
+              Another Article owns this slug. Your local Draft remains visible;
+              choose a different slug to resume autosave.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
       ) : state === "invalid" ? (
         <Alert status="danger" role="alert">
           <Alert.Content>
@@ -774,6 +797,7 @@ function ArticleDraftManager() {
         fullWidth
         type="button"
         isPending={state === "creating"}
+        isDisabled={hasUnsavedChanges}
         onPress={createDraft}
       >
         Create Article Draft
@@ -927,7 +951,7 @@ function ArticleDraftManager() {
             <ClientOnly fallback={<ArticleEditorFallback />}>
               <Suspense fallback={<ArticleEditorFallback />}>
                 <ArticleEditor
-                  key={selected.id}
+                  key={`${selected.id}:${editorGeneration}`}
                   document={selected.draft.document}
                   onChange={(document) => updateDraft({ document })}
                 />

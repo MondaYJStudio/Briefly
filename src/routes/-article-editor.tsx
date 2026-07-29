@@ -5,8 +5,12 @@ import { useState } from "react";
 import {
   createArticleEditorExtensions,
   isAllowedArticleLink,
+  isAllowedCodeBlockLanguage,
 } from "../articles/article-document";
-import type { ArticleDocument } from "../articles/articles";
+import {
+  ARTICLE_DOCUMENT_SCHEMA_VERSION,
+  type ArticleDocument,
+} from "../articles/articles";
 
 export interface ArticleEditorProps {
   document: ArticleDocument;
@@ -30,7 +34,7 @@ export function ArticleEditor({ document, onChange }: ArticleEditorProps) {
     },
     onUpdate: ({ editor: updatedEditor }) => {
       onChange({
-        documentSchemaVersion: 1,
+        documentSchemaVersion: ARTICLE_DOCUMENT_SCHEMA_VERSION,
         doc: updatedEditor.getJSON() as ArticleDocument["doc"],
       });
     },
@@ -56,7 +60,7 @@ export function ArticleEditor({ document, onChange }: ArticleEditorProps) {
 
   function applyCodeBlockLanguage() {
     const normalized = language.trim() || "plaintext";
-    if (!/^[a-z0-9][a-z0-9+#.-]{0,31}$/iu.test(normalized)) return;
+    if (!isAllowedCodeBlockLanguage(normalized)) return;
     if (activeEditor.isActive("codeBlock")) {
       activeEditor
         .chain()

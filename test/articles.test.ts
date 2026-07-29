@@ -291,6 +291,75 @@ describe("Article Draft administration", () => {
     });
   }, 15_000);
 
+  it("normalizes an accepted programmatic document before persistence", async () => {
+    const cookie = await initializeAndSignIn();
+    const created = await (
+      await SELF.fetch("http://briefly.test/api/admin/articles", {
+        method: "POST",
+        headers: { cookie },
+      })
+    ).json<{ id: string }>();
+
+    const response = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${created.id}/draft`,
+      {
+        method: "PUT",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          version: 1,
+          title: "Canonical document",
+          slug: null,
+          summary: null,
+          tags: [],
+          byline: null,
+          language: null,
+          document: {
+            documentSchemaVersion: 1,
+            doc: {
+              type: "doc",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [
+                    {
+                      type: "text",
+                      text: "Canonical marks",
+                      marks: [{ type: "italic" }, { type: "bold" }],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      draft: {
+        document: {
+          documentSchemaVersion: 1,
+          doc: {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [
+                  {
+                    type: "text",
+                    text: "Canonical marks",
+                    marks: [{ type: "bold" }, { type: "italic" }],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    });
+  }, 15_000);
+
   it.each([
     [
       "raw HTML",
@@ -417,6 +486,69 @@ describe("Article Draft administration", () => {
     },
     15_000,
   );
+
+  it("does not advance the Draft when the atomic save fails", async () => {
+    const cookie = await initializeAndSignIn();
+    const created = await (
+      await SELF.fetch("http://briefly.test/api/admin/articles", {
+        method: "POST",
+        headers: { cookie },
+      })
+    ).json<{ id: string }>();
+    await env.DB.prepare(
+      `CREATE TRIGGER reject_article_timestamp
+       BEFORE UPDATE OF updated_at ON article
+       BEGIN
+         SELECT RAISE(ABORT, 'simulated article timestamp failure');
+       END`,
+    ).run();
+
+    const failed = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${created.id}/draft`,
+      {
+        method: "PUT",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          version: 1,
+          title: "Must roll back",
+          slug: null,
+          summary: null,
+          tags: [],
+          byline: null,
+          language: null,
+          document: {
+            documentSchemaVersion: 1,
+            doc: {
+              type: "doc",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "Must roll back" }],
+                },
+              ],
+            },
+          },
+        }),
+      },
+    );
+    await env.DB.prepare("DROP TRIGGER reject_article_timestamp").run();
+
+    expect(failed.status).toBe(500);
+    const preserved = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${created.id}`,
+      { headers: { cookie } },
+    );
+    expect(await preserved.json()).toMatchObject({
+      draft: {
+        version: 1,
+        title: "",
+        document: {
+          documentSchemaVersion: 1,
+          doc: { type: "doc", content: [{ type: "paragraph" }] },
+        },
+      },
+    });
+  }, 15_000);
 
   it("rejects a stale Draft Version without mutating the newer saved Draft", async () => {
     const cookie = await initializeAndSignIn();

@@ -1,17 +1,23 @@
 import { getSchema, type Extensions, type JSONContent } from "@tiptap/core";
 import CodeBlock from "@tiptap/extension-code-block";
 import Link from "@tiptap/extension-link";
+import { OrderedList } from "@tiptap/extension-list";
 import { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import StarterKit from "@tiptap/starter-kit";
 import { z } from "zod";
 
-import type { ArticleDocument } from "./articles";
-
-export const ARTICLE_DOCUMENT_SCHEMA_VERSION = 1;
+import {
+  ARTICLE_DOCUMENT_SCHEMA_VERSION,
+  type ArticleDocument,
+} from "./articles";
 
 const codeBlockLanguage = z.string().regex(/^[a-z0-9][a-z0-9+#.-]{0,31}$/iu, {
   message: "Code block language must be a short language identifier.",
 });
+
+export function isAllowedCodeBlockLanguage(value: string): boolean {
+  return codeBlockLanguage.safeParse(value).success;
+}
 
 export function isAllowedArticleLink(value: string): boolean {
   if (/[\u0000-\u0020\u007f]/u.test(value)) return false;
@@ -32,7 +38,7 @@ const ArticleCodeBlock = CodeBlock.extend({
           const language = [...element.classList]
             .find((name) => name.startsWith("language-"))
             ?.slice("language-".length);
-          return language && codeBlockLanguage.safeParse(language).success
+          return language && isAllowedCodeBlockLanguage(language)
             ? language
             : "plaintext";
         },
@@ -50,16 +56,37 @@ const ArticleLink = Link.extend({
   },
 });
 
+const ArticleOrderedList = OrderedList.extend({
+  addAttributes() {
+    return {
+      start: {
+        default: 1,
+        parseHTML: (element) => {
+          const parsed = Number.parseInt(
+            element.getAttribute("start") ?? "1",
+            10,
+          );
+          return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : 1;
+        },
+        renderHTML: (attributes) =>
+          attributes.start === 1 ? {} : { start: attributes.start },
+      },
+    };
+  },
+});
+
 export function createArticleEditorExtensions(): Extensions {
   return [
     StarterKit.configure({
       codeBlock: false,
       heading: { levels: [2, 3, 4] },
       link: false,
+      orderedList: false,
       trailingNode: false,
       underline: false,
     }),
     ArticleCodeBlock,
+    ArticleOrderedList,
     ArticleLink.configure({
       autolink: true,
       linkOnPaste: true,
@@ -208,6 +235,14 @@ export function validateArticleDocument(
       parsed.data.doc,
     );
     document.check();
+    const normalized = articleDocumentSchema.parse({
+      documentSchemaVersion: ARTICLE_DOCUMENT_SCHEMA_VERSION,
+      doc: document.toJSON(),
+    });
+    return {
+      ok: true,
+      document: normalized as ArticleDocument,
+    };
   } catch {
     return {
       ok: false,
@@ -219,6 +254,4 @@ export function validateArticleDocument(
       ],
     };
   }
-
-  return { ok: true, document: parsed.data as ArticleDocument };
 }
