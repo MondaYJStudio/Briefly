@@ -97,7 +97,10 @@ async function publicArticleResponse(
     .get("if-none-match")
     ?.split(",")
     .map((candidate) => candidate.trim())
-    .some((candidate) => candidate === etag || candidate === "*");
+    .some(
+      (candidate) =>
+        candidate === "*" || candidate.replace(/^W\//u, "") === etag,
+    );
   if (matches) return new Response(null, { status: 304, headers });
   if (head) {
     headers.set("content-type", "application/json");

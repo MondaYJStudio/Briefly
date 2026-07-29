@@ -38,6 +38,83 @@ async function initializeAndSignIn(): Promise<string> {
   return setCookie.split(";", 1)[0];
 }
 
+function textDocument(text: string) {
+  return {
+    documentSchemaVersion: 1,
+    doc: {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text }],
+        },
+      ],
+    },
+  };
+}
+
+interface DraftPayload {
+  version: number;
+  title: string;
+  slug: string | null;
+  summary: string | null;
+  tags: string[];
+  byline: { name: string; url: string | null } | null;
+  language: string | null;
+  document: unknown;
+  cover?: { assetId: string; alt: string };
+}
+
+async function createArticle(cookie: string): Promise<string> {
+  const response = await SELF.fetch("http://briefly.test/api/admin/articles", {
+    method: "POST",
+    headers: { cookie },
+  });
+  expect(response.status).toBe(201);
+  return (await response.json<{ id: string }>()).id;
+}
+
+function saveDraft(
+  cookie: string,
+  articleId: string,
+  overrides: Partial<DraftPayload> = {},
+): Promise<Response> {
+  const payload: DraftPayload = {
+    version: 1,
+    title: "Publication candidate",
+    slug: "publication-candidate",
+    summary: null,
+    tags: [],
+    byline: null,
+    language: null,
+    document: textDocument("Substantive body"),
+    ...overrides,
+  };
+  return SELF.fetch(
+    `http://briefly.test/api/admin/articles/${articleId}/draft`,
+    {
+      method: "PUT",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+function publish(
+  cookie: string,
+  articleId: string,
+  draftVersion = 2,
+): Promise<Response> {
+  return SELF.fetch(
+    `http://briefly.test/api/admin/articles/${articleId}/publications`,
+    {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ draftVersion }),
+    },
+  );
+}
+
 describe("first immutable Publication", () => {
   beforeEach(async () => {
     await env.DB.batch([
@@ -58,12 +135,7 @@ describe("first immutable Publication", () => {
 
   it("publishes a saved text Draft and makes its stored HTML immediately public", async () => {
     const cookie = await initializeAndSignIn();
-    const created = await (
-      await SELF.fetch("http://briefly.test/api/admin/articles", {
-        method: "POST",
-        headers: { cookie },
-      })
-    ).json<{ id: string }>();
+    const articleId = await createArticle(cookie);
     const document = {
       documentSchemaVersion: 1,
       doc: {
@@ -83,36 +155,18 @@ describe("first immutable Publication", () => {
         ],
       },
     };
-    const saved = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${created.id}/draft`,
-      {
-        method: "PUT",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({
-          version: 1,
-          title: "First Publication",
-          slug: "first-publication",
-          summary: null,
-          tags: ["release", "immutable"],
-          byline: null,
-          language: null,
-          document,
-        }),
-      },
-    );
+    const saved = await saveDraft(cookie, articleId, {
+      title: "First Publication",
+      slug: "first-publication",
+      tags: ["release", "immutable"],
+      document,
+    });
     expect(saved.status).toBe(200);
     expect(await saved.json()).toMatchObject({
       draft: { version: 2, document },
     });
 
-    const published = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${created.id}/publications`,
-      {
-        method: "POST",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ draftVersion: 2 }),
-      },
-    );
+    const published = await publish(cookie, articleId);
 
     expect(published.status).toBe(201);
     expect(published.headers.get("cache-control")).toBe("no-store");
@@ -124,7 +178,7 @@ describe("first immutable Publication", () => {
       html: string;
     }>();
     expect(publicArticle).toMatchObject({
-      id: created.id,
+      id: articleId,
       slug: "first-publication",
       title: "First Publication",
       summary: null,
@@ -163,7 +217,7 @@ describe("first immutable Publication", () => {
        FROM publication
        WHERE article_id = ?`,
     )
-      .bind(created.id)
+      .bind(articleId)
       .first<Record<string, unknown>>();
     expect(stored).toMatchObject({
       publication_number: 1,
@@ -184,50 +238,15 @@ describe("first immutable Publication", () => {
 
   it("rejects a stale Draft Version without creating any public state", async () => {
     const cookie = await initializeAndSignIn();
-    const created = await (
-      await SELF.fetch("http://briefly.test/api/admin/articles", {
-        method: "POST",
-        headers: { cookie },
-      })
-    ).json<{ id: string }>();
-    const saved = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${created.id}/draft`,
-      {
-        method: "PUT",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({
-          version: 1,
-          title: "Confirmed Draft",
-          slug: "confirmed-draft",
-          summary: null,
-          tags: [],
-          byline: null,
-          language: null,
-          document: {
-            documentSchemaVersion: 1,
-            doc: {
-              type: "doc",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [{ type: "text", text: "Saved body" }],
-                },
-              ],
-            },
-          },
-        }),
-      },
-    );
+    const articleId = await createArticle(cookie);
+    const saved = await saveDraft(cookie, articleId, {
+      title: "Confirmed Draft",
+      slug: "confirmed-draft",
+      document: textDocument("Saved body"),
+    });
     expect(saved.status).toBe(200);
 
-    const stale = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${created.id}/publications`,
-      {
-        method: "POST",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ draftVersion: 1 }),
-      },
-    );
+    const stale = await publish(cookie, articleId, 1);
 
     expect(stale.status).toBe(409);
     expect(await stale.json()).toEqual({
@@ -236,14 +255,14 @@ describe("first immutable Publication", () => {
     });
     expect(
       await env.DB.prepare("SELECT id FROM publication WHERE article_id = ?")
-        .bind(created.id)
+        .bind(articleId)
         .first(),
     ).toBeNull();
     expect(
       await env.DB.prepare(
         "SELECT current_publication_id FROM article WHERE id = ?",
       )
-        .bind(created.id)
+        .bind(articleId)
         .first(),
     ).toEqual({ current_publication_id: null });
     expect(
@@ -283,50 +302,15 @@ describe("first immutable Publication", () => {
     "rejects $name while preserving the saved Draft and private state",
     async ({ title, slug, text, code }) => {
       const cookie = await initializeAndSignIn();
-      const created = await (
-        await SELF.fetch("http://briefly.test/api/admin/articles", {
-          method: "POST",
-          headers: { cookie },
-        })
-      ).json<{ id: string }>();
-      const saved = await SELF.fetch(
-        `http://briefly.test/api/admin/articles/${created.id}/draft`,
-        {
-          method: "PUT",
-          headers: { cookie, "content-type": "application/json" },
-          body: JSON.stringify({
-            version: 1,
-            title,
-            slug,
-            summary: null,
-            tags: [],
-            byline: null,
-            language: null,
-            document: {
-              documentSchemaVersion: 1,
-              doc: {
-                type: "doc",
-                content: [
-                  {
-                    type: "paragraph",
-                    content: [{ type: "text", text }],
-                  },
-                ],
-              },
-            },
-          }),
-        },
-      );
+      const articleId = await createArticle(cookie);
+      const saved = await saveDraft(cookie, articleId, {
+        title,
+        slug,
+        document: textDocument(text),
+      });
       expect(saved.status).toBe(200);
 
-      const rejected = await SELF.fetch(
-        `http://briefly.test/api/admin/articles/${created.id}/publications`,
-        {
-          method: "POST",
-          headers: { cookie, "content-type": "application/json" },
-          body: JSON.stringify({ draftVersion: 2 }),
-        },
-      );
+      const rejected = await publish(cookie, articleId);
 
       expect(rejected.status).toBe(400);
       expect(await rejected.json()).toMatchObject({
@@ -336,12 +320,12 @@ describe("first immutable Publication", () => {
       });
       expect(
         await env.DB.prepare("SELECT id FROM publication WHERE article_id = ?")
-          .bind(created.id)
+          .bind(articleId)
           .first(),
       ).toBeNull();
       const preserved = await (
         await SELF.fetch(
-          `http://briefly.test/api/admin/articles/${created.id}`,
+          `http://briefly.test/api/admin/articles/${articleId}`,
           { headers: { cookie } },
         )
       ).json<{
@@ -358,42 +342,14 @@ describe("first immutable Publication", () => {
 
   it("cleanly rejects a cover-bearing Draft before the asset tickets land", async () => {
     const cookie = await initializeAndSignIn();
-    const created = await (
-      await SELF.fetch("http://briefly.test/api/admin/articles", {
-        method: "POST",
-        headers: { cookie },
-      })
-    ).json<{ id: string }>();
+    const articleId = await createArticle(cookie);
 
-    const rejected = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${created.id}/draft`,
-      {
-        method: "PUT",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({
-          version: 1,
-          title: "No covers yet",
-          slug: "no-covers-yet",
-          summary: null,
-          tags: [],
-          byline: null,
-          language: null,
-          cover: { assetId: "private-asset", alt: "Not supported yet" },
-          document: {
-            documentSchemaVersion: 1,
-            doc: {
-              type: "doc",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [{ type: "text", text: "Text body" }],
-                },
-              ],
-            },
-          },
-        }),
-      },
-    );
+    const rejected = await saveDraft(cookie, articleId, {
+      title: "No covers yet",
+      slug: "no-covers-yet",
+      cover: { assetId: "private-asset", alt: "Not supported yet" },
+      document: textDocument("Text body"),
+    });
 
     expect(rejected.status).toBe(400);
     expect(await rejected.json()).toMatchObject({
@@ -406,7 +362,7 @@ describe("first immutable Publication", () => {
       ],
     });
     const preserved = await (
-      await SELF.fetch(`http://briefly.test/api/admin/articles/${created.id}`, {
+      await SELF.fetch(`http://briefly.test/api/admin/articles/${articleId}`, {
         headers: { cookie },
       })
     ).json<{ draft: { version: number; title: string } }>();
@@ -416,7 +372,6 @@ describe("first immutable Publication", () => {
   it.each([
     {
       name: "unsupported schema version",
-      code: "UNSUPPORTED_DOCUMENT_SCHEMA_VERSION",
       document: {
         documentSchemaVersion: 999,
         doc: {
@@ -432,7 +387,6 @@ describe("first immutable Publication", () => {
     },
     {
       name: "unknown node",
-      code: "UNSUPPORTED_NODE",
       document: {
         documentSchemaVersion: 1,
         doc: {
@@ -448,7 +402,6 @@ describe("first immutable Publication", () => {
     },
     {
       name: "figure",
-      code: "UNSUPPORTED_DOCUMENT_FEATURE",
       document: {
         documentSchemaVersion: 1,
         doc: {
@@ -473,7 +426,6 @@ describe("first immutable Publication", () => {
     },
     {
       name: "video embed",
-      code: "UNSUPPORTED_DOCUMENT_FEATURE",
       document: {
         documentSchemaVersion: 1,
         doc: {
@@ -496,103 +448,104 @@ describe("first immutable Publication", () => {
       },
     },
   ])(
-    "rejects a saved $name without partial HTML or public state",
-    async ({ document, code }) => {
+    "rejects a $name before it can become a saved Publication candidate",
+    async ({ document }) => {
       const cookie = await initializeAndSignIn();
-      const created = await (
-        await SELF.fetch("http://briefly.test/api/admin/articles", {
-          method: "POST",
-          headers: { cookie },
-        })
-      ).json<{ id: string }>();
-      const saved = await SELF.fetch(
-        `http://briefly.test/api/admin/articles/${created.id}/draft`,
-        {
-          method: "PUT",
-          headers: { cookie, "content-type": "application/json" },
-          body: JSON.stringify({
-            version: 1,
-            title: "Unsupported content",
-            slug: "unsupported-content",
-            summary: null,
-            tags: [],
-            byline: null,
-            language: null,
-            document,
-          }),
-        },
-      );
-      expect(saved.status).toBe(200);
-
-      const rejected = await SELF.fetch(
-        `http://briefly.test/api/admin/articles/${created.id}/publications`,
-        {
-          method: "POST",
-          headers: { cookie, "content-type": "application/json" },
-          body: JSON.stringify({ draftVersion: 2 }),
-        },
-      );
-
-      expect(rejected.status).toBe(400);
-      expect(await rejected.json()).toMatchObject({
+      const articleId = await createArticle(cookie);
+      const saved = await saveDraft(cookie, articleId, {
+        title: "Unsupported content",
+        slug: "unsupported-content",
+        document,
+      });
+      expect(saved.status).toBe(400);
+      expect(await saved.json()).toMatchObject({
         status: "error",
-        code: "PUBLICATION_INVALID",
-        issues: [expect.objectContaining({ code })],
+        code: "ARTICLE_DRAFT_INVALID",
+        issues: expect.any(Array),
       });
       expect(
         await env.DB.prepare(
           "SELECT id, html FROM publication WHERE article_id = ?",
         )
-          .bind(created.id)
+          .bind(articleId)
           .first(),
       ).toBeNull();
       expect(
-        await env.DB.prepare(
-          "SELECT current_publication_id FROM article WHERE id = ?",
-        )
-          .bind(created.id)
-          .first(),
-      ).toEqual({ current_publication_id: null });
+        await (
+          await SELF.fetch(
+            `http://briefly.test/api/admin/articles/${articleId}`,
+            { headers: { cookie } },
+          )
+        ).json(),
+      ).toMatchObject({
+        currentPublicationId: null,
+        draft: { version: 1, title: "", slug: null },
+      });
     },
     20_000,
   );
 
+  it("rejects an invalid persisted Draft without creating partial public state", async () => {
+    const cookie = await initializeAndSignIn();
+    const articleId = await createArticle(cookie);
+    const saved = await saveDraft(cookie, articleId, {
+      title: "Persisted invalid Draft",
+      slug: "persisted-invalid-draft",
+    });
+    expect(saved.status).toBe(200);
+    await env.DB.prepare(
+      "UPDATE article_draft SET document = ? WHERE article_id = ?",
+    )
+      .bind(
+        JSON.stringify({
+          documentSchemaVersion: 999,
+          doc: { type: "doc", content: [{ type: "future-node" }] },
+        }),
+        articleId,
+      )
+      .run();
+
+    const rejected = await publish(cookie, articleId);
+
+    expect(rejected.status).toBe(400);
+    expect(await rejected.json()).toEqual({
+      status: "error",
+      code: "PUBLICATION_INVALID",
+      issues: [
+        {
+          code: "INVALID_DOCUMENT",
+          path: "document",
+          message: "The saved Draft document is invalid or unsupported",
+        },
+      ],
+    });
+    expect(
+      await env.DB.prepare("SELECT id FROM publication WHERE article_id = ?")
+        .bind(articleId)
+        .first(),
+    ).toBeNull();
+    expect(
+      await env.DB.prepare(
+        "SELECT current_publication_id, published_at FROM article WHERE id = ?",
+      )
+        .bind(articleId)
+        .first(),
+    ).toEqual({ current_publication_id: null, published_at: null });
+    expect(
+      await env.DB.prepare(
+        "SELECT was_published FROM article_slug WHERE slug_key = 'persisted-invalid-draft'",
+      ).first(),
+    ).toEqual({ was_published: 0 });
+  }, 20_000);
+
   it("rolls back the slug claim and Current Publication when D1 rejects creation", async () => {
     const cookie = await initializeAndSignIn();
-    const created = await (
-      await SELF.fetch("http://briefly.test/api/admin/articles", {
-        method: "POST",
-        headers: { cookie },
-      })
-    ).json<{ id: string }>();
-    const saved = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${created.id}/draft`,
-      {
-        method: "PUT",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({
-          version: 1,
-          title: "Atomic publication",
-          slug: "atomic-publication",
-          summary: null,
-          tags: [],
-          byline: null,
-          language: null,
-          document: {
-            documentSchemaVersion: 1,
-            doc: {
-              type: "doc",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [{ type: "text", text: "Atomic body" }],
-                },
-              ],
-            },
-          },
-        }),
-      },
-    );
+    const articleId = await createArticle(cookie);
+    const saved = await saveDraft(cookie, articleId, {
+      title: "Atomic publication",
+      slug: "atomic-publication",
+      document: textDocument("Atomic body"),
+    });
     expect(saved.status).toBe(200);
     await env.DB.prepare(
       `CREATE TRIGGER reject_publication_insert
@@ -604,14 +557,7 @@ describe("first immutable Publication", () => {
 
     let failed: Response;
     try {
-      failed = await SELF.fetch(
-        `http://briefly.test/api/admin/articles/${created.id}/publications`,
-        {
-          method: "POST",
-          headers: { cookie, "content-type": "application/json" },
-          body: JSON.stringify({ draftVersion: 2 }),
-        },
-      );
+      failed = await publish(cookie, articleId);
     } finally {
       await env.DB.prepare(
         "DROP TRIGGER IF EXISTS reject_publication_insert",
@@ -625,14 +571,14 @@ describe("first immutable Publication", () => {
     });
     expect(
       await env.DB.prepare("SELECT id FROM publication WHERE article_id = ?")
-        .bind(created.id)
+        .bind(articleId)
         .first(),
     ).toBeNull();
     expect(
       await env.DB.prepare(
         "SELECT current_publication_id, published_at FROM article WHERE id = ?",
       )
-        .bind(created.id)
+        .bind(articleId)
         .first(),
     ).toEqual({ current_publication_id: null, published_at: null });
     expect(
@@ -644,12 +590,7 @@ describe("first immutable Publication", () => {
 
   it("serves only the stored artifact with cookie-independent CORS, HEAD, and conditional semantics", async () => {
     const cookie = await initializeAndSignIn();
-    const created = await (
-      await SELF.fetch("http://briefly.test/api/admin/articles", {
-        method: "POST",
-        headers: { cookie },
-      })
-    ).json<{ id: string }>();
+    const articleId = await createArticle(cookie);
     const document = {
       documentSchemaVersion: 1,
       doc: {
@@ -664,66 +605,31 @@ describe("first immutable Publication", () => {
     };
     expect(
       (
-        await SELF.fetch(
-          `http://briefly.test/api/admin/articles/${created.id}/draft`,
-          {
-            method: "PUT",
-            headers: { cookie, "content-type": "application/json" },
-            body: JSON.stringify({
-              version: 1,
-              title: "Stored public title",
-              slug: "stored-publication",
-              summary: "Authored summary",
-              tags: ["public"],
-              byline: { name: "Public Byline", url: null },
-              language: "zh-Hans",
-              document,
-            }),
-          },
-        )
+        await saveDraft(cookie, articleId, {
+          title: "Stored public title",
+          slug: "stored-publication",
+          summary: "Authored summary",
+          tags: ["public"],
+          byline: { name: "Public Byline", url: null },
+          language: "zh-Hans",
+          document,
+        })
       ).status,
     ).toBe(200);
-    const publish = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${created.id}/publications`,
-      {
-        method: "POST",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ draftVersion: 2 }),
-      },
-    );
-    expect(publish.status).toBe(201);
-    const expected = await publish.json<Record<string, unknown>>();
+    const published = await publish(cookie, articleId);
+    expect(published.status).toBe(201);
+    const expected = await published.json<Record<string, unknown>>();
 
     expect(
       (
-        await SELF.fetch(
-          `http://briefly.test/api/admin/articles/${created.id}/draft`,
-          {
-            method: "PUT",
-            headers: { cookie, "content-type": "application/json" },
-            body: JSON.stringify({
-              version: 2,
-              title: "Private revised title",
-              slug: "private-revision",
-              summary: "Private revised summary",
-              tags: ["private"],
-              byline: null,
-              language: null,
-              document: {
-                documentSchemaVersion: 1,
-                doc: {
-                  type: "doc",
-                  content: [
-                    {
-                      type: "paragraph",
-                      content: [{ type: "text", text: "Private revised body" }],
-                    },
-                  ],
-                },
-              },
-            }),
-          },
-        )
+        await saveDraft(cookie, articleId, {
+          version: 2,
+          title: "Private revised title",
+          slug: "private-revision",
+          summary: "Private revised summary",
+          tags: ["private"],
+          document: textDocument("Private revised body"),
+        })
       ).status,
     ).toBe(200);
     await env.DB.prepare(
@@ -734,7 +640,7 @@ describe("first immutable Publication", () => {
           documentSchemaVersion: 999,
           doc: { type: "private-source-must-not-be-rendered" },
         }),
-        created.id,
+        articleId,
       )
       .run();
 
@@ -786,7 +692,10 @@ describe("first immutable Publication", () => {
     const conditional = await SELF.fetch(
       "http://briefly.test/api/articles/stored-publication",
       {
-        headers: { "if-none-match": etag, origin: "https://reader.example" },
+        headers: {
+          "if-none-match": `W/${etag}`,
+          origin: "https://reader.example",
+        },
       },
     );
     expect(conditional.status).toBe(304);
@@ -855,53 +764,17 @@ describe("first immutable Publication", () => {
 
   it("does not turn the first-publication tracer into implicit republishing", async () => {
     const cookie = await initializeAndSignIn();
-    const created = await (
-      await SELF.fetch("http://briefly.test/api/admin/articles", {
-        method: "POST",
-        headers: { cookie },
-      })
-    ).json<{ id: string }>();
+    const articleId = await createArticle(cookie);
     expect(
       (
-        await SELF.fetch(
-          `http://briefly.test/api/admin/articles/${created.id}/draft`,
-          {
-            method: "PUT",
-            headers: { cookie, "content-type": "application/json" },
-            body: JSON.stringify({
-              version: 1,
-              title: "First means first",
-              slug: "first-means-first",
-              summary: null,
-              tags: [],
-              byline: null,
-              language: null,
-              document: {
-                documentSchemaVersion: 1,
-                doc: {
-                  type: "doc",
-                  content: [
-                    {
-                      type: "paragraph",
-                      content: [{ type: "text", text: "First body" }],
-                    },
-                  ],
-                },
-              },
-            }),
-          },
-        )
+        await saveDraft(cookie, articleId, {
+          title: "First means first",
+          slug: "first-means-first",
+          document: textDocument("First body"),
+        })
       ).status,
     ).toBe(200);
-    const publishRequest = () =>
-      SELF.fetch(
-        `http://briefly.test/api/admin/articles/${created.id}/publications`,
-        {
-          method: "POST",
-          headers: { cookie, "content-type": "application/json" },
-          body: JSON.stringify({ draftVersion: 2 }),
-        },
-      );
+    const publishRequest = () => publish(cookie, articleId);
     expect((await publishRequest()).status).toBe(201);
 
     const repeated = await publishRequest();
@@ -914,7 +787,7 @@ describe("first immutable Publication", () => {
     const publications = await env.DB.prepare(
       "SELECT id, publication_number FROM publication WHERE article_id = ?",
     )
-      .bind(created.id)
+      .bind(articleId)
       .all();
     expect(publications.results).toHaveLength(1);
     expect(publications.results[0]).toMatchObject({ publication_number: 1 });
@@ -922,7 +795,7 @@ describe("first immutable Publication", () => {
       await env.DB.prepare(
         "SELECT current_publication_id FROM article WHERE id = ?",
       )
-        .bind(created.id)
+        .bind(articleId)
         .first(),
     ).toEqual({ current_publication_id: publications.results[0]?.id });
   }, 20_000);

@@ -139,7 +139,28 @@ export async function publishArticle(
   articleId: string,
   draftVersion: number,
 ): Promise<PublishArticleResult> {
-  const article = await readArticle(database, articleId);
+  let article;
+  try {
+    article = await readArticle(database, articleId);
+  } catch (error) {
+    if (
+      error instanceof z.ZodError &&
+      error.issues.some((issue) => issue.path[0] === "document")
+    ) {
+      return {
+        ok: false,
+        reason: "invalid",
+        issues: [
+          {
+            code: "INVALID_DOCUMENT",
+            path: "document",
+            message: "The saved Draft document is invalid or unsupported",
+          },
+        ],
+      };
+    }
+    throw error;
+  }
   if (!article) return { ok: false, reason: "not-found" };
   if (article.currentPublicationId !== null)
     return { ok: false, reason: "already-published" };
@@ -162,6 +183,20 @@ export async function publishArticle(
   if (slug === null) throw new Error("Validated Publication slug is absent");
   const slugKey = slugKeyFor(slug);
   const publishedAt = Date.now();
+  const publishedAtIso = new Date(publishedAt).toISOString();
+  const publicArticle: PublicArticle = {
+    id: article.id,
+    slug,
+    title: article.draft.title,
+    summary: article.draft.summary,
+    tags: article.draft.tags,
+    byline: resolvedMetadata.byline,
+    language: resolvedMetadata.language,
+    cover: null,
+    publishedAt: publishedAtIso,
+    updatedAt: publishedAtIso,
+    html: rendered.value.html,
+  };
   const batch = await database.batch([
     database
       .prepare(
@@ -230,7 +265,10 @@ export async function publishArticle(
       .bind(publicationId, publishedAt, publishedAt, articleId, publicationId),
   ]);
 
-  if ((batch[1]?.meta.changes ?? 0) !== 1) {
+  if (
+    (batch[1]?.meta.changes ?? 0) !== 1 ||
+    (batch[2]?.meta.changes ?? 0) !== 1
+  ) {
     const current = await readArticle(database, articleId);
     if (!current) return { ok: false, reason: "not-found" };
     return current.currentPublicationId === null
@@ -238,9 +276,7 @@ export async function publishArticle(
       : { ok: false, reason: "already-published" };
   }
 
-  const published = await readPublicArticle(database, slug);
-  if (!published) throw new Error("Published Article could not be read");
-  return { ok: true, article: published.article };
+  return { ok: true, article: publicArticle };
 }
 
 const publicArticleSelection = `
