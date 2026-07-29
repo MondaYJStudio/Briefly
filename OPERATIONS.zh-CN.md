@@ -55,11 +55,25 @@ Briefly 处于 0.x 生命周期。发布说明必须明确指出任何破坏性 
 
 唯一管理员的密码长度为 12–128 个字符，建议使用密码管理器生成。未知邮箱和错误密码返回完全相同的登录失败响应。
 
-凭证滥用限制保存在 D1，而不是 Worker 内存，因此所有 isolate 共享计数器。两类限制都采用固定的 15 分钟窗口，并以 Cloudflare 客户端 IP 的 SHA-256 摘要为键：
+凭证滥用限制保存在 D1，而不是 Worker 内存，因此所有 isolate 共享计数器。所有限制都采用固定的 15 分钟窗口，并以 Cloudflare 客户端 IP 的 SHA-256 摘要为键：
 
 - 初始化：5 次；
+- 紧急恢复：5 次；
 - 邮箱/密码登录：10 次。
 
 无论成功还是失败，每个请求都会计数。超限请求返回 `429` 和 `Retry-After`；无法取得客户端 IP 时，请求共享一个后备桶。后续认证请求会清理已过期的计数器。
 
-Better Auth 将可撤销 session 存在 D1 中。记住的 session 固定有效 7 天；使用满 24 小时后会续回 7 天，受保护的 Elysia 操作会透传续期 cookie。生产 HTTPS 源上的 session cookie 带有 HttpOnly、SameSite=Lax、路径 `/` 和 Secure 属性。退出会删除当前 D1 session，因此重放已丢弃的 cookie 无法再次授权。`/admin` 会为导航体验把匿名浏览器重定向到 `/sign-in`，但每个私有服务端操作仍必须独立解析并授权 Better Auth session。
+Better Auth 将可撤销 session 存在 D1 中。记住的 session 固定有效 7 天；使用满 24 小时后会续回 7 天，受保护的 Elysia 操作会透传续期 cookie。生产 HTTPS 源上的 session cookie 带有 HttpOnly、SameSite=Lax、路径 `/` 和 Secure 属性。退出会删除当前 D1 session，因此重放已丢弃的 cookie 无法再次授权。在 `/admin` 修改密码会撤销全部管理员 session，包括提交改密的当前 session，并要求重新登录。`/admin` 会为导航体验把匿名浏览器重定向到 `/sign-in`，但每个私有服务端操作仍必须独立解析并授权 Better Auth session。
+
+## 管理员紧急恢复
+
+只有部署运维人员有意配置独立的 `RECOVERY_SECRET` 时，恢复功能才会开启。它绝不会回退使用 `SETUP_SECRET`、`BETTER_AUTH_SECRET`、session 或已存储数据；Worker 只从运行时配置读取该值。此 secret 至少 32 个字符，必须与其他 secret 相互独立，且不得出现在 URL、命令历史参数、日志或已提交文件中。
+
+仅在现有管理员无法登录时执行以下短时流程：
+
+1. 生成新的高熵值，然后运行 `pnpm exec wrangler secret put RECOVERY_SECRET --env production`。仅在 Wrangler 的交互提示中输入该值；如果 Wrangler 提示需要新 Worker 版本，则完成部署。
+2. 打开规范生产来源下的 `/recover`，提交临时恢复 secret 和一个 12–128 字符的新密码。该表单及 `POST /api/recover` 只会重置已经存在的唯一管理员，不能初始化空安装或添加身份。
+3. 收到成功响应后，确认持有旧 cookie 的浏览器访问 `/admin` 会被重定向到 `/sign-in`，旧密码登录失败且新密码可以登录。恢复只会在删除 D1 中全部 session 后报告成功。
+4. 立即运行 `pnpm exec wrangler secret delete RECOVERY_SECRET --env production` 并确认变更。如果仍需再次尝试，应生成新值进行轮换，不得复用旧值。
+
+恢复按每个客户端固定 15 分钟窗口最多接受 5 个请求，每个请求都会计数。超限客户端会收到带 `Retry-After` 的 `429`，必须等待所指示的窗口；等待期间不要继续保留临时 secret。恢复关闭、secret 错误、管理员不存在和密码输入无效都会返回相同的通用拒绝响应。

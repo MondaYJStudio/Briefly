@@ -23,6 +23,7 @@ export default defineConfig(async () => {
             APP_ORIGIN: "http://briefly.test",
             BETTER_AUTH_SECRET:
               "test-only-better-auth-secret-32-characters-minimum",
+            RECOVERY_SECRET: "test-only-recovery-secret-32-characters-minimum",
             SETUP_SECRET: "test-only-setup-secret-32-characters-minimum",
             TEST_MIGRATIONS: migrations,
           },

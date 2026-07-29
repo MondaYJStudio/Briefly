@@ -37,6 +37,18 @@ async function signIn(
   });
 }
 
+async function recover(
+  recoverySecret: string,
+  newPassword: string,
+  fetcher: typeof fetch = SELF.fetch.bind(SELF) as typeof fetch,
+) {
+  return fetcher("http://briefly.test/api/recover", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ recoverySecret, newPassword }),
+  });
+}
+
 function cookieFrom(response: Response): string {
   const setCookie = response.headers.get("set-cookie");
   if (!setCookie) throw new Error("Expected a session cookie");
@@ -84,6 +96,247 @@ describe("sole Administrator authentication", () => {
       suppliedSecret,
     );
   });
+
+  it("uses the same generic denial when recovery is disabled or the dedicated secret is wrong", async () => {
+    const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+    const wrongSecret = "wrong-recovery-secret-that-must-stay-private";
+    const withoutRecoverySecret = { ...env, RECOVERY_SECRET: undefined };
+    const context = createExecutionContext();
+
+    const disabledResponse = await recover(
+      env.SETUP_SECRET,
+      "replacement password is long enough",
+      (request, init) =>
+        worker.fetch(
+          new Request(request, init) as Request<
+            unknown,
+            IncomingRequestCfProperties
+          >,
+          withoutRecoverySecret,
+          context,
+        ),
+    );
+    await waitOnExecutionContext(context);
+    const disabledText = await disabledResponse.text();
+    const wrongSecretResponse = await recover(
+      wrongSecret,
+      "replacement password is long enough",
+    );
+    const wrongSecretText = await wrongSecretResponse.text();
+
+    expect(disabledResponse.status).toBe(403);
+    expect(wrongSecretResponse.status).toBe(403);
+    expect(disabledText).toBe(wrongSecretText);
+    expect(JSON.parse(disabledText)).toEqual({
+      status: "error",
+      code: "RECOVERY_DENIED",
+    });
+    for (const secret of [env.SETUP_SECRET, wrongSecret]) {
+      expect(disabledText).not.toContain(secret);
+      expect(wrongSecretText).not.toContain(secret);
+      expect(consoleInfo.mock.calls.flat().join(" ")).not.toContain(secret);
+    }
+  });
+
+  it("recovers the existing Administrator and revokes every issued session before success", async () => {
+    const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+    expect((await initialize()).status).toBe(201);
+    const originalIdentity = await env.DB.prepare(
+      "SELECT id, email FROM auth_user",
+    ).first<{ id: string; email: string }>();
+    const cookies = await Promise.all([
+      signIn().then(cookieFrom),
+      signIn().then(cookieFrom),
+    ]);
+    const newPassword = "a fresh password from the operator";
+
+    const recoveryResponse = await recover(env.RECOVERY_SECRET, newPassword);
+
+    expect(recoveryResponse.status).toBe(200);
+    expect(await recoveryResponse.json()).toEqual({ status: "ok" });
+    const client = createApiClient(
+      "http://briefly.test",
+      SELF.fetch.bind(SELF) as typeof fetch,
+    );
+    for (const cookie of cookies) {
+      expect(
+        (await client.admin.session.get({ headers: { cookie } })).status,
+      ).toBe(401);
+    }
+    expect((await signIn()).status).toBe(401);
+    expect(
+      (
+        await signIn({
+          email: administrator.email,
+          password: newPassword,
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      await env.DB.prepare("SELECT id, email FROM auth_user").all(),
+    ).toMatchObject({ results: [originalIdentity] });
+    const logText = consoleInfo.mock.calls.flat().join(" ");
+    expect(logText).not.toContain(env.RECOVERY_SECRET);
+    expect(logText).not.toContain(newPassword);
+  });
+
+  it("does not let recovery initialize an installation and denies invalid account input generically", async () => {
+    const emptyInstallationResponse = await recover(
+      env.RECOVERY_SECRET,
+      "valid replacement password",
+    );
+    expect((await initialize()).status).toBe(201);
+    const invalidPasswordResponse = await recover(
+      env.RECOVERY_SECRET,
+      "too-short",
+    );
+    const setupSecretResponse = await recover(
+      env.SETUP_SECRET,
+      "valid replacement password",
+    );
+    const responseTexts = await Promise.all([
+      emptyInstallationResponse.text(),
+      invalidPasswordResponse.text(),
+      setupSecretResponse.text(),
+    ]);
+
+    expect([
+      emptyInstallationResponse.status,
+      invalidPasswordResponse.status,
+      setupSecretResponse.status,
+    ]).toEqual([403, 403, 403]);
+    expect(new Set(responseTexts)).toEqual(
+      new Set([JSON.stringify({ status: "error", code: "RECOVERY_DENIED" })]),
+    );
+    expect((await signIn()).status).toBe(200);
+  });
+
+  it("never accepts the recovery secret from a URL query string", async () => {
+    expect((await initialize()).status).toBe(201);
+    const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+    const newPassword = "query strings cannot recover accounts";
+
+    const response = await SELF.fetch(
+      `http://briefly.test/api/recover?recoverySecret=${encodeURIComponent(env.RECOVERY_SECRET)}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ newPassword }),
+      },
+    );
+    const responseText = await response.text();
+
+    expect(response.status).toBe(403);
+    expect(JSON.parse(responseText)).toEqual({
+      status: "error",
+      code: "RECOVERY_DENIED",
+    });
+    expect((await signIn()).status).toBe(200);
+    expect(responseText).not.toContain(env.RECOVERY_SECRET);
+    expect(consoleInfo.mock.calls.flat().join(" ")).not.toContain(
+      env.RECOVERY_SECRET,
+    );
+  });
+
+  it("revokes the submitting and every other session after an authenticated password change", async () => {
+    expect((await initialize()).status).toBe(201);
+    const submittingCookie = cookieFrom(await signIn());
+    const otherCookie = cookieFrom(await signIn());
+    const newPassword = "a normal fresh administrator password";
+
+    const changeResponse = await SELF.fetch(
+      "http://briefly.test/api/auth/change-password",
+      {
+        method: "POST",
+        headers: {
+          cookie: submittingCookie,
+          "content-type": "application/json",
+          origin: "http://briefly.test",
+        },
+        body: JSON.stringify({
+          currentPassword: administrator.password,
+          newPassword,
+          revokeOtherSessions: false,
+        }),
+      },
+    );
+
+    expect(changeResponse.status).toBe(200);
+    expect(await changeResponse.json()).toEqual({ status: "ok" });
+    const client = createApiClient(
+      "http://briefly.test",
+      SELF.fetch.bind(SELF) as typeof fetch,
+    );
+    for (const cookie of [submittingCookie, otherCookie]) {
+      expect(
+        (await client.admin.session.get({ headers: { cookie } })).status,
+      ).toBe(401);
+    }
+    expect((await signIn()).status).toBe(401);
+    expect(
+      (
+        await signIn({
+          email: administrator.email,
+          password: newPassword,
+        })
+      ).status,
+    ).toBe(200);
+  });
+
+  it("keeps the old password and sessions when all-session revocation cannot commit", async () => {
+    expect((await initialize()).status).toBe(201);
+    const cookie = cookieFrom(await signIn());
+    const newPassword = "a password that must roll back";
+    await env.DB.prepare(
+      `CREATE TRIGGER fail_auth_session_delete
+       BEFORE DELETE ON auth_session
+       BEGIN
+         SELECT RAISE(ABORT, 'injected session deletion failure');
+       END`,
+    ).run();
+
+    try {
+      const response = await SELF.fetch(
+        "http://briefly.test/api/auth/change-password",
+        {
+          method: "POST",
+          headers: {
+            cookie,
+            "content-type": "application/json",
+            origin: "http://briefly.test",
+          },
+          body: JSON.stringify({
+            currentPassword: administrator.password,
+            newPassword,
+          }),
+        },
+      );
+
+      expect(response.status).toBe(500);
+      expect(await response.json()).toMatchObject({
+        status: "error",
+        code: "INTERNAL_ERROR",
+      });
+      const client = createApiClient(
+        "http://briefly.test",
+        SELF.fetch.bind(SELF) as typeof fetch,
+      );
+      expect(
+        (await client.admin.session.get({ headers: { cookie } })).status,
+      ).toBe(200);
+      expect((await signIn()).status).toBe(200);
+      expect(
+        (
+          await signIn({
+            email: administrator.email,
+            password: newPassword,
+          })
+        ).status,
+      ).toBe(401);
+    } finally {
+      await env.DB.prepare("DROP TRIGGER fail_auth_session_delete").run();
+    }
+  }, 15_000);
 
   it("initializes the installation exactly once without returning the configured identity", async () => {
     const response = await initialize();
@@ -486,6 +739,67 @@ describe("sole Administrator authentication", () => {
     expect(otherClientResponse.status).toBe(401);
   });
 
+  it("rate-limits recovery attempts and allows recovery after the window resets", async () => {
+    expect((await initialize()).status).toBe(201);
+    const newPassword = "recovered after rate limit reset";
+    const statuses: number[] = [];
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const response = await SELF.fetch("http://briefly.test/api/recover", {
+        method: "POST",
+        headers: {
+          "cf-connecting-ip": "203.0.113.30",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          recoverySecret:
+            attempt === 5 ? env.RECOVERY_SECRET : "incorrect secret",
+          newPassword,
+        }),
+      });
+      statuses.push(response.status);
+      if (attempt === 5) {
+        expect(response.headers.get("retry-after")).toEqual(
+          expect.stringMatching(/^\d+$/),
+        );
+        expect(await response.json()).toEqual({
+          status: "error",
+          code: "RATE_LIMITED",
+        });
+      }
+    }
+
+    expect(statuses).toEqual([403, 403, 403, 403, 403, 429]);
+    expect((await signIn()).status).toBe(200);
+    await env.DB.prepare(
+      "UPDATE auth_rate_limit SET reset_at = 0 WHERE key LIKE 'recovery:%'",
+    ).run();
+
+    const recoveredResponse = await SELF.fetch(
+      "http://briefly.test/api/recover",
+      {
+        method: "POST",
+        headers: {
+          "cf-connecting-ip": "203.0.113.30",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          recoverySecret: env.RECOVERY_SECRET,
+          newPassword,
+        }),
+      },
+    );
+    expect(recoveredResponse.status).toBe(200);
+    expect(
+      (
+        await signIn({
+          email: administrator.email,
+          password: newPassword,
+        })
+      ).status,
+    ).toBe(200);
+  });
+
   it("redirects anonymous administration navigation without treating it as authorization", async () => {
     const anonymousResponse = await SELF.fetch("http://briefly.test/admin", {
       redirect: "manual",
@@ -502,8 +816,17 @@ describe("sole Administrator authentication", () => {
       { headers: { cookie } },
     );
     expect(authenticatedResponse.status).toBe(200);
-    expect(await authenticatedResponse.text()).toContain(
-      "Administrator session",
-    );
-  }, 15_000);
+    const authenticatedHtml = await authenticatedResponse.text();
+    expect(authenticatedHtml).toContain("Administrator session");
+    expect(authenticatedHtml).toContain("Change password");
+    expect(authenticatedHtml).toContain("revokes every Administrator session");
+
+    const recoveryResponse = await SELF.fetch("http://briefly.test/recover");
+    const recoveryHtml = await recoveryResponse.text();
+    expect(recoveryResponse.status).toBe(200);
+    expect(recoveryHtml).toContain("Recover Administrator");
+    expect(recoveryHtml).toContain("revokes every Administrator session");
+    expect(recoveryHtml).toContain('name="recoverySecret"');
+    expect(recoveryHtml).toContain('name="newPassword"');
+  }, 30_000);
 });

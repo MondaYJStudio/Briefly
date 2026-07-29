@@ -149,6 +149,28 @@ describe("Worker HTTP runtime", () => {
     }
   });
 
+  it("rejects a recovery secret that reuses another application secret", async () => {
+    for (const reusedSecret of [env.SETUP_SECRET, env.BETTER_AUTH_SECRET]) {
+      const context = createExecutionContext();
+      const response = await worker.fetch(
+        new Request("http://briefly.test/health") as Request<
+          unknown,
+          IncomingRequestCfProperties
+        >,
+        { ...env, RECOVERY_SECRET: reusedSecret },
+        context,
+      );
+      await waitOnExecutionContext(context);
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({
+        status: "error",
+        code: "RUNTIME_CONFIGURATION_INVALID",
+        issues: [{ binding: "RECOVERY_SECRET", reason: "invalid" }],
+      });
+    }
+  });
+
   it("reports a missing required schema capability without changing the schema", async () => {
     await env.DB.prepare("DELETE FROM runtime_metadata WHERE id = 1").run();
 

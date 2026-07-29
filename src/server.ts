@@ -16,6 +16,7 @@ function authenticationRateLimitFor(
 ): import("./auth/rate-limit.server").AuthenticationRateLimit | undefined {
   if (request.method !== "POST") return undefined;
   if (pathname === "/api/initialize") return "initialization";
+  if (pathname === "/api/recover") return "recovery";
   if (pathname === "/api/auth/sign-in/email") return "signIn";
   return undefined;
 }
@@ -42,6 +43,16 @@ function withRequestId(response: Response, requestId: string): Response {
     statusText: response.statusText,
     headers,
   });
+}
+
+function handleStartRequest(request: Request, bindings: RuntimeBindings) {
+  // Start propagates fetch options.context to server-route handlers, although
+  // the generated default entry exposes only its base context type here.
+  const fetchWithContext = startHandler.fetch as unknown as (
+    request: Request,
+    options: { context: { bindings: RuntimeBindings } },
+  ) => Promise<Response>;
+  return fetchWithContext(request, { context: { bindings } });
 }
 
 const worker = {
@@ -190,7 +201,10 @@ const worker = {
           },
         );
         response = session
-          ? withRequestId(await startHandler.fetch(request), requestId)
+          ? withRequestId(
+              await handleStartRequest(request, configuration.bindings),
+              requestId,
+            )
           : withRequestId(
               Response.redirect(
                 new URL("/sign-in", configuration.bindings.APP_ORIGIN),
@@ -200,14 +214,18 @@ const worker = {
             );
         response.headers.set("cache-control", "no-store");
       } else if (requestUrl.pathname.startsWith("/api/auth/")) {
-        const { createAuth } = await import("./auth/auth.server");
+        const { handleAuthenticationRequest } =
+          await import("./auth/http.server");
         response = withRequestId(
-          await createAuth(configuration.bindings).handler(request),
+          await handleAuthenticationRequest(request, configuration.bindings),
           requestId,
         );
         response.headers.set("cache-control", "no-store");
       } else {
-        response = withRequestId(await startHandler.fetch(request), requestId);
+        response = withRequestId(
+          await handleStartRequest(request, configuration.bindings),
+          requestId,
+        );
       }
 
       return finishResponse(response, diagnosisCode);

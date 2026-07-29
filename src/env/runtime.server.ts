@@ -8,6 +8,7 @@ export interface RuntimeBindings {
   BETTER_AUTH_SECRET: string;
   DB: D1Database;
   MEDIA_BUCKET: R2Bucket;
+  RECOVERY_SECRET?: string;
   SETUP_SECRET: string;
 }
 
@@ -17,6 +18,7 @@ const bindingNames = [
   "BETTER_AUTH_SECRET",
   "DB",
   "MEDIA_BUCKET",
+  "RECOVERY_SECRET",
   "SETUP_SECRET",
 ] as const;
 
@@ -59,6 +61,7 @@ const runtimeBindingsSchema = z
     BETTER_AUTH_SECRET: z.string().min(32),
     DB: z.custom<D1Database>(isD1Database),
     MEDIA_BUCKET: z.custom<R2Bucket>(isR2Bucket),
+    RECOVERY_SECRET: z.string().min(32).optional(),
     SETUP_SECRET: z.string().min(32),
   })
   .superRefine((bindings, context) => {
@@ -74,6 +77,18 @@ const runtimeBindingsSchema = z
         code: "custom",
         path: ["APP_ORIGIN"],
         message: "APP_ORIGIN must be a canonical origin",
+      });
+    }
+
+    if (
+      bindings.RECOVERY_SECRET &&
+      (bindings.RECOVERY_SECRET === bindings.SETUP_SECRET ||
+        bindings.RECOVERY_SECRET === bindings.BETTER_AUTH_SECRET)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["RECOVERY_SECRET"],
+        message: "RECOVERY_SECRET must be independent",
       });
     }
   });

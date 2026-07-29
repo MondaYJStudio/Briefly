@@ -1,6 +1,9 @@
-# Copy this file to .dev.vars and replace both values with independent random
-# secrets of at least 32 characters. Never commit .dev.vars or reuse production
-# values locally.
+# Copy this file to .dev.vars and replace both permanent values with independent
+# random secrets of at least 32 characters. Never commit .dev.vars or reuse
+# production values locally. RECOVERY_SECRET is deliberately absent by default;
+# add a third independent value only for a temporary recovery window, then
+# remove it immediately.
 
 BETTER_AUTH_SECRET=replace-with-an-independent-random-secret
 SETUP_SECRET=replace-with-an-independent-random-secret
+# RECOVERY_SECRET=replace-with-a-temporary-independent-random-secret

@@ -1,5 +1,6 @@
 export const AUTH_RATE_LIMITS = {
   initialization: { attempts: 5, windowSeconds: 15 * 60 },
+  recovery: { attempts: 5, windowSeconds: 15 * 60 },
   signIn: { attempts: 10, windowSeconds: 15 * 60 },
 } as const;
 

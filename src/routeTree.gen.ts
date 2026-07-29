@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as RecoverRouteImport } from './routes/recover'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
@@ -23,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecoverRoute = RecoverRouteImport.update({
+  id: '/recover',
+  path: '/recover',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SetupRoute = SetupRouteImport.update({
@@ -44,6 +50,7 @@ const ApiSplatRoute = ApiSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/recover': typeof RecoverRoute
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
   '/api/$': typeof ApiSplatRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/recover': typeof RecoverRoute
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
   '/api/$': typeof ApiSplatRoute
@@ -59,21 +67,24 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/recover': typeof RecoverRoute
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
   '/api/$': typeof ApiSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/setup' | '/sign-in' | '/api/$'
+  fullPaths: '/' | '/admin' | '/recover' | '/setup' | '/sign-in' | '/api/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/setup' | '/sign-in' | '/api/$'
-  id: '__root__' | '/' | '/admin' | '/setup' | '/sign-in' | '/api/$'
+  to: '/' | '/admin' | '/recover' | '/setup' | '/sign-in' | '/api/$'
+  id:
+    '__root__' | '/' | '/admin' | '/recover' | '/setup' | '/sign-in' | '/api/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  RecoverRoute: typeof RecoverRoute
   SetupRoute: typeof SetupRoute
   SignInRoute: typeof SignInRoute
   ApiSplatRoute: typeof ApiSplatRoute
@@ -93,6 +104,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recover': {
+      id: '/recover'
+      path: '/recover'
+      fullPath: '/recover'
+      preLoaderRoute: typeof RecoverRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/setup': {
@@ -122,6 +140,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  RecoverRoute: RecoverRoute,
   SetupRoute: SetupRoute,
   SignInRoute: SignInRoute,
   ApiSplatRoute: ApiSplatRoute,
