@@ -1,7 +1,7 @@
 import { Node, generateHTML } from "@tiptap/core";
 import { describe, expect, it } from "vitest";
 
-import { renderPublication } from "../prototype/publication-renderer/renderer";
+import { renderPublication } from "../src/articles/publication-renderer.server";
 
 describe("Publication renderer", () => {
   it("renders a versioned paragraph document as an escaped semantic fragment", async () => {
@@ -13,7 +13,12 @@ describe("Publication renderer", () => {
           content: [
             {
               type: "paragraph",
-              content: [{ type: "text", text: "Hello <workerd>" }],
+              content: [
+                {
+                  type: "text",
+                  text: 'Hello <script>alert("workerd")</script> 世界',
+                },
+              ],
             },
           ],
         },
@@ -26,7 +31,8 @@ describe("Publication renderer", () => {
     expect(result).toEqual({
       ok: true,
       value: {
-        html: "<p>Hello &lt;workerd&gt;</p>",
+        rendererVersion: 1,
+        html: '<p>Hello &lt;script&gt;alert("workerd")&lt;/script&gt; 世界</p>',
         referencedAssets: [],
         referencedProviders: [],
       },
@@ -170,6 +176,7 @@ describe("Publication renderer", () => {
     expect(result).toEqual({
       ok: true,
       value: {
+        rendererVersion: 1,
         html: '<h2>语义化 Publication</h2><h3>Portable</h3><h4>Safe</h4><p><strong>Bold</strong> <em>Italic</em> <s>Strike</s> <code>inline &lt;code&gt;</code><br/><a href="https://example.com/a?b=1" rel="noopener noreferrer">safe link</a></p><ul><li><p>Outer</p><ol start="3"><li><p>Nested</p></li></ol></li></ul><blockquote><p>Quoted &amp; escaped</p></blockquote><pre><code data-language="typescript">&lt;script&gt;alert(\'no\')&lt;/script&gt;</code></pre><hr/><figure><img src="https://media.example.com/assets/moon.webp" width="1200" height="800" alt="Moon over water"/><figcaption>Night &amp; tide</figcaption></figure><iframe src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ" title="YouTube example" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen=""></iframe><iframe src="https://player.bilibili.com/player.html?bvid=BV1xx411c7mD" title="Bilibili example" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen" allowfullscreen=""></iframe>',
         referencedAssets: [
           {
@@ -184,6 +191,23 @@ describe("Publication renderer", () => {
           { provider: "bilibili", id: "BV1xx411c7mD" },
         ],
       },
+    });
+  });
+
+  it("returns structured issues for an invalid document envelope", async () => {
+    const result = await renderPublication(null as never, {
+      resolveAsset: async () => null,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      issues: [
+        {
+          code: "INVALID_DOCUMENT",
+          path: "",
+          message: "Invalid input: expected object, received null",
+        },
+      ],
     });
   });
 
@@ -594,6 +618,7 @@ describe("Publication renderer", () => {
     expect(result).toEqual({
       ok: true,
       value: {
+        rendererVersion: 1,
         html: '<figure><img src="https://media.example.com/assets/divider.svg" width="800" height="40" alt=""/></figure>',
         referencedAssets: [
           {
@@ -601,6 +626,53 @@ describe("Publication renderer", () => {
             publicUrl: "https://media.example.com/assets/divider.svg",
             width: 800,
             height: 40,
+          },
+        ],
+        referencedProviders: [],
+      },
+    });
+  });
+
+  it("returns only publication-safe Asset reference facts", async () => {
+    const result = await renderPublication(
+      {
+        documentSchemaVersion: 1,
+        doc: {
+          type: "doc",
+          content: [
+            {
+              type: "figure",
+              attrs: {
+                assetId: "asset-private",
+                alt: "Safe public projection",
+                decorative: false,
+              },
+            },
+          ],
+        },
+      },
+      {
+        resolveAsset: async (assetId) => ({
+          assetId,
+          publicUrl: "https://media.example.com/assets/public.webp",
+          width: 640,
+          height: 480,
+          privateObjectKey: "private/uploads/secret.webp",
+        }),
+      },
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        rendererVersion: 1,
+        html: '<figure><img src="https://media.example.com/assets/public.webp" width="640" height="480" alt="Safe public projection"/></figure>',
+        referencedAssets: [
+          {
+            assetId: "asset-private",
+            publicUrl: "https://media.example.com/assets/public.webp",
+            width: 640,
+            height: 480,
           },
         ],
         referencedProviders: [],
@@ -677,6 +749,7 @@ describe("Publication renderer", () => {
       result: {
         ok: true,
         value: {
+          rendererVersion: 1,
           html: "<p>workerd proof</p>",
           referencedAssets: [],
           referencedProviders: [],

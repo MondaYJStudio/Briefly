@@ -1,4 +1,4 @@
-import { renderPublication } from "./renderer";
+import { renderPublication } from "../../src/articles/publication-renderer.server";
 
 export default {
   async fetch(): Promise<Response> {

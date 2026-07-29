@@ -69,6 +69,12 @@ The tested baseline is pinned to:
 
 Use Corepack or another pnpm installation that honors the `packageManager` field. Other package managers are unsupported.
 
+## Publication renderer
+
+The production Publication renderer is the single `renderPublication` operation in [`src/articles/publication-renderer.server.ts`](src/articles/publication-renderer.server.ts). Successful output records Renderer Version `1` separately from the input Document Schema Version. Increment the Renderer Version whenever a change can alter stored Publication HTML or reference facts; existing Publications are not re-rendered automatically.
+
+Renderer Version `1` uses the DOM-free `@tiptap/static-renderer/pm/html-string` path proven in workerd by Ticket 02. Production versions are pinned exactly: `@tiptap/core`, `@tiptap/pm`, and `@tiptap/static-renderer` at `3.29.2`, with Zod `4.4.3`. It runs under the project-wide Cloudflare compatibility date `2026-07-28` and `nodejs_compat` flag. The reproducible runtime, dependency, bundle, security, and rejected-path evidence remains in [`prototype/publication-renderer/README.md`](prototype/publication-renderer/README.md).
+
 `pnpm build` selects Wrangler's `production` environment before Cloudflare's Vite plugin writes the deploy configuration. This prevents a later deploy from accidentally carrying local D1/R2 bindings. Wrangler CLI metrics and deployment dependency instrumentation are disabled in the committed configuration.
 
 ## Local development

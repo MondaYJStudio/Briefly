@@ -1,9 +1,13 @@
 # Publication renderer workerd evidence
 
-Ticket 02 has a viable provisional path: strict Zod validation, ProseMirror
+Ticket 02 established a viable path: strict Zod validation, ProseMirror
 schema validation through Tiptap, and Tiptap's DOM-free static HTML renderer.
 The renderer accepts only versioned ProseMirror JSON; it does not accept or
 parse HTML and does not need a sanitizer or DOM shim.
+
+Ticket 09 productionized this path as the single `renderPublication` operation
+in `src/articles/publication-renderer.server.ts`. Renderer Version `1` uses the
+exact dependencies and compatibility requirements recorded below.
 
 ## Reproduce
 
@@ -17,7 +21,7 @@ pnpm prototype:renderer:bundle
 ```
 
 The focused suite is part of the repository's Cloudflare Vitest pool, not a
-Node test environment. On 2026-07-28 it reported 21 passing tests on workerd.
+Node test environment. On 2026-07-29 it reported 23 passing tests on workerd.
 The dry-run command writes its Worker bundle and esbuild metadata under
 `.output/publication-renderer-prototype/`.
 
@@ -57,9 +61,9 @@ static renderer, and iframe markup is generated only from fixed templates.
 
 `pnpm prototype:renderer:bundle` produced:
 
-- uncompressed Worker file: 983,949 bytes
-- Wrangler upload: 960.50 KiB
-- gzip: 171.26 KiB
+- uncompressed Worker file: 984,475 bytes
+- Wrangler upload: 961.01 KiB
+- gzip: 171.36 KiB
 - bindings: none
 
 The workerd suite observes `navigator.userAgent === "Cloudflare-Workers"`, no
@@ -87,6 +91,7 @@ renderPublication(
   | {
       ok: true;
       value: {
+        rendererVersion: 1;
         html: string;
         referencedAssets: ResolvedPublicationAsset[];
         referencedProviders: Array<{
@@ -118,9 +123,10 @@ Validation order is owned by the operation:
    mappings;
 6. return the complete HTML fragment and reference facts.
 
-The main refinement to the spec's provisional seam is the explicit
-`documentSchemaVersion` name and asynchronous Asset resolver. The all-or-nothing
-result and responsibility for validation ordering are unchanged.
+The production refinements to the spec's provisional seam are the explicit
+`documentSchemaVersion` name, asynchronous Asset resolver, and independent
+`rendererVersion`. The all-or-nothing result and responsibility for validation
+ordering are unchanged.
 
 ## Successful artifact
 
@@ -210,6 +216,6 @@ without partial HTML.
   the actionable Publication issues required by the spec. Strict source
   rejection occurs before ProseMirror materialization and rendering.
 
-This evidence is sufficient for Ticket 09 to use the provisional static
-renderer path; dependency upgrades must rerun the workerd suite and bundle
-probe because the runtime and security conclusions are version-specific.
+The production renderer uses this static renderer path. Dependency upgrades
+must rerun the workerd suite and bundle probe because the runtime and security
+conclusions are version-specific.

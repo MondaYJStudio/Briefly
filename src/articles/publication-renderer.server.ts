@@ -1,4 +1,4 @@
-/** Ticket 02's workerd compatibility prototype; Ticket 09 owns productionization. */
+/** Production Publication renderer, proven against workerd by Ticket 02. */
 import { Mark, Node, getSchema } from "@tiptap/core";
 import type { JSONContent } from "@tiptap/core";
 import { Node as ProseMirrorNode } from "@tiptap/pm/model";
@@ -10,6 +10,7 @@ import {
 import { z } from "zod";
 
 const DOCUMENT_SCHEMA_VERSION = 1;
+export const PUBLICATION_RENDERER_VERSION = 1;
 const VIDEO_PROVIDER_POLICIES = {
   youtube: {
     idPattern: /^[A-Za-z0-9_-]{11}$/,
@@ -343,6 +344,13 @@ const videoEmbedNodeSchema = z
   })
   .strict();
 
+const documentEnvelopeSchema = z
+  .object({
+    documentSchemaVersion: z.number(),
+    doc: z.unknown(),
+  })
+  .passthrough();
+
 const versionedDocumentSchema = z
   .object({
     documentSchemaVersion: z.literal(DOCUMENT_SCHEMA_VERSION),
@@ -381,6 +389,7 @@ export type PublicationRenderResult =
   | {
       ok: true;
       value: {
+        rendererVersion: typeof PUBLICATION_RENDERER_VERSION;
         html: string;
         referencedAssets: ResolvedPublicationAsset[];
         referencedProviders: Array<{ provider: VideoProvider; id: string }>;
@@ -388,18 +397,27 @@ export type PublicationRenderResult =
     }
   | { ok: false; issues: PublicationIssue[] };
 
-export async function renderPublication(
+export function renderPublication(
   document: VersionedPublicationDocument,
   dependencies: PublicationRendererDependencies,
+): Promise<PublicationRenderResult>;
+export async function renderPublication(
+  document: unknown,
+  dependencies: PublicationRendererDependencies,
 ): Promise<PublicationRenderResult> {
-  if (document.documentSchemaVersion !== DOCUMENT_SCHEMA_VERSION) {
+  const envelope = documentEnvelopeSchema.safeParse(document);
+  if (!envelope.success) {
+    return invalidDocumentIssues(document, envelope.error);
+  }
+
+  if (envelope.data.documentSchemaVersion !== DOCUMENT_SCHEMA_VERSION) {
     return {
       ok: false,
       issues: [
         {
           code: "UNSUPPORTED_DOCUMENT_SCHEMA_VERSION",
           path: "documentSchemaVersion",
-          message: `Document Schema Version ${document.documentSchemaVersion} is not supported`,
+          message: `Document Schema Version ${envelope.data.documentSchemaVersion} is not supported`,
         },
       ],
     };
@@ -472,6 +490,7 @@ export async function renderPublication(
   return {
     ok: true,
     value: {
+      rendererVersion: PUBLICATION_RENDERER_VERSION,
       html,
       referencedAssets: resolvedAssets.assets,
       referencedProviders: references.providers,
@@ -480,7 +499,7 @@ export async function renderPublication(
 }
 
 function invalidDocumentIssues(
-  document: VersionedPublicationDocument,
+  document: unknown,
   error: z.ZodError,
 ): PublicationRenderResult {
   return {
@@ -682,7 +701,12 @@ function normalizeResolvedAsset(
     return null;
   }
 
-  return { ...asset, publicUrl: publicUrl.href };
+  return {
+    assetId: asset.assetId,
+    publicUrl: publicUrl.href,
+    width: asset.width,
+    height: asset.height,
+  };
 }
 
 function renderFigure(
