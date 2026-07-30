@@ -6,11 +6,12 @@ import {
 } from "../assets/assets.server";
 import { readSiteSettings } from "../site-settings/site-settings.server";
 import { resolveArticleMetadata } from "../site-settings/site-settings";
-import { readArticle } from "./articles.server";
+import { normalizeArticleTag, readArticle } from "./articles.server";
 import type {
   ArticleCoverUsage,
   PublicArticle,
   PublicArticleCover,
+  PublicArticleListItem,
 } from "./articles";
 import {
   renderPublication,
@@ -23,6 +24,22 @@ export type PublishArticleResult =
   | {
       ok: false;
       reason: "conflict" | "not-found" | "already-published";
+    };
+
+export const PUBLIC_ARTICLE_LIST_DEFAULT_PAGE_SIZE = 20;
+export const PUBLIC_ARTICLE_LIST_MAXIMUM_PAGE_SIZE = 100;
+
+export type ListPublicArticlesResult =
+  | {
+      ok: true;
+      page: {
+        items: PublicArticleListItem[];
+        nextCursor: string | null;
+      };
+    }
+  | {
+      ok: false;
+      reason: "invalid-query" | "invalid-cursor" | "stale-cursor";
     };
 
 const publicArticleCover = z.object({
@@ -97,6 +114,13 @@ function publicArticleFromRow(row: PublicArticleRow): PublicArticle {
     updatedAt: new Date(publication.publication_published_at).toISOString(),
     html: publication.html,
   };
+}
+
+function publicArticleListItemFromRow(
+  row: PublicArticleRow,
+): PublicArticleListItem {
+  const { html: _html, ...item } = publicArticleFromRow(row);
+  return item;
 }
 
 function slugKeyFor(value: string): string {
@@ -379,6 +403,155 @@ const publicArticleSelection = `
   JOIN publication ON publication.id = article.current_publication_id
                   AND publication.article_id = article.id
 `;
+
+const publicArticleListQuery = z
+  .object({
+    cursor: z.string().min(1).optional(),
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(PUBLIC_ARTICLE_LIST_MAXIMUM_PAGE_SIZE)
+      .default(PUBLIC_ARTICLE_LIST_DEFAULT_PAGE_SIZE),
+    tag: z.string().optional(),
+  })
+  .strict();
+
+const publicArticleListCursor = z
+  .object({
+    v: z.literal(1),
+    publishedAt: z.number().int().nonnegative(),
+    articleId: z.string().uuid(),
+    tag: z.string().nullable(),
+  })
+  .strict();
+
+type PublicArticleListCursor = z.infer<typeof publicArticleListCursor>;
+
+function encodePublicArticleListCursor(
+  cursor: PublicArticleListCursor,
+): string {
+  const bytes = new TextEncoder().encode(JSON.stringify(cursor));
+  const base64 = btoa(String.fromCharCode(...bytes));
+  return base64.replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+}
+
+function decodePublicArticleListCursor(
+  encoded: string,
+): PublicArticleListCursor | null {
+  if (!/^[A-Za-z0-9_-]+$/u.test(encoded)) return null;
+  try {
+    const base64 = encoded.replaceAll("-", "+").replaceAll("_", "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const bytes = Uint8Array.from(atob(padded), (character) =>
+      character.charCodeAt(0),
+    );
+    const parsed = publicArticleListCursor.parse(
+      JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)),
+    );
+    return encodePublicArticleListCursor(parsed) === encoded ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function publicArticleListCursorIsCurrent(
+  database: D1Database,
+  cursor: PublicArticleListCursor,
+): Promise<boolean> {
+  const tagPredicate = cursor.tag
+    ? `AND EXISTS (
+         SELECT 1 FROM json_each(publication.tags) AS publication_tag
+         WHERE publication_tag.value = ?
+       )`
+    : "";
+  const bindings: unknown[] = [cursor.articleId, cursor.publishedAt];
+  if (cursor.tag) bindings.push(cursor.tag);
+  const anchor = await database
+    .prepare(
+      `${publicArticleSelection}
+       WHERE article.trashed_at IS NULL
+         AND article.id = ?
+         AND article.published_at = ?
+         ${tagPredicate}
+       LIMIT 1`,
+    )
+    .bind(...bindings)
+    .first<PublicArticleRow>();
+  return anchor !== null;
+}
+
+export async function listPublicArticles(
+  database: D1Database,
+  input: unknown = {},
+): Promise<ListPublicArticlesResult> {
+  const parsedQuery = publicArticleListQuery.safeParse(input);
+  if (!parsedQuery.success) return { ok: false, reason: "invalid-query" };
+  const normalizedTag = parsedQuery.data.tag
+    ? normalizeArticleTag(parsedQuery.data.tag)
+    : null;
+  if (parsedQuery.data.tag !== undefined && normalizedTag === null) {
+    return { ok: false, reason: "invalid-query" };
+  }
+
+  let cursor: PublicArticleListCursor | null = null;
+  if (parsedQuery.data.cursor) {
+    cursor = decodePublicArticleListCursor(parsedQuery.data.cursor);
+    if (!cursor) return { ok: false, reason: "invalid-cursor" };
+    if (
+      cursor.tag !== normalizedTag ||
+      !(await publicArticleListCursorIsCurrent(database, cursor))
+    ) {
+      return { ok: false, reason: "stale-cursor" };
+    }
+  }
+
+  const predicates = ["article.trashed_at IS NULL"];
+  const bindings: unknown[] = [];
+  if (normalizedTag) {
+    predicates.push(`EXISTS (
+      SELECT 1 FROM json_each(publication.tags) AS publication_tag
+      WHERE publication_tag.value = ?
+    )`);
+    bindings.push(normalizedTag);
+  }
+  if (cursor) {
+    predicates.push(`(
+      article.published_at < ? OR
+      (article.published_at = ? AND article.id > ?)
+    )`);
+    bindings.push(cursor.publishedAt, cursor.publishedAt, cursor.articleId);
+  }
+  bindings.push(parsedQuery.data.limit + 1);
+  const { results } = await database
+    .prepare(
+      `${publicArticleSelection}
+       WHERE ${predicates.join(" AND ")}
+       ORDER BY article.published_at DESC, article.id ASC
+       LIMIT ?`,
+    )
+    .bind(...bindings)
+    .all<PublicArticleRow>();
+  const hasNextPage = results.length > parsedQuery.data.limit;
+  const pageRows = results.slice(0, parsedQuery.data.limit);
+  const lastRow = pageRows.at(-1);
+  return {
+    ok: true,
+    page: {
+      items: pageRows.map(publicArticleListItemFromRow),
+      nextCursor:
+        hasNextPage && lastRow
+          ? encodePublicArticleListCursor({
+              v: 1,
+              publishedAt:
+                persistedPublicArticle.parse(lastRow).article_published_at,
+              articleId: lastRow.id,
+              tag: normalizedTag,
+            })
+          : null,
+    },
+  };
+}
 
 export async function readPublicArticle(
   database: D1Database,

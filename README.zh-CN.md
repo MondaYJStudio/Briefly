@@ -120,14 +120,14 @@ Drizzle schema 文件是数据库结构的事实来源；Drizzle Kit 生成提�
 
 该基线不包含产品遥测、主动联网、第三方分析或强制监控账户。结构化服务端日志使用固定的安全信封：时间戳、事件名、已校验的请求 ID、粗粒度操作、方法、状态和可选诊断码。日志 API 排除请求体、Cookie、凭据、会话值、初始化/恢复秘密、URL 和签名媒体数据。
 
-## 计划中的公开 API
+## 公开内容 API
 
-- `GET /api/articles` — 使用游标分页列出当前发布版本
-- `GET /api/articles/:slug` — 根据规范 slug 获取当前发布版本
+- `GET` / `HEAD /api/articles` — 使用不透明游标仅列出当前发布版本；`limit` 默认为 20、上限为 100，并支持一个归一化后的 `tag` 过滤条件
+- `GET` / `HEAD /api/articles/:slug` — 根据规范 slug 获取当前发布版本
+- `GET /api/openapi.json` — 查看机器可读的 OpenAPI 3.1 契约
 - `/media/...` — 交付受控的私有媒体与不可变公开媒体
-- OpenAPI 3.1 — 描述公开内容契约
 
-公开内容 API 将允许匿名跨域读取，并且不受管理员 Cookie 影响。
+公开内容 API 允许匿名跨域读取，并且不受管理员 Cookie 影响。列表与详情响应使用确定性 ETag，并要求共享缓存重新验证，因此成功发布会立即可见。OpenAPI 源与应用一起提交，其 schema 会用真实 Worker 响应做契约测试。
 
 ## 许可证
 

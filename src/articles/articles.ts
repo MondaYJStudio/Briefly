@@ -109,6 +109,8 @@ export interface PublicArticle {
   html: string;
 }
 
+export type PublicArticleListItem = Omit<PublicArticle, "html">;
+
 export interface PublicArticleCover {
   url: string;
   width: number;

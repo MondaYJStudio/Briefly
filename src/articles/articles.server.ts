@@ -88,6 +88,11 @@ const tag = z
   .pipe(z.string().min(1).max(ARTICLE_TAG_MAXIMUM_LENGTH))
   .transform((value) => value.toLocaleLowerCase("und"));
 
+export function normalizeArticleTag(value: string): string | null {
+  const result = tag.safeParse(value);
+  return result.success ? result.data : null;
+}
+
 const draftInput = z
   .object({
     version: z.number().int().positive(),

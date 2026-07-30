@@ -120,14 +120,14 @@ Drizzle schema files are the source of truth, and Drizzle Kit generates the orde
 
 The baseline contains no product telemetry, phone-home behavior, third-party analytics, or mandatory monitoring account. Structured server logs use a fixed safe envelope: timestamp, event name, validated request ID, coarse operation, method, status, and optional diagnosis code. Request bodies, cookies, credentials, session values, setup/recovery secrets, URLs, and signed media data are excluded by the logging API.
 
-## Planned public API
+## Public content API
 
-- `GET /api/articles` — list current Publications with cursor pagination
-- `GET /api/articles/:slug` — retrieve the current Publication by canonical slug
+- `GET` / `HEAD /api/articles` — list only current Publications using opaque cursor pagination; `limit` defaults to 20 and is capped at 100, and one normalized `tag` filter is supported
+- `GET` / `HEAD /api/articles/:slug` — retrieve the current Publication by canonical slug
+- `GET /api/openapi.json` — inspect the machine-readable OpenAPI 3.1 contract
 - `/media/...` — serve controlled private media and immutable public media
-- OpenAPI 3.1 — describe the public content contract
 
-The public content API will be anonymous, cross-origin readable, and independent of administrator cookies.
+The public content API is anonymous, cross-origin readable, and independent of administrator cookies. List and detail responses use deterministic ETags and require shared caches to revalidate so a successful publish is visible immediately. The OpenAPI source is committed with the application and its schemas are tested against real Worker responses.
 
 ## License
 

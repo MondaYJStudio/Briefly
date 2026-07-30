@@ -9,6 +9,7 @@ import {
 } from "../articles/articles.server";
 import { renderSavedArticleDraft } from "../articles/article-publication.server";
 import {
+  listPublicArticles,
   publishArticle,
   readPublicArticle,
 } from "../articles/publications.server";
@@ -31,6 +32,7 @@ import {
   readSiteSettings,
   updateSiteSettings,
 } from "../site-settings/site-settings.server";
+import { publicOpenApiDocument } from "./public-openapi";
 
 const siteSettingsContract = t.Object({
   siteName: t.String(),
@@ -77,42 +79,104 @@ async function administratorIsAuthenticated(
   );
 }
 
+function publicContentHeaders(): Headers {
+  return new Headers({
+    "access-control-allow-origin": "*",
+    "cache-control": "public, max-age=0, must-revalidate",
+  });
+}
+
+function requestMatchesEtag(request: Request, etag: string): boolean {
+  return Boolean(
+    request.headers
+      .get("if-none-match")
+      ?.split(",")
+      .map((candidate) => candidate.trim())
+      .some(
+        (candidate) =>
+          candidate === "*" || candidate.replace(/^W\//u, "") === etag,
+      ),
+  );
+}
+
+async function etagForBody(body: string): Promise<string> {
+  const digest = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)),
+  );
+  const base64 = btoa(String.fromCharCode(...digest));
+  return `"sha256-${base64.replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "")}"`;
+}
+
+async function publicJsonResponse(
+  request: Request,
+  value: unknown,
+  options: {
+    status?: number;
+    head?: boolean;
+    etag?: string | true;
+  } = {},
+): Promise<Response> {
+  const headers = publicContentHeaders();
+  const body = JSON.stringify(value);
+  if (options.etag) {
+    const etag = options.etag === true ? await etagForBody(body) : options.etag;
+    headers.set("etag", etag);
+    if (requestMatchesEtag(request, etag)) {
+      return new Response(null, { status: 304, headers });
+    }
+  }
+  headers.set("content-type", "application/json");
+  return new Response(options.head ? null : body, {
+    status: options.status ?? 200,
+    headers,
+  });
+}
+
+async function publicArticleListResponse(
+  database: D1Database,
+  request: Request,
+  query: unknown,
+  head = false,
+): Promise<Response> {
+  const result = await listPublicArticles(database, query);
+  if (!result.ok) {
+    const code =
+      result.reason === "invalid-query"
+        ? "ARTICLE_LIST_QUERY_INVALID"
+        : result.reason === "invalid-cursor"
+          ? "ARTICLE_LIST_CURSOR_INVALID"
+          : "ARTICLE_LIST_CURSOR_STALE";
+    return publicJsonResponse(
+      request,
+      { status: "error", code },
+      { status: 400, head },
+    );
+  }
+  return publicJsonResponse(request, result.page, { head, etag: true });
+}
+
+async function publicOpenApiResponse(request: Request): Promise<Response> {
+  return publicJsonResponse(request, publicOpenApiDocument, { etag: true });
+}
+
 async function publicArticleResponse(
   database: D1Database,
   request: Request,
   slug: string,
   head = false,
 ): Promise<Response> {
-  const headers = new Headers({
-    "access-control-allow-origin": "*",
-    "cache-control": "public, max-age=0, must-revalidate",
-  });
   const published = await readPublicArticle(database, slug);
   if (!published) {
-    return head
-      ? new Response(null, { status: 404, headers })
-      : Response.json(
-          { status: "error", code: "ARTICLE_NOT_FOUND" },
-          { status: 404, headers },
-        );
-  }
-
-  const etag = `"${published.publicationId}"`;
-  headers.set("etag", etag);
-  const matches = request.headers
-    .get("if-none-match")
-    ?.split(",")
-    .map((candidate) => candidate.trim())
-    .some(
-      (candidate) =>
-        candidate === "*" || candidate.replace(/^W\//u, "") === etag,
+    return publicJsonResponse(
+      request,
+      { status: "error", code: "ARTICLE_NOT_FOUND" },
+      { status: 404, head },
     );
-  if (matches) return new Response(null, { status: 304, headers });
-  if (head) {
-    headers.set("content-type", "application/json");
-    return new Response(null, { headers });
   }
-  return Response.json(published.article, { headers });
+  return publicJsonResponse(request, published.article, {
+    head,
+    etag: `"${published.publicationId}"`,
+  });
 }
 
 function createApi(getBindings: () => RuntimeBindings) {
@@ -443,6 +507,13 @@ function createApi(getBindings: () => RuntimeBindings) {
         params: t.Object({ articleId: t.String({ format: "uuid" }) }),
         body: t.Object({ draftVersion: t.Number({ minimum: 1 }) }),
       },
+    )
+    .get("/openapi.json", ({ request }) => publicOpenApiResponse(request))
+    .get("/articles", ({ query, request }) =>
+      publicArticleListResponse(getBindings().DB, request, query),
+    )
+    .head("/articles", ({ query, request }) =>
+      publicArticleListResponse(getBindings().DB, request, query, true),
     )
     .get("/articles/:slug", ({ params, request }) =>
       publicArticleResponse(getBindings().DB, request, params.slug),
