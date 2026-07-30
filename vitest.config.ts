@@ -33,6 +33,7 @@ export default defineConfig(async () => {
       }),
     ],
     test: {
+      maxWorkers: 4,
       setupFiles: ["./test/apply-migrations.ts"],
       testTimeout: 15_000,
     },

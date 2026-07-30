@@ -144,10 +144,7 @@ describe("sole Administrator authentication", () => {
     const originalIdentity = await env.DB.prepare(
       "SELECT id, email FROM auth_user",
     ).first<{ id: string; email: string }>();
-    const cookies = await Promise.all([
-      signIn().then(cookieFrom),
-      signIn().then(cookieFrom),
-    ]);
+    const cookies = [cookieFrom(await signIn()), cookieFrom(await signIn())];
     const newPassword = "a fresh password from the operator";
 
     const recoveryResponse = await recover(env.RECOVERY_SECRET, newPassword);
@@ -185,20 +182,23 @@ describe("sole Administrator authentication", () => {
       env.RECOVERY_SECRET,
       "valid replacement password",
     );
+    const emptyInstallationText = await emptyInstallationResponse.text();
     expect((await initialize()).status).toBe(201);
     const invalidPasswordResponse = await recover(
       env.RECOVERY_SECRET,
       "too-short",
     );
+    const invalidPasswordText = await invalidPasswordResponse.text();
     const setupSecretResponse = await recover(
       env.SETUP_SECRET,
       "valid replacement password",
     );
-    const responseTexts = await Promise.all([
-      emptyInstallationResponse.text(),
-      invalidPasswordResponse.text(),
-      setupSecretResponse.text(),
-    ]);
+    const setupSecretText = await setupSecretResponse.text();
+    const responseTexts = [
+      emptyInstallationText,
+      invalidPasswordText,
+      setupSecretText,
+    ];
 
     expect([
       emptyInstallationResponse.status,
