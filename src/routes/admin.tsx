@@ -420,6 +420,40 @@ function preserveLocalDraft(server: Article, local: Article): Article {
   };
 }
 
+function mergeConcurrentCurrentPublication(
+  server: Article,
+  requestSnapshot: Article | null,
+  local: Article | null,
+): { article: Article; currentPublicationChanged: boolean } {
+  if (
+    !requestSnapshot ||
+    !local ||
+    requestSnapshot.id !== server.id ||
+    local.id !== server.id ||
+    local.currentPublicationId === requestSnapshot.currentPublicationId
+  ) {
+    return { article: server, currentPublicationChanged: false };
+  }
+
+  return {
+    article: { ...server, currentPublicationId: local.currentPublicationId },
+    currentPublicationChanged: true,
+  };
+}
+
+function replaceArticlePreservingConcurrentCurrentPublication(
+  articles: Article[],
+  server: Article,
+  requestSnapshot: Article | null,
+): Article[] {
+  return articles.map((local) =>
+    local.id === server.id
+      ? mergeConcurrentCurrentPublication(server, requestSnapshot, local)
+          .article
+      : local,
+  );
+}
+
 function ArticleDraftManager() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [selected, setSelected] = useState<Article | null>(null);
@@ -451,6 +485,9 @@ function ArticleDraftManager() {
   const [publicationAction, setPublicationAction] = useState<
     "published" | "republished" | null
   >(null);
+  const [unpublishState, setUnpublishState] = useState<
+    "ready" | "unpublishing" | "unpublished" | "error"
+  >("ready");
 
   function resetPreview() {
     previewRequestGeneration.current += 1;
@@ -459,7 +496,10 @@ function ArticleDraftManager() {
     setPreviewState("idle");
   }
 
-  function selectServerDraft(article: Article) {
+  function selectServerDraft(
+    article: Article,
+    options: { preserveUnpublishFeedback?: boolean } = {},
+  ) {
     selectedRef.current = article;
     revisionRef.current = 0;
     confirmedRevisionRef.current = 0;
@@ -467,6 +507,11 @@ function ArticleDraftManager() {
     setRevision(0);
     setConfirmedRevision(0);
     setEditorGeneration((current) => current + 1);
+    if (!options.preserveUnpublishFeedback) {
+      setUnpublishState((current) =>
+        current === "unpublishing" ? current : "ready",
+      );
+    }
     resetPreview();
   }
 
@@ -491,6 +536,7 @@ function ArticleDraftManager() {
   }, []);
 
   async function createDraft() {
+    if (lifecycleActionPending) return;
     setState("creating");
     setIssues([]);
     try {
@@ -509,13 +555,22 @@ function ArticleDraftManager() {
   }
 
   async function loadDraft(articleId: string) {
+    if (lifecycleActionPending) return;
+    const requestSnapshot = selectedRef.current;
     setState("loading");
     setIssues([]);
     try {
       const response = await getApiClient().admin.articles({ articleId }).get();
       if (response.status !== 200 || !response.data)
         throw new Error("Article unavailable");
-      selectServerDraft(response.data);
+      const merged = mergeConcurrentCurrentPublication(
+        response.data,
+        requestSnapshot,
+        selectedRef.current,
+      );
+      selectServerDraft(merged.article, {
+        preserveUnpublishFeedback: merged.currentPublicationChanged,
+      });
       setState("ready");
       setPublishState("ready");
       setPublicationAction(null);
@@ -544,15 +599,25 @@ function ArticleDraftManager() {
         .draft.put(input);
       if (response.status === 200 && response.data) {
         const local = selectedRef.current;
+        const localArticle = local?.id === response.data.id ? local : null;
         const localChanged = revisionRef.current !== capturedRevision;
+        const lifecycleMerged = mergeConcurrentCurrentPublication(
+          response.data,
+          snapshot,
+          localArticle,
+        ).article;
         const next =
-          localChanged && local?.id === response.data.id
-            ? preserveLocalDraft(response.data, local)
-            : response.data;
+          localChanged && localArticle
+            ? preserveLocalDraft(lifecycleMerged, localArticle)
+            : lifecycleMerged;
         selectedRef.current = next;
         setSelected(next);
         setArticles((current) =>
-          current.map((article) => (article.id === next.id ? next : article)),
+          replaceArticlePreservingConcurrentCurrentPublication(
+            current,
+            next,
+            snapshot,
+          ),
         );
         setPublishState("ready");
         setPublicationAction(null);
@@ -641,17 +706,29 @@ function ArticleDraftManager() {
   }
 
   async function reloadDraft() {
-    const articleId = selectedRef.current?.id;
-    if (!articleId) return;
+    if (lifecycleActionPending) return;
+    const requestSnapshot = selectedRef.current;
+    if (!requestSnapshot) return;
     setState("loading");
     try {
-      const response = await getApiClient().admin.articles({ articleId }).get();
+      const response = await getApiClient()
+        .admin.articles({ articleId: requestSnapshot.id })
+        .get();
       if (response.status !== 200 || !response.data)
         throw new Error("Article unavailable");
-      selectServerDraft(response.data);
+      const merged = mergeConcurrentCurrentPublication(
+        response.data,
+        requestSnapshot,
+        selectedRef.current,
+      );
+      selectServerDraft(merged.article, {
+        preserveUnpublishFeedback: merged.currentPublicationChanged,
+      });
       setArticles((current) =>
-        current.map((article) =>
-          article.id === response.data.id ? response.data : article,
+        replaceArticlePreservingConcurrentCurrentPublication(
+          current,
+          merged.article,
+          requestSnapshot,
         ),
       );
       setState("ready");
@@ -663,6 +740,7 @@ function ArticleDraftManager() {
   }
 
   async function retryConflict() {
+    if (lifecycleActionPending) return;
     const local = selectedRef.current;
     if (!local) return;
     setState("loading");
@@ -674,7 +752,14 @@ function ArticleDraftManager() {
         .get();
       if (response.status !== 200 || !response.data)
         throw new Error("Article unavailable");
-      const retry = preserveLocalDraft(response.data, local);
+      const current = selectedRef.current;
+      const currentArticle = current?.id === response.data.id ? current : local;
+      const lifecycleMerged = mergeConcurrentCurrentPublication(
+        response.data,
+        local,
+        currentArticle,
+      ).article;
+      const retry = preserveLocalDraft(lifecycleMerged, currentArticle);
       selectedRef.current = retry;
       setSelected(retry);
       await persistCurrentDraft(response.data.draft.version);
@@ -689,6 +774,18 @@ function ArticleDraftManager() {
     isOnline &&
     !hasUnsavedChanges &&
     ["ready", "saved"].includes(state);
+  const lifecycleActionPending =
+    publishState === "publishing" || unpublishState === "unpublishing";
+  const publishActionDisabled =
+    !selected ||
+    !serverConfirmed ||
+    publishState !== "ready" ||
+    lifecycleActionPending;
+  const unpublishActionDisabled =
+    !selected?.currentPublicationId ||
+    lifecycleActionPending ||
+    state === "loading" ||
+    state === "creating";
   const blocker = useBlocker({
     shouldBlockFn: () => hasUnsavedChanges,
     enableBeforeUnload: hasUnsavedChanges,
@@ -746,12 +843,7 @@ function ArticleDraftManager() {
       isOnline &&
       revisionRef.current === confirmedRevisionRef.current &&
       ["ready", "saved"].includes(state);
-    if (
-      !snapshot ||
-      !publishable ||
-      publishState === "publishing" ||
-      publishState === "published"
-    ) {
+    if (!snapshot || !publishable || publishActionDisabled) {
       return;
     }
 
@@ -766,6 +858,7 @@ function ArticleDraftManager() {
         if (selectedRef.current?.id === snapshot.id) {
           setPublishState("published");
           setPublicationAction(isRepublish ? "republished" : "published");
+          setUnpublishState("ready");
         }
         try {
           const refreshed = await getApiClient()
@@ -776,21 +869,31 @@ function ArticleDraftManager() {
             const stillSelected = local?.id === refreshed.data.id;
             const localChanged =
               stillSelected && revisionRef.current !== capturedRevision;
+            const lifecycleMerged = mergeConcurrentCurrentPublication(
+              refreshed.data,
+              snapshot,
+              local,
+            );
             const next =
               localChanged && local
-                ? preserveLocalDraft(refreshed.data, local)
-                : refreshed.data;
+                ? preserveLocalDraft(lifecycleMerged.article, local)
+                : lifecycleMerged.article;
             if (stillSelected) {
               if (localChanged) {
                 selectedRef.current = next;
                 setSelected(next);
               } else {
-                selectServerDraft(next);
+                selectServerDraft(next, {
+                  preserveUnpublishFeedback:
+                    lifecycleMerged.currentPublicationChanged,
+                });
               }
             }
             setArticles((current) =>
-              current.map((article) =>
-                article.id === next.id ? next : article,
+              replaceArticlePreservingConcurrentCurrentPublication(
+                current,
+                next,
+                snapshot,
               ),
             );
           }
@@ -814,6 +917,43 @@ function ArticleDraftManager() {
       }
     } catch {
       if (selectedRef.current?.id === snapshot.id) setPublishState("error");
+    }
+  }
+
+  async function unpublishCurrentPublication() {
+    const snapshot = selectedRef.current;
+    if (!snapshot?.currentPublicationId || unpublishActionDisabled) {
+      return;
+    }
+
+    setUnpublishState("unpublishing");
+    try {
+      const response = await getApiClient()
+        .admin.articles({ articleId: snapshot.id })
+        ["current-publication"].delete();
+      if (response.status === 200 && response.data) {
+        setArticles((current) =>
+          current.map((article) =>
+            article.id === snapshot.id
+              ? { ...article, currentPublicationId: null }
+              : article,
+          ),
+        );
+        const local = selectedRef.current;
+        if (local?.id === snapshot.id) {
+          const unpublished = { ...local, currentPublicationId: null };
+          selectedRef.current = unpublished;
+          setSelected(unpublished);
+          setPublishState("ready");
+          setPublicationAction(null);
+          setUnpublishState("unpublished");
+        }
+        return;
+      }
+
+      if (selectedRef.current?.id === snapshot.id) setUnpublishState("error");
+    } catch {
+      if (selectedRef.current?.id === snapshot.id) setUnpublishState("error");
     }
   }
 
@@ -868,7 +1008,12 @@ function ArticleDraftManager() {
                 >
                   Retry save
                 </Button>
-                <Button type="button" variant="secondary" onPress={reloadDraft}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  isDisabled={lifecycleActionPending}
+                  onPress={reloadDraft}
+                >
                   Reload server Draft
                 </Button>
               </div>
@@ -883,10 +1028,19 @@ function ArticleDraftManager() {
               A newer Draft Version is already saved. No automatic rich-text
               merge or overwrite was attempted.
               <div className="mt-3 flex gap-2">
-                <Button type="button" onPress={retryConflict}>
+                <Button
+                  type="button"
+                  isDisabled={lifecycleActionPending}
+                  onPress={retryConflict}
+                >
                   Deliberately retry local Draft
                 </Button>
-                <Button type="button" variant="secondary" onPress={reloadDraft}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  isDisabled={lifecycleActionPending}
+                  onPress={reloadDraft}
+                >
                   Reload server Draft
                 </Button>
               </div>
@@ -979,7 +1133,7 @@ function ArticleDraftManager() {
             <Alert.Description>
               {publicationAction === "republished"
                 ? "The new immutable Publication is public now; earlier Publications remain unchanged."
-                : "The first immutable Publication is public now."}
+                : "A new immutable Publication is public now."}
             </Alert.Description>
           </Alert.Content>
         </Alert>
@@ -1014,11 +1168,33 @@ function ArticleDraftManager() {
           </Alert.Content>
         </Alert>
       ) : null}
+      {unpublishState === "unpublished" ? (
+        <Alert status="success" role="status">
+          <Alert.Content>
+            <Alert.Title>Article unpublished</Alert.Title>
+            <Alert.Description>
+              This Article is private now: it has no Current Publication and is
+              unavailable from public content endpoints. Its Draft and
+              Publication history remain intact, and it can be published again.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : unpublishState === "error" ? (
+        <Alert status="danger" role="alert">
+          <Alert.Content>
+            <Alert.Title>Unable to unpublish Article</Alert.Title>
+            <Alert.Description>
+              Briefly did not confirm withdrawal. The existing Current
+              Publication remains public; reload and try again.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : null}
       <Button
         fullWidth
         type="button"
         isPending={state === "creating"}
-        isDisabled={hasUnsavedChanges}
+        isDisabled={hasUnsavedChanges || lifecycleActionPending}
         onPress={createDraft}
       >
         Create Article Draft
@@ -1038,7 +1214,7 @@ function ArticleDraftManager() {
                 fullWidth
                 type="button"
                 variant="secondary"
-                isDisabled={hasUnsavedChanges}
+                isDisabled={hasUnsavedChanges || lifecycleActionPending}
                 onPress={() => loadDraft(article.id)}
               >
                 {article.draft.title || "Untitled Article"} · Version{" "}
@@ -1309,8 +1485,8 @@ function ArticleDraftManager() {
       <p className="text-sm text-default-500">
         Publishing is available only for a server-confirmed Draft Version and
         requires deliberate confirmation while online. Choose Publish saved
-        Draft for the first immutable Publication; choose Republish saved Draft
-        after later saved edits. Republishing creates a new immutable
+        Draft while the Article has no Current Publication; choose Republish
+        saved Draft while it is public. Republishing creates a new immutable
         Publication while preserving earlier history and switches the Current
         Publication only after the new public read is available.
       </p>
@@ -1318,11 +1494,18 @@ function ArticleDraftManager() {
         Published media URLs remain public permanently, including after the
         Article is unpublished.
       </p>
+      <p className="text-sm text-default-500">
+        Unpublish is reversible and does not depend on the Draft save state. It
+        removes the Current Publication from public list and detail endpoints;
+        Draft and Publication history remain intact. This is not Trash or
+        permanent purge, and previously published media remains public. The
+        action requires deliberate confirmation.
+      </p>
       <AlertDialog.Root>
         <Button
           fullWidth
           type="button"
-          isDisabled={!selected || !serverConfirmed || publishState !== "ready"}
+          isDisabled={publishActionDisabled}
           isPending={publishState === "publishing"}
         >
           {selected?.currentPublicationId
@@ -1349,9 +1532,9 @@ function ArticleDraftManager() {
                   </p>
                 ) : (
                   <p>
-                    Publish saved Draft Version {selected?.draft.version} as
-                    this Article&apos;s first immutable Publication. It will be
-                    immediately public after the Current Publication switches.
+                    Publish saved Draft Version {selected?.draft.version} as a
+                    new immutable Publication. It will be immediately public
+                    after the Current Publication switches.
                   </p>
                 )}
               </AlertDialog.Body>
@@ -1362,12 +1545,59 @@ function ArticleDraftManager() {
                 <Button
                   type="button"
                   slot="close"
-                  isDisabled={!serverConfirmed || publishState !== "ready"}
+                  isDisabled={publishActionDisabled}
                   onPress={() => void publishDraft()}
                 >
                   {selected?.currentPublicationId
                     ? "Republish saved Draft"
                     : "Publish saved Draft"}
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog.Root>
+      <AlertDialog.Root>
+        <Button
+          fullWidth
+          type="button"
+          variant="danger-soft"
+          aria-label="Unpublish this Article?"
+          isDisabled={unpublishActionDisabled}
+          isPending={unpublishState === "unpublishing"}
+        >
+          Unpublish Article
+        </Button>
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog>
+              <AlertDialog.Header>
+                <AlertDialog.Heading>
+                  Unpublish this Article?
+                </AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>
+                <p>
+                  Unpublish is reversible. It immediately removes the Current
+                  Publication from the public list and makes public detail GET
+                  and HEAD return 404. Draft and Publication history remain
+                  intact, so you can edit and publish a new immutable
+                  Publication later. This is not Trash or permanent purge, and
+                  previously published media remains public.
+                </p>
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button type="button" variant="secondary" slot="close">
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger-soft"
+                  slot="close"
+                  isDisabled={unpublishActionDisabled}
+                  onPress={() => void unpublishCurrentPublication()}
+                >
+                  Unpublish Article
                 </Button>
               </AlertDialog.Footer>
             </AlertDialog.Dialog>

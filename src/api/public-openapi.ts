@@ -18,6 +18,9 @@ const publicResponseHeaders = {
   ETag: { $ref: "#/components/headers/ETag" },
 } satisfies Record<string, OpenAPIV3_1.ReferenceObject>;
 
+const articleUnavailableDescription =
+  "The Article is unavailable; this response intentionally does not disclose why.";
+
 const listParameters = [
   {
     name: "cursor",
@@ -215,8 +218,7 @@ export const publicOpenApiDocument = {
             headers: publicResponseHeaders,
           },
           404: {
-            description:
-              "No current, non-trashed Publication exists at this slug.",
+            description: articleUnavailableDescription,
             headers: {
               "Access-Control-Allow-Origin":
                 publicResponseHeaders["Access-Control-Allow-Origin"],
@@ -244,7 +246,7 @@ export const publicOpenApiDocument = {
             headers: publicResponseHeaders,
           },
           404: {
-            description: "No current Publication exists at this slug.",
+            description: articleUnavailableDescription,
             headers: {
               "Access-Control-Allow-Origin":
                 publicResponseHeaders["Access-Control-Allow-Origin"],
@@ -357,7 +359,12 @@ export const publicOpenApiDocument = {
         required: ["status", "code"],
         properties: {
           status: { type: "string", enum: ["error"] },
-          code: { type: "string", enum: ["ARTICLE_NOT_FOUND"] },
+          code: {
+            type: "string",
+            enum: ["ARTICLE_NOT_FOUND"],
+            description:
+              "Generic unavailable code shared by unknown, Draft-only, unpublished, and other non-public Articles.",
+          },
         },
       },
     },

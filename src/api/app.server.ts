@@ -12,6 +12,7 @@ import {
   listPublicArticles,
   publishArticle,
   readPublicArticle,
+  unpublishArticle,
 } from "../articles/publications.server";
 import { recognizeVideoEmbed } from "../articles/video-embeds";
 import {
@@ -504,6 +505,35 @@ function createApi(getBindings: () => RuntimeBindings) {
         params: t.Object({ articleId: t.String({ format: "uuid" }) }),
         body: t.Object({ draftVersion: t.Number({ minimum: 1 }) }),
       },
+    )
+    .delete(
+      "/admin/articles/:articleId/current-publication",
+      async ({ params, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        let result: Awaited<ReturnType<typeof unpublishArticle>>;
+        try {
+          result = await unpublishArticle(bindings.DB, params.articleId);
+        } catch {
+          return status(500, {
+            status: "error" as const,
+            code: "INTERNAL_ERROR" as const,
+          });
+        }
+        if (result.ok) return result.article;
+        if (result.reason === "not-found")
+          return status(404, {
+            status: "error" as const,
+            code: "ARTICLE_NOT_FOUND" as const,
+          });
+      },
+      { params: t.Object({ articleId: t.String({ format: "uuid" }) }) },
     )
     .get("/openapi.json", ({ request }) => publicOpenApiResponse(request))
     .get("/articles", ({ query, request }) =>

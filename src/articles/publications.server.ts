@@ -23,8 +23,35 @@ export type PublishArticleResult =
   | { ok: false; reason: "invalid"; issues: PublicationIssue[] }
   | { ok: false; reason: "conflict" | "not-found" };
 
+export type UnpublishArticleResult =
+  | {
+      ok: true;
+      article: { id: string; currentPublicationId: null };
+    }
+  | { ok: false; reason: "not-found" };
+
 export const PUBLIC_ARTICLE_LIST_DEFAULT_PAGE_SIZE = 20;
 export const PUBLIC_ARTICLE_LIST_MAXIMUM_PAGE_SIZE = 100;
+
+export async function unpublishArticle(
+  database: D1Database,
+  articleId: string,
+): Promise<UnpublishArticleResult> {
+  const cleared = await database
+    .prepare(
+      `UPDATE article
+       SET current_publication_id = NULL
+       WHERE id = ? AND trashed_at IS NULL`,
+    )
+    .bind(articleId)
+    .run();
+  if (cleared.meta.changes !== 1) return { ok: false, reason: "not-found" };
+
+  return {
+    ok: true,
+    article: { id: articleId, currentPublicationId: null },
+  };
+}
 
 export type ListPublicArticlesResult =
   | {

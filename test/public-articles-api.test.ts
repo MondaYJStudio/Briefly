@@ -555,7 +555,7 @@ describe("public Article API", () => {
   it("serves an OpenAPI 3.1 contract that validates real list and detail behavior", async () => {
     const cookie = await initializeAndSignIn();
     const coverAsset = await uploadOnePixelPngAsset(cookie, "contract.png");
-    await createArticle(cookie, {
+    const contractArticle = await createArticle(cookie, {
       slug: "contract-article",
       title: "Contract article",
       summary: null,
@@ -577,6 +577,16 @@ describe("public Article API", () => {
       "/api/articles",
       "/api/articles/{slug}",
     ]);
+    const unavailableDescription =
+      "The Article is unavailable; this response intentionally does not disclose why.";
+    for (const method of ["get", "head"] as const) {
+      const unavailable =
+        contract.paths?.["/api/articles/{slug}"]?.[method]?.responses?.[404];
+      if (!unavailable || "$ref" in unavailable) {
+        throw new Error(`Missing inline 404 response for ${method}`);
+      }
+      expect(unavailable.description).toBe(unavailableDescription);
+    }
 
     const listParameters = contract.paths?.["/api/articles"]?.get?.parameters;
     if (!listParameters) throw new Error("Missing list parameters");
@@ -641,6 +651,8 @@ describe("public Article API", () => {
     const detailSuccess = await SELF.fetch(
       "http://briefly.test/api/articles/contract-article",
     );
+    const detailEtag = detailSuccess.headers.get("etag");
+    expect(detailEtag).toBeTruthy();
     const detailSuccessBody = await detailSuccess.json();
     expectResponseMatchesContract(
       contract,
@@ -654,12 +666,42 @@ describe("public Article API", () => {
     const detailError = await SELF.fetch(
       "http://briefly.test/api/articles/missing-article",
     );
+    const detailErrorBody = await detailError.json();
     expectResponseMatchesContract(
       contract,
       "/api/articles/{slug}",
       "get",
       detailError.status,
-      await detailError.json(),
+      detailErrorBody,
     );
+
+    const unpublished = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${contractArticle.id}/current-publication`,
+      { method: "DELETE", headers: { cookie } },
+    );
+    expect(unpublished.status).toBe(200);
+    const unavailable = await SELF.fetch(
+      "http://briefly.test/api/articles/contract-article",
+      { headers: { "if-none-match": detailEtag! } },
+    );
+    const unavailableBody = await unavailable.json();
+    expect(unavailable.status).toBe(404);
+    expect(unavailable.headers.get("etag")).toBeNull();
+    expect(unavailableBody).toEqual(detailErrorBody);
+    expectResponseMatchesContract(
+      contract,
+      "/api/articles/{slug}",
+      "get",
+      unavailable.status,
+      unavailableBody,
+    );
+
+    const unavailableHead = await SELF.fetch(
+      "http://briefly.test/api/articles/contract-article",
+      { method: "HEAD", headers: { "if-none-match": detailEtag! } },
+    );
+    expect(unavailableHead.status).toBe(404);
+    expect(unavailableHead.headers.get("etag")).toBeNull();
+    expect(await unavailableHead.text()).toBe("");
   }, 30_000);
 });
