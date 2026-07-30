@@ -21,10 +21,7 @@ import {
 export type PublishArticleResult =
   | { ok: true; article: PublicArticle }
   | { ok: false; reason: "invalid"; issues: PublicationIssue[] }
-  | {
-      ok: false;
-      reason: "conflict" | "not-found" | "already-published";
-    };
+  | { ok: false; reason: "conflict" | "not-found" };
 
 export const PUBLIC_ARTICLE_LIST_DEFAULT_PAGE_SIZE = 20;
 export const PUBLIC_ARTICLE_LIST_MAXIMUM_PAGE_SIZE = 100;
@@ -99,8 +96,9 @@ const persistedPublicArticle = z.object({
 
 type PublicArticleRow = z.input<typeof persistedPublicArticle>;
 
-function publicArticleFromRow(row: PublicArticleRow): PublicArticle {
-  const publication = persistedPublicArticle.parse(row);
+function publicArticleFromPublication(
+  publication: z.output<typeof persistedPublicArticle>,
+): PublicArticle {
   return {
     id: publication.id,
     slug: publication.slug,
@@ -114,6 +112,10 @@ function publicArticleFromRow(row: PublicArticleRow): PublicArticle {
     updatedAt: new Date(publication.publication_published_at).toISOString(),
     html: publication.html,
   };
+}
+
+function publicArticleFromRow(row: PublicArticleRow): PublicArticle {
+  return publicArticleFromPublication(persistedPublicArticle.parse(row));
 }
 
 function publicArticleListItemFromRow(
@@ -216,8 +218,6 @@ export async function publishArticle(
     throw error;
   }
   if (!article) return { ok: false, reason: "not-found" };
-  if (article.currentPublicationId !== null)
-    return { ok: false, reason: "already-published" };
   if (article.draft.version !== draftVersion)
     return { ok: false, reason: "conflict" };
 
@@ -263,20 +263,7 @@ export async function publishArticle(
   if (slug === null) throw new Error("Validated Publication slug is absent");
   const slugKey = slugKeyFor(slug);
   const publishedAt = Date.now();
-  const publishedAtIso = new Date(publishedAt).toISOString();
-  const publicArticle: PublicArticle = {
-    id: article.id,
-    slug,
-    title: article.draft.title,
-    summary: article.draft.summary,
-    tags: article.draft.tags,
-    byline: resolvedMetadata.byline,
-    language: resolvedMetadata.language,
-    cover,
-    publishedAt: publishedAtIso,
-    updatedAt: publishedAtIso,
-    html: rendered.value.html,
-  };
+  const expectedCurrentPublicationId = article.currentPublicationId;
   const statements: D1PreparedStatement[] = [
     database
       .prepare(
@@ -289,11 +276,17 @@ export async function publishArticle(
              JOIN article ON article.id = article_draft.article_id
              WHERE article_draft.article_id = ?
                AND article_draft.version = ?
-               AND article.current_publication_id IS NULL
+               AND article.current_publication_id IS ?
                AND article.trashed_at IS NULL
            )`,
       )
-      .bind(slugKey, articleId, articleId, draftVersion),
+      .bind(
+        slugKey,
+        articleId,
+        articleId,
+        draftVersion,
+        expectedCurrentPublicationId,
+      ),
   ];
   for (const asset of resolvedAssets.values()) {
     statements.push(
@@ -302,9 +295,25 @@ export async function publishArticle(
           `UPDATE asset
            SET public_asset_id = COALESCE(public_asset_id, ?)
            WHERE id = ? AND lifecycle_state = 'ready'
-             AND (public_asset_id IS NULL OR public_asset_id = ?)`,
+             AND (public_asset_id IS NULL OR public_asset_id = ?)
+             AND EXISTS (
+               SELECT 1
+               FROM article_draft
+               JOIN article ON article.id = article_draft.article_id
+               WHERE article_draft.article_id = ?
+                 AND article_draft.version = ?
+                 AND article.current_publication_id IS ?
+                 AND article.trashed_at IS NULL
+             )`,
         )
-        .bind(asset.publicAssetId, asset.assetId, asset.publicAssetId),
+        .bind(
+          asset.publicAssetId,
+          asset.assetId,
+          asset.publicAssetId,
+          articleId,
+          draftVersion,
+          expectedCurrentPublicationId,
+        ),
     );
   }
   const publicationStatementIndex = statements.length;
@@ -316,14 +325,23 @@ export async function publishArticle(
             summary, tags, byline, language, cover, document_schema_version,
             document, renderer_version, provider_facts, html, published_at,
             created_at)
-         SELECT ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+         SELECT ?, ?, ?, ?,
+                COALESCE(
+                  (
+                    SELECT MAX(publication_number) + 1
+                    FROM publication
+                    WHERE article_id = ?
+                  ),
+                  1
+                ),
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          WHERE EXISTS (
            SELECT 1
            FROM article_draft
            JOIN article ON article.id = article_draft.article_id
            WHERE article_draft.article_id = ?
              AND article_draft.version = ?
-             AND article.current_publication_id IS NULL
+             AND article.current_publication_id IS ?
              AND article.trashed_at IS NULL
          )`,
       )
@@ -332,6 +350,7 @@ export async function publishArticle(
         articleId,
         slug,
         slugKey,
+        articleId,
         article.draft.title,
         article.draft.summary,
         JSON.stringify(article.draft.tags),
@@ -347,6 +366,7 @@ export async function publishArticle(
         publishedAt,
         articleId,
         draftVersion,
+        expectedCurrentPublicationId,
       ),
   );
   for (const asset of resolvedAssets.values()) {
@@ -355,9 +375,20 @@ export async function publishArticle(
         .prepare(
           `INSERT INTO publication_asset_reference
              (publication_id, asset_id, public_asset_id, asset_lifecycle_state)
-           VALUES (?, ?, ?, 'ready')`,
+           SELECT ?, ?, ?, 'ready'
+           WHERE EXISTS (
+             SELECT 1
+             FROM publication
+             WHERE id = ? AND article_id = ?
+           )`,
         )
-        .bind(publicationId, asset.assetId, asset.publicAssetId),
+        .bind(
+          publicationId,
+          asset.assetId,
+          asset.publicAssetId,
+          publicationId,
+          articleId,
+        ),
     );
   }
   const pointerStatementIndex = statements.length;
@@ -368,15 +399,41 @@ export async function publishArticle(
          SET current_publication_id = ?,
              published_at = COALESCE(published_at, ?),
              updated_at = ?
-         WHERE id = ? AND current_publication_id IS NULL
+         WHERE id = ? AND current_publication_id IS ?
            AND EXISTS (
              SELECT 1 FROM publication
              WHERE publication.id = ? AND publication.article_id = article.id
+           )
+           AND EXISTS (
+             SELECT 1
+             FROM article_draft
+             WHERE article_draft.article_id = article.id
+               AND article_draft.version = ?
            )`,
       )
-      .bind(publicationId, publishedAt, publishedAt, articleId, publicationId),
+      .bind(
+        publicationId,
+        publishedAt,
+        publishedAt,
+        articleId,
+        expectedCurrentPublicationId,
+        publicationId,
+        draftVersion,
+      ),
   );
-  const batch = await database.batch(statements);
+  const publicReadStatementIndex = statements.length;
+  statements.push(
+    database
+      .prepare(
+        `${publicArticleSelection}
+         WHERE article.trashed_at IS NULL
+           AND publication.slug_key = ?
+           AND publication.id = ?
+         LIMIT 1`,
+      )
+      .bind(slugKey, publicationId),
+  );
+  const batch = await database.batch<PublicArticleRow>(statements);
 
   if (
     (batch[publicationStatementIndex]?.meta.changes ?? 0) !== 1 ||
@@ -384,12 +441,17 @@ export async function publishArticle(
   ) {
     const current = await readArticle(database, articleId);
     if (!current) return { ok: false, reason: "not-found" };
-    return current.currentPublicationId === null
-      ? { ok: false, reason: "conflict" }
-      : { ok: false, reason: "already-published" };
+    return { ok: false, reason: "conflict" };
   }
 
-  return { ok: true, article: publicArticle };
+  const publicRead = batch[publicReadStatementIndex]?.results.at(0);
+  const published = persistedPublicArticle.safeParse(publicRead);
+  if (!published.success || published.data.publication_id !== publicationId) {
+    throw new Error(
+      "Committed Publication is not immediately publicly readable",
+    );
+  }
+  return { ok: true, article: publicArticleFromPublication(published.data) };
 }
 
 const publicArticleSelection = `

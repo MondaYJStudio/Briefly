@@ -1,5 +1,6 @@
 import {
   Alert,
+  AlertDialog,
   Button,
   Form,
   Input,
@@ -423,6 +424,9 @@ function ArticleDraftManager() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [selected, setSelected] = useState<Article | null>(null);
   const [state, setState] = useState<ArticleDraftManagerState>("loading");
+  const [isOnline, setIsOnline] = useState(
+    () => typeof navigator === "undefined" || navigator.onLine,
+  );
   const [issues, setIssues] = useState<string[]>([]);
   const [revision, setRevision] = useState(0);
   const [confirmedRevision, setConfirmedRevision] = useState(0);
@@ -444,6 +448,9 @@ function ArticleDraftManager() {
     "ready" | "publishing" | "published" | "invalid" | "conflict" | "error"
   >("ready");
   const [publicationIssues, setPublicationIssues] = useState<string[]>([]);
+  const [publicationAction, setPublicationAction] = useState<
+    "published" | "republished" | null
+  >(null);
 
   function resetPreview() {
     previewRequestGeneration.current += 1;
@@ -495,6 +502,7 @@ function ArticleDraftManager() {
       setConflictCopy(null);
       setState("ready");
       setPublishState("ready");
+      setPublicationAction(null);
     } catch {
       setState("failed");
     }
@@ -510,6 +518,7 @@ function ArticleDraftManager() {
       selectServerDraft(response.data);
       setState("ready");
       setPublishState("ready");
+      setPublicationAction(null);
     } catch {
       setState("failed");
     }
@@ -546,6 +555,7 @@ function ArticleDraftManager() {
           current.map((article) => (article.id === next.id ? next : article)),
         );
         setPublishState("ready");
+        setPublicationAction(null);
         confirmedRevisionRef.current = capturedRevision;
         setConfirmedRevision(capturedRevision);
         setConflictCopy(null);
@@ -598,12 +608,15 @@ function ArticleDraftManager() {
 
   useEffect(() => {
     function markOffline() {
+      setIsOnline(false);
       if (revisionRef.current !== confirmedRevisionRef.current)
         setState("offline");
     }
     function markOnline() {
+      setIsOnline(true);
       setState((current) => (current === "offline" ? "failed" : current));
     }
+    setIsOnline(navigator.onLine);
     globalThis.addEventListener("offline", markOffline);
     globalThis.addEventListener("online", markOnline);
     return () => {
@@ -624,6 +637,7 @@ function ArticleDraftManager() {
     setIssues([]);
     setState("dirty");
     setPublishState("ready");
+    setPublicationAction(null);
   }
 
   async function reloadDraft() {
@@ -642,6 +656,7 @@ function ArticleDraftManager() {
       );
       setState("ready");
       setPublishState("ready");
+      setPublicationAction(null);
     } catch {
       setState("failed");
     }
@@ -671,6 +686,7 @@ function ArticleDraftManager() {
   const hasUnsavedChanges = revision !== confirmedRevision;
   const serverConfirmed =
     selected !== null &&
+    isOnline &&
     !hasUnsavedChanges &&
     ["ready", "saved"].includes(state);
   const blocker = useBlocker({
@@ -727,25 +743,19 @@ function ArticleDraftManager() {
     const capturedRevision = revisionRef.current;
     const publishable =
       snapshot !== null &&
+      isOnline &&
       revisionRef.current === confirmedRevisionRef.current &&
       ["ready", "saved"].includes(state);
     if (
       !snapshot ||
       !publishable ||
-      snapshot.currentPublicationId !== null ||
       publishState === "publishing" ||
       publishState === "published"
     ) {
       return;
     }
-    if (
-      !globalThis.confirm(
-        `Publish saved Draft Version ${snapshot.draft.version}? This makes it immediately public.`,
-      )
-    ) {
-      return;
-    }
 
+    const isRepublish = snapshot.currentPublicationId !== null;
     setPublishState("publishing");
     setPublicationIssues([]);
     try {
@@ -753,8 +763,10 @@ function ArticleDraftManager() {
         .admin.articles({ articleId: snapshot.id })
         .publications.post({ draftVersion: snapshot.draft.version });
       if (response.status === 201 && response.data) {
-        if (selectedRef.current?.id === snapshot.id)
+        if (selectedRef.current?.id === snapshot.id) {
           setPublishState("published");
+          setPublicationAction(isRepublish ? "republished" : "published");
+        }
         try {
           const refreshed = await getApiClient()
             .admin.articles({ articleId: snapshot.id })
@@ -783,8 +795,9 @@ function ArticleDraftManager() {
             );
           }
         } catch {
-          // The publish response already confirms public visibility. A private
-          // administration refresh must not turn that success into an error.
+          // The publish response confirms the new Current Publication through
+          // the public-read path. A private administration refresh must not
+          // turn that success into an error.
         }
         return;
       }
@@ -958,9 +971,15 @@ function ArticleDraftManager() {
       {publishState === "published" ? (
         <Alert status="success" role="status">
           <Alert.Content>
-            <Alert.Title>Article published</Alert.Title>
+            <Alert.Title>
+              {publicationAction === "republished"
+                ? "Article republished"
+                : "Article published"}
+            </Alert.Title>
             <Alert.Description>
-              The new public Article is available now.
+              {publicationAction === "republished"
+                ? "The new immutable Publication is public now; earlier Publications remain unchanged."
+                : "The first immutable Publication is public now."}
             </Alert.Description>
           </Alert.Content>
         </Alert>
@@ -1289,26 +1308,72 @@ function ArticleDraftManager() {
       </section>
       <p className="text-sm text-default-500">
         Publishing is available only for a server-confirmed Draft Version and
-        requires deliberate confirmation.
+        requires deliberate confirmation while online. Choose Publish saved
+        Draft for the first immutable Publication; choose Republish saved Draft
+        after later saved edits. Republishing creates a new immutable
+        Publication while preserving earlier history and switches the Current
+        Publication only after the new public read is available.
       </p>
       <p className="text-sm text-default-500">
         Published media URLs remain public permanently, including after the
         Article is unpublished.
       </p>
-      <Button
-        fullWidth
-        type="button"
-        isDisabled={
-          !selected ||
-          selected.currentPublicationId !== null ||
-          !serverConfirmed ||
-          publishState === "published"
-        }
-        isPending={publishState === "publishing"}
-        onPress={publishDraft}
-      >
-        Publish saved Draft
-      </Button>
+      <AlertDialog.Root>
+        <Button
+          fullWidth
+          type="button"
+          isDisabled={!selected || !serverConfirmed || publishState !== "ready"}
+          isPending={publishState === "publishing"}
+        >
+          {selected?.currentPublicationId
+            ? "Republish saved Draft"
+            : "Publish saved Draft"}
+        </Button>
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog>
+              <AlertDialog.Header>
+                <AlertDialog.Heading>
+                  {selected?.currentPublicationId
+                    ? "Republish saved Draft?"
+                    : "Publish saved Draft?"}
+                </AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>
+                {selected?.currentPublicationId ? (
+                  <p>
+                    Republish saved Draft Version {selected?.draft.version} as a
+                    new immutable Publication. Earlier Publications remain
+                    unchanged, and the Current Publication switches only after
+                    the new public read is available.
+                  </p>
+                ) : (
+                  <p>
+                    Publish saved Draft Version {selected?.draft.version} as
+                    this Article&apos;s first immutable Publication. It will be
+                    immediately public after the Current Publication switches.
+                  </p>
+                )}
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button type="button" variant="secondary" slot="close">
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  slot="close"
+                  isDisabled={!serverConfirmed || publishState !== "ready"}
+                  onPress={() => void publishDraft()}
+                >
+                  {selected?.currentPublicationId
+                    ? "Republish saved Draft"
+                    : "Publish saved Draft"}
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog.Root>
     </section>
   );
 }

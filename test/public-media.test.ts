@@ -68,13 +68,17 @@ async function saveAssetBackedDraft(
   expect(response.status).toBe(200);
 }
 
-async function publish(cookie: string, articleId: string): Promise<Response> {
+async function publish(
+  cookie: string,
+  articleId: string,
+  draftVersion = 2,
+): Promise<Response> {
   return SELF.fetch(
     `http://briefly.test/api/admin/articles/${articleId}/publications`,
     {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },
-      body: JSON.stringify({ draftVersion: 2 }),
+      body: JSON.stringify({ draftVersion }),
     },
   );
 }
@@ -219,6 +223,13 @@ describe("stable public Asset delivery", () => {
     expect(firstBody.cover.url).toBe(
       `http://briefly.test/media/${assigned?.public_asset_id}`,
     );
+    const firstSnapshot = await env.DB.prepare(
+      `SELECT cover, document, html
+       FROM publication
+       WHERE article_id = ? AND publication_number = 1`,
+    )
+      .bind(firstArticleId)
+      .first();
 
     const internalIdentityRequest = await SELF.fetch(
       `http://briefly.test/media/${asset.id}`,
@@ -254,6 +265,10 @@ describe("stable public Asset delivery", () => {
       "private, no-store",
     );
 
+    const replacementAsset = await uploadOnePixelPngAsset(
+      cookie,
+      "replacement.png",
+    );
     const revisedDraft = await SELF.fetch(
       `http://briefly.test/api/admin/articles/${firstArticleId}/draft`,
       {
@@ -261,29 +276,27 @@ describe("stable public Asset delivery", () => {
         headers: { cookie, "content-type": "application/json" },
         body: JSON.stringify({
           version: 2,
-          title: "Private revision without media",
+          title: "Republished Asset delivery",
           slug: `public-asset-${firstArticleId}`,
           summary: null,
           tags: [],
           byline: null,
           language: null,
-          cover: null,
-          document: {
-            documentSchemaVersion: 1,
-            doc: {
-              type: "doc",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [{ type: "text", text: "Media removed privately" }],
-                },
-              ],
-            },
+          cover: {
+            assetId: replacementAsset.id,
+            alt: "A replacement cover description",
           },
+          document: figureDocument(replacementAsset.id),
         }),
       },
     );
     expect(revisedDraft.status).toBe(200);
+
+    const privateAssetRevision = await SELF.fetch(
+      `http://briefly.test/api/articles/public-asset-${firstArticleId}`,
+    );
+    expect(privateAssetRevision.status).toBe(200);
+    expect(await privateAssetRevision.json()).toMatchObject(firstBody);
     expect(
       await env.DB.prepare(
         `SELECT publication_asset_reference.asset_id
@@ -295,6 +308,57 @@ describe("stable public Asset delivery", () => {
         .bind(firstArticleId)
         .all(),
     ).toMatchObject({ results: [{ asset_id: asset.id }] });
+
+    const republished = await publish(cookie, firstArticleId, 3);
+    expect(republished.status).toBe(201);
+    const republishedBody = await republished.json<{
+      cover: { url: string; alt: string };
+      html: string;
+    }>();
+    const replacementIdentity = await env.DB.prepare(
+      "SELECT public_asset_id FROM asset WHERE id = ?",
+    )
+      .bind(replacementAsset.id)
+      .first<{ public_asset_id: string }>();
+    expect(republishedBody.cover).toMatchObject({
+      url: `http://briefly.test/media/${replacementIdentity?.public_asset_id}`,
+      alt: "A replacement cover description",
+    });
+    expect(republishedBody.html).toContain(republishedBody.cover.url);
+    expect(republishedBody.cover.url).not.toBe(firstBody.cover.url);
+
+    const currentArticle = await SELF.fetch(
+      `http://briefly.test/api/articles/public-asset-${firstArticleId}`,
+    );
+    expect(currentArticle.status).toBe(200);
+    expect(await currentArticle.json()).toMatchObject(republishedBody);
+    expect(
+      await env.DB.prepare(
+        `SELECT cover, document, html
+         FROM publication
+         WHERE article_id = ? AND publication_number = 1`,
+      )
+        .bind(firstArticleId)
+        .first(),
+    ).toEqual(firstSnapshot);
+    const historicalAssetReferences = await env.DB.prepare(
+      `SELECT publication.publication_number,
+              publication_asset_reference.asset_id
+       FROM publication
+       LEFT JOIN publication_asset_reference
+         ON publication_asset_reference.publication_id = publication.id
+       WHERE publication.article_id = ?
+       ORDER BY publication.publication_number`,
+    )
+      .bind(firstArticleId)
+      .all<{
+        publication_number: number;
+        asset_id: string;
+      }>();
+    expect(historicalAssetReferences.results).toEqual([
+      { publication_number: 1, asset_id: asset.id },
+      { publication_number: 2, asset_id: replacementAsset.id },
+    ]);
 
     const secondArticleId = await createArticle(cookie);
     await saveAssetBackedDraft(cookie, secondArticleId, asset.id, asset.id);
@@ -334,6 +398,114 @@ describe("stable public Asset delivery", () => {
     expect(await response.text()).toContain(
       "Published media URLs remain public permanently, including after the Article is unpublished.",
     );
+  }, 20_000);
+
+  it("keeps the previous Current Publication when a republish Asset becomes unavailable", async () => {
+    const cookie = await initializeAndSignIn();
+    const originalAsset = await uploadOnePixelPngAsset(cookie, "original.png");
+    const articleId = await createArticle(cookie);
+    await saveAssetBackedDraft(
+      cookie,
+      articleId,
+      originalAsset.id,
+      originalAsset.id,
+    );
+    const firstPublished = await publish(cookie, articleId);
+    expect(firstPublished.status).toBe(201);
+    const firstBody = await firstPublished.json<{
+      cover: { url: string };
+      html: string;
+    }>();
+    const firstPublication = await env.DB.prepare(
+      `SELECT id, cover, document, html
+       FROM publication
+       WHERE article_id = ? AND publication_number = 1`,
+    )
+      .bind(articleId)
+      .first<Record<string, unknown>>();
+    expect(firstPublication).not.toBeNull();
+
+    const unavailableAsset = await uploadOnePixelPngAsset(
+      cookie,
+      "unavailable-replacement.png",
+    );
+    const revisedDraft = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${articleId}/draft`,
+      {
+        method: "PUT",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          version: 2,
+          title: "Unavailable Asset replacement",
+          slug: `public-asset-${articleId}`,
+          summary: null,
+          tags: [],
+          byline: null,
+          language: null,
+          cover: {
+            assetId: unavailableAsset.id,
+            alt: "Unavailable replacement cover",
+          },
+          document: figureDocument(unavailableAsset.id),
+        }),
+      },
+    );
+    expect(revisedDraft.status).toBe(200);
+    const unavailableObject = await env.DB.prepare(
+      "SELECT object_key FROM asset WHERE id = ?",
+    )
+      .bind(unavailableAsset.id)
+      .first<{ object_key: string }>();
+    if (!unavailableObject) throw new Error("Expected replacement Asset");
+    await env.MEDIA_BUCKET.delete(unavailableObject.object_key);
+
+    const rejected = await publish(cookie, articleId, 3);
+
+    expect(rejected.status).toBe(400);
+    expect(await rejected.json()).toMatchObject({
+      status: "error",
+      code: "PUBLICATION_INVALID",
+      issues: [
+        expect.objectContaining({
+          code: "ASSET_NOT_RESOLVED",
+          path: `assets.${unavailableAsset.id}`,
+        }),
+      ],
+    });
+    expect(
+      await env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM publication WHERE article_id = ?",
+      )
+        .bind(articleId)
+        .first(),
+    ).toEqual({ count: 1 });
+    expect(
+      await env.DB.prepare(
+        `SELECT id, cover, document, html
+         FROM publication
+         WHERE article_id = ? AND publication_number = 1`,
+      )
+        .bind(articleId)
+        .first(),
+    ).toEqual(firstPublication);
+    expect(
+      await env.DB.prepare(
+        "SELECT current_publication_id FROM article WHERE id = ?",
+      )
+        .bind(articleId)
+        .first(),
+    ).toEqual({ current_publication_id: firstPublication?.id });
+    expect(
+      await env.DB.prepare("SELECT public_asset_id FROM asset WHERE id = ?")
+        .bind(unavailableAsset.id)
+        .first(),
+    ).toEqual({ public_asset_id: null });
+
+    const stillPublic = await SELF.fetch(
+      `http://briefly.test/api/articles/public-asset-${articleId}`,
+    );
+    expect(stillPublic.status).toBe(200);
+    expect(await stillPublic.json()).toMatchObject(firstBody);
   }, 20_000);
 
   it("reports every unavailable Asset without leaving partial public state", async () => {

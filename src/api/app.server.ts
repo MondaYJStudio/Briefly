@@ -497,10 +497,7 @@ function createApi(getBindings: () => RuntimeBindings) {
           });
         return status(409, {
           status: "error" as const,
-          code:
-            result.reason === "already-published"
-              ? ("ARTICLE_ALREADY_PUBLISHED" as const)
-              : ("ARTICLE_DRAFT_VERSION_CONFLICT" as const),
+          code: "ARTICLE_DRAFT_VERSION_CONFLICT" as const,
         });
       },
       {

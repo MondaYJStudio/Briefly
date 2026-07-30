@@ -200,6 +200,22 @@ describe("structured video embeds", () => {
       html: previewed.html,
     });
 
+    const revisedDocument = {
+      documentSchemaVersion: 1,
+      doc: {
+        type: "doc",
+        content: [
+          {
+            type: "videoEmbed",
+            attrs: {
+              provider: "youtube",
+              id: "9bZkp7q19f0",
+              title: "A private revision",
+            },
+          },
+        ],
+      },
+    };
     const revised = await SELF.fetch(
       `http://briefly.test/api/admin/articles/${articleId}/draft`,
       {
@@ -213,22 +229,7 @@ describe("structured video embeds", () => {
           tags: [],
           byline: null,
           language: null,
-          document: {
-            documentSchemaVersion: 1,
-            doc: {
-              type: "doc",
-              content: [
-                {
-                  type: "videoEmbed",
-                  attrs: {
-                    provider: "youtube",
-                    id: "9bZkp7q19f0",
-                    title: "A private revision",
-                  },
-                },
-              ],
-            },
-          },
+          document: revisedDocument,
         }),
       },
     );
@@ -250,6 +251,56 @@ describe("structured video embeds", () => {
         { provider: "bilibili", id: "BV1xx411c7mD" },
       ]),
       html: previewed.html,
+    });
+
+    const republished = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${articleId}/publications`,
+      {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ draftVersion: 3 }),
+      },
+    );
+    expect(republished.status).toBe(201);
+    const republishedArticle = await republished.json<{ html: string }>();
+    expect(republishedArticle.html).toBe(
+      '<iframe src="https://www.youtube-nocookie.com/embed/9bZkp7q19f0" title="A private revision" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen=""></iframe>',
+    );
+
+    const visibleRevision = await SELF.fetch(
+      "http://briefly.test/api/articles/private-revised-video",
+    );
+    expect(visibleRevision.status).toBe(200);
+    expect(await visibleRevision.json()).toMatchObject(republishedArticle);
+
+    expect(
+      await env.DB.prepare(
+        `SELECT document_schema_version, document, renderer_version,
+                provider_facts, html
+         FROM publication
+         WHERE article_id = ? AND publication_number = 1`,
+      )
+        .bind(articleId)
+        .first(),
+    ).toEqual(stored);
+    expect(
+      await env.DB.prepare(
+        `SELECT publication_number, document_schema_version, document,
+                renderer_version, provider_facts, html
+         FROM publication
+         WHERE article_id = ? AND publication_number = 2`,
+      )
+        .bind(articleId)
+        .first(),
+    ).toEqual({
+      publication_number: 2,
+      document_schema_version: 1,
+      document: JSON.stringify(revisedDocument),
+      renderer_version: 3,
+      provider_facts: JSON.stringify([
+        { provider: "youtube", id: "9bZkp7q19f0" },
+      ]),
+      html: republishedArticle.html,
     });
   }, 20_000);
 
