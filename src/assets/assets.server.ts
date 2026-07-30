@@ -45,6 +45,15 @@ interface PrivateAssetRow extends ReadyAssetRow {
   object_key: string;
 }
 
+export interface PublicationAssetResolution {
+  assetId: string;
+  publicAssetId: string;
+  publicUrl: string;
+  width: number;
+  height: number;
+  delivery: "public";
+}
+
 export type UploadAssetResult =
   | { ok: true; asset: Asset }
   | { ok: false; reason: "invalid"; issues: AssetValidationIssue[] }
@@ -606,4 +615,104 @@ export async function resolvePrivateAssetForRendering(
     height: row.height,
     delivery: "private" as const,
   };
+}
+
+async function derivedPublicAssetId(assetId: string): Promise<string> {
+  const digest = new Uint8Array(
+    await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(`briefly-public-asset:${assetId}`),
+    ),
+  );
+  digest[6] = (digest[6] & 0x0f) | 0x40;
+  digest[8] = (digest[8] & 0x3f) | 0x80;
+  const hex = [...digest.subarray(0, 16)]
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function objectMatchesAsset(row: PrivateAssetRow, object: R2Object): boolean {
+  return (
+    object.size === row.byte_size &&
+    object.httpMetadata?.contentType === row.mime_type
+  );
+}
+
+export async function resolveAssetForPublication(
+  database: D1Database,
+  bucket: R2Bucket,
+  applicationOrigin: string,
+  assetId: string,
+): Promise<PublicationAssetResolution | null> {
+  const row = await readReadyPrivateAssetRow(database, assetId);
+  if (!row) return null;
+
+  try {
+    readyAssetFromRow(row);
+  } catch {
+    return null;
+  }
+  const object = await bucket.head(row.object_key);
+  if (!object || !objectMatchesAsset(row, object)) return null;
+
+  const publicAssetId =
+    row.public_asset_id ?? (await derivedPublicAssetId(row.id));
+  return {
+    assetId: row.id,
+    publicAssetId,
+    publicUrl: new URL(`/media/${publicAssetId}`, applicationOrigin).href,
+    width: row.width,
+    height: row.height,
+    delivery: "public",
+  };
+}
+
+async function readPublicAssetRow(
+  database: D1Database,
+  publicAssetId: string,
+): Promise<PrivateAssetRow | null> {
+  if (!z.string().uuid().safeParse(publicAssetId).success) return null;
+  return database
+    .prepare(
+      `SELECT id, original_filename, mime_type, byte_size, width, height,
+              uploaded_at, lifecycle_state, public_asset_id, object_key
+       FROM asset
+       WHERE public_asset_id = ? AND lifecycle_state = 'ready'
+       LIMIT 1`,
+    )
+    .bind(publicAssetId)
+    .first<PrivateAssetRow>();
+}
+
+async function readPublicAssetObject<ObjectType extends R2Object>(
+  database: D1Database,
+  publicAssetId: string,
+  readObject: (objectKey: string) => Promise<ObjectType | null>,
+): Promise<{ asset: Asset; object: ObjectType } | null> {
+  const row = await readPublicAssetRow(database, publicAssetId);
+  if (!row) return null;
+  const object = await readObject(row.object_key);
+  if (!object || !objectMatchesAsset(row, object)) return null;
+  return { asset: readyAssetFromRow(row), object };
+}
+
+export function readPublicAsset(
+  database: D1Database,
+  bucket: R2Bucket,
+  publicAssetId: string,
+): Promise<{ asset: Asset; object: R2ObjectBody } | null> {
+  return readPublicAssetObject(database, publicAssetId, (objectKey) =>
+    bucket.get(objectKey),
+  );
+}
+
+export async function headPublicAsset(
+  database: D1Database,
+  bucket: R2Bucket,
+  publicAssetId: string,
+): Promise<{ asset: Asset; object: R2Object } | null> {
+  return readPublicAssetObject(database, publicAssetId, (objectKey) =>
+    bucket.head(objectKey),
+  );
 }

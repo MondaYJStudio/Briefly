@@ -166,3 +166,30 @@ export const articleDraftAssetReference = sqliteTable(
     index("article_draft_asset_reference_asset_idx").on(table.assetId),
   ],
 );
+
+export const publicationAssetReference = sqliteTable(
+  "publication_asset_reference",
+  {
+    publicationId: text("publication_id")
+      .notNull()
+      .references(() => publication.id, { onDelete: "cascade" }),
+    assetId: text("asset_id").notNull(),
+    publicAssetId: text("public_asset_id").notNull(),
+    assetLifecycleState: text("asset_lifecycle_state", { enum: ["ready"] })
+      .notNull()
+      .default("ready"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.publicationId, table.assetId] }),
+    index("publication_asset_reference_asset_idx").on(table.assetId),
+    foreignKey({
+      columns: [table.assetId, table.publicAssetId, table.assetLifecycleState],
+      foreignColumns: [asset.id, asset.publicAssetId, asset.lifecycleState],
+      name: "publication_asset_reference_requires_public_ready_asset",
+    }),
+    check(
+      "publication_asset_reference_ready",
+      sql`${table.assetLifecycleState} = 'ready'`,
+    ),
+  ],
+);

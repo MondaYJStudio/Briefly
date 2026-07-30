@@ -71,9 +71,9 @@ Briefly 是一个 pnpm 包、一个 TanStack Start 应用和一个 Cloudflare Wo
 
 ## Publication 渲染器
 
-生产环境唯一的 Publication 渲染入口是 [`src/articles/publication-renderer.server.ts`](src/articles/publication-renderer.server.ts) 中的 `renderPublication` 操作。成功结果会记录独立于输入 Document Schema Version 的 Renderer Version `1`。任何可能改变已存储 Publication HTML 或引用事实的修改都必须提升 Renderer Version；现有 Publication 不会被自动重新渲染。
+生产环境唯一的 Publication 渲染入口是 [`src/articles/publication-renderer.server.ts`](src/articles/publication-renderer.server.ts) 中的 `renderPublication` 操作。成功结果会记录独立于输入 Document Schema Version 的 Renderer Version `3`。任何可能改变已存储 Publication HTML 或引用事实的修改都必须提升 Renderer Version；现有 Publication 不会被自动重新渲染。
 
-Renderer Version `1` 使用 Ticket 02 已在 workerd 中验证的无 DOM `@tiptap/static-renderer/pm/html-string` 路径。生产依赖版本精确固定为：`@tiptap/core`、`@tiptap/pm` 和 `@tiptap/static-renderer` 均为 `3.29.2`，Zod 为 `4.4.3`。它在项目统一的 Cloudflare 兼容日期 `2026-07-28` 和 `nodejs_compat` 标志下运行。可复现的运行时、依赖、打包、安全与被拒绝路径证据保留在 [`prototype/publication-renderer/README.md`](prototype/publication-renderer/README.md)。
+Renderer Version `1` 至 `3` 均使用 Ticket 02 已在 workerd 中验证的无 DOM `@tiptap/static-renderer/pm/html-string` 路径。Version `2` 记录可发布的视频输出及 provider facts；Version `3` 记录由应用拥有的公开 Asset URL 和 Publication Asset 引用事实。生产依赖版本精确固定为：`@tiptap/core`、`@tiptap/pm` 和 `@tiptap/static-renderer` 均为 `3.29.2`，Zod 为 `4.4.3`。它在项目统一的 Cloudflare 兼容日期 `2026-07-28` 和 `nodejs_compat` 标志下运行。可复现的运行时、依赖、打包、安全与被拒绝路径证据保留在 [`prototype/publication-renderer/README.md`](prototype/publication-renderer/README.md)。
 
 `pnpm build` 会在 Cloudflare Vite 插件写入部署配置前选择 Wrangler 的 `production` 环境，避免后续部署意外携带本地 D1/R2 绑定。已提交的配置同时关闭了 Wrangler CLI 指标上报和部署依赖检测。
 

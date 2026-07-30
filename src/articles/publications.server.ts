@@ -1,9 +1,17 @@
 import { z } from "zod";
 
+import {
+  resolveAssetForPublication,
+  type PublicationAssetResolution,
+} from "../assets/assets.server";
 import { readSiteSettings } from "../site-settings/site-settings.server";
 import { resolveArticleMetadata } from "../site-settings/site-settings";
 import { readArticle } from "./articles.server";
-import type { ArticleCoverUsage, PublicArticle } from "./articles";
+import type {
+  ArticleCoverUsage,
+  PublicArticle,
+  PublicArticleCover,
+} from "./articles";
 import {
   renderPublication,
   type PublicationIssue,
@@ -16,6 +24,13 @@ export type PublishArticleResult =
       ok: false;
       reason: "conflict" | "not-found" | "already-published";
     };
+
+const publicArticleCover = z.object({
+  url: z.string().url(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  alt: z.string().min(1),
+});
 
 const persistedPublicArticle = z.object({
   id: z.string().uuid(),
@@ -45,7 +60,21 @@ const persistedPublicArticle = z.object({
     }
   }),
   language: z.string().min(1),
-  cover: z.null(),
+  cover: z
+    .string()
+    .nullable()
+    .transform((value, context) => {
+      if (value === null) return null;
+      try {
+        return publicArticleCover.parse(JSON.parse(value));
+      } catch {
+        context.addIssue({
+          code: "custom",
+          message: "Invalid Publication cover",
+        });
+        return z.NEVER;
+      }
+    }),
   article_published_at: z.number().int(),
   publication_published_at: z.number().int(),
   html: z.string(),
@@ -63,7 +92,7 @@ function publicArticleFromRow(row: PublicArticleRow): PublicArticle {
     tags: publication.tags,
     byline: publication.byline,
     language: publication.language,
-    cover: null,
+    cover: publication.cover,
     publishedAt: new Date(publication.article_published_at).toISOString(),
     updatedAt: new Date(publication.publication_published_at).toISOString(),
     html: publication.html,
@@ -95,15 +124,6 @@ function publicationMetadataIssues(input: {
       message: "A Publication requires a canonical slug",
     });
   }
-  if (input.cover !== null) {
-    issues.push({
-      code: "UNSUPPORTED_DOCUMENT_FEATURE",
-      path: "cover",
-      message:
-        "Asset-backed cover publication is not supported until public Asset delivery is available",
-    });
-  }
-
   let hasSubstantiveContent = false;
   const visit = (value: unknown, path: string): void => {
     if (value === null || typeof value !== "object") return;
@@ -119,12 +139,7 @@ function publicationMetadataIssues(input: {
       hasSubstantiveContent = true;
     }
     if (node.type === "figure") {
-      issues.push({
-        code: "UNSUPPORTED_DOCUMENT_FEATURE",
-        path,
-        message:
-          "Figures are not supported until public Asset delivery is available",
-      });
+      hasSubstantiveContent = true;
     }
     for (const [key, child] of Object.entries(node)) {
       if (Array.isArray(child)) {
@@ -149,6 +164,8 @@ function publicationMetadataIssues(input: {
 
 export async function publishArticle(
   database: D1Database,
+  bucket: R2Bucket,
+  applicationOrigin: string,
   articleId: string,
   draftVersion: number,
 ): Promise<PublishArticleResult> {
@@ -185,11 +202,37 @@ export async function publishArticle(
 
   const settings = await readSiteSettings(database);
   const resolvedMetadata = resolveArticleMetadata(settings, article.draft);
-  const rendered = await renderPublication(article.draft.document, {
-    resolveAsset: async () => null,
-  });
+  const resolvedAssets = new Map<string, PublicationAssetResolution>();
+  const rendered = await renderPublication(
+    article.draft.document,
+    {
+      resolveAsset: async (assetId) => {
+        const resolution = await resolveAssetForPublication(
+          database,
+          bucket,
+          applicationOrigin,
+          assetId,
+        );
+        if (resolution) resolvedAssets.set(assetId, resolution);
+        return resolution;
+      },
+    },
+    article.draft.cover,
+  );
   if (!rendered.ok)
     return { ok: false, reason: "invalid", issues: rendered.issues };
+
+  let cover: PublicArticleCover | null = null;
+  if (article.draft.cover) {
+    const asset = resolvedAssets.get(article.draft.cover.assetId);
+    if (!asset) throw new Error("Rendered cover Asset resolution is absent");
+    cover = {
+      url: asset.publicUrl,
+      width: asset.width,
+      height: asset.height,
+      alt: article.draft.cover.alt,
+    };
+  }
 
   const publicationId = crypto.randomUUID();
   const slug = article.draft.slug;
@@ -205,12 +248,12 @@ export async function publishArticle(
     tags: article.draft.tags,
     byline: resolvedMetadata.byline,
     language: resolvedMetadata.language,
-    cover: null,
+    cover,
     publishedAt: publishedAtIso,
     updatedAt: publishedAtIso,
     html: rendered.value.html,
   };
-  const batch = await database.batch([
+  const statements: D1PreparedStatement[] = [
     database
       .prepare(
         `UPDATE article_slug
@@ -227,6 +270,21 @@ export async function publishArticle(
            )`,
       )
       .bind(slugKey, articleId, articleId, draftVersion),
+  ];
+  for (const asset of resolvedAssets.values()) {
+    statements.push(
+      database
+        .prepare(
+          `UPDATE asset
+           SET public_asset_id = COALESCE(public_asset_id, ?)
+           WHERE id = ? AND lifecycle_state = 'ready'
+             AND (public_asset_id IS NULL OR public_asset_id = ?)`,
+        )
+        .bind(asset.publicAssetId, asset.assetId, asset.publicAssetId),
+    );
+  }
+  const publicationStatementIndex = statements.length;
+  statements.push(
     database
       .prepare(
         `INSERT INTO publication
@@ -234,7 +292,7 @@ export async function publishArticle(
             summary, tags, byline, language, cover, document_schema_version,
             document, renderer_version, provider_facts, html, published_at,
             created_at)
-         SELECT ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?
+         SELECT ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          WHERE EXISTS (
            SELECT 1
            FROM article_draft
@@ -255,6 +313,7 @@ export async function publishArticle(
         JSON.stringify(article.draft.tags),
         JSON.stringify(resolvedMetadata.byline),
         resolvedMetadata.language,
+        cover === null ? null : JSON.stringify(cover),
         article.draft.document.documentSchemaVersion,
         JSON.stringify(article.draft.document),
         rendered.value.rendererVersion,
@@ -265,6 +324,20 @@ export async function publishArticle(
         articleId,
         draftVersion,
       ),
+  );
+  for (const asset of resolvedAssets.values()) {
+    statements.push(
+      database
+        .prepare(
+          `INSERT INTO publication_asset_reference
+             (publication_id, asset_id, public_asset_id, asset_lifecycle_state)
+           VALUES (?, ?, ?, 'ready')`,
+        )
+        .bind(publicationId, asset.assetId, asset.publicAssetId),
+    );
+  }
+  const pointerStatementIndex = statements.length;
+  statements.push(
     database
       .prepare(
         `UPDATE article
@@ -278,11 +351,12 @@ export async function publishArticle(
            )`,
       )
       .bind(publicationId, publishedAt, publishedAt, articleId, publicationId),
-  ]);
+  );
+  const batch = await database.batch(statements);
 
   if (
-    (batch[1]?.meta.changes ?? 0) !== 1 ||
-    (batch[2]?.meta.changes ?? 0) !== 1
+    (batch[publicationStatementIndex]?.meta.changes ?? 0) !== 1 ||
+    (batch[pointerStatementIndex]?.meta.changes ?? 0) !== 1
   ) {
     const current = await readArticle(database, articleId);
     if (!current) return { ok: false, reason: "not-found" };

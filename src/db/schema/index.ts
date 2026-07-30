@@ -13,6 +13,7 @@ export {
   articleDraftAssetReference,
   articleSlug,
   publication,
+  publicationAssetReference,
 } from "./articles";
 export { asset } from "./assets";
 export { runtimeMetadata } from "./runtime-metadata";

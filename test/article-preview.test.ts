@@ -114,7 +114,7 @@ describe("private saved Draft preview", () => {
         },
         language: "zh-Hans",
       },
-      rendererVersion: 2,
+      rendererVersion: 3,
       coverHtml: null,
       html: "<p>Server-confirmed &lt;Draft&gt;</p>",
     });

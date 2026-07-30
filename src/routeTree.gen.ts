@@ -15,6 +15,7 @@ import { Route as RecoverRouteImport } from './routes/recover'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
+import { Route as MediaPublicAssetIdRouteImport } from './routes/media.$publicAssetId'
 import { Route as MediaPrivateAssetIdRouteImport } from './routes/media.private.$assetId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -47,6 +48,11 @@ const ApiSplatRoute = ApiSplatRouteImport.update({
   path: '/api/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MediaPublicAssetIdRoute = MediaPublicAssetIdRouteImport.update({
+  id: '/media/$publicAssetId',
+  path: '/media/$publicAssetId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MediaPrivateAssetIdRoute = MediaPrivateAssetIdRouteImport.update({
   id: '/media/private/$assetId',
   path: '/media/private/$assetId',
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
   '/api/$': typeof ApiSplatRoute
+  '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
   '/media/private/$assetId': typeof MediaPrivateAssetIdRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
   '/api/$': typeof ApiSplatRoute
+  '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
   '/media/private/$assetId': typeof MediaPrivateAssetIdRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
   '/api/$': typeof ApiSplatRoute
+  '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
   '/media/private/$assetId': typeof MediaPrivateAssetIdRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/sign-in'
     | '/api/$'
+    | '/media/$publicAssetId'
     | '/media/private/$assetId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/sign-in'
     | '/api/$'
+    | '/media/$publicAssetId'
     | '/media/private/$assetId'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/sign-in'
     | '/api/$'
+    | '/media/$publicAssetId'
     | '/media/private/$assetId'
   fileRoutesById: FileRoutesById
 }
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   SetupRoute: typeof SetupRoute
   SignInRoute: typeof SignInRoute
   ApiSplatRoute: typeof ApiSplatRoute
+  MediaPublicAssetIdRoute: typeof MediaPublicAssetIdRoute
   MediaPrivateAssetIdRoute: typeof MediaPrivateAssetIdRoute
 }
 
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/media/$publicAssetId': {
+      id: '/media/$publicAssetId'
+      path: '/media/$publicAssetId'
+      fullPath: '/media/$publicAssetId'
+      preLoaderRoute: typeof MediaPublicAssetIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/media/private/$assetId': {
       id: '/media/private/$assetId'
       path: '/media/private/$assetId'
@@ -182,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRoute: SetupRoute,
   SignInRoute: SignInRoute,
   ApiSplatRoute: ApiSplatRoute,
+  MediaPublicAssetIdRoute: MediaPublicAssetIdRoute,
   MediaPrivateAssetIdRoute: MediaPrivateAssetIdRoute,
 }
 export const routeTree = rootRouteImport

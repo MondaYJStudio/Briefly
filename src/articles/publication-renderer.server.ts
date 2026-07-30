@@ -15,7 +15,7 @@ import { VIDEO_PROVIDER_IDENTIFIERS, type VideoProvider } from "./video-embeds";
 export type { PublicationIssue } from "./articles";
 
 const DOCUMENT_SCHEMA_VERSION = 1;
-export const PUBLICATION_RENDERER_VERSION = 2;
+export const PUBLICATION_RENDERER_VERSION = 3;
 const VIDEO_PROVIDER_POLICIES = {
   youtube: {
     idPattern: VIDEO_PROVIDER_IDENTIFIERS.youtube,
@@ -775,13 +775,25 @@ function isAllowedResolvedAssetUrl(
   url: URL,
   delivery: ResolvedPublicationAsset["delivery"],
 ): boolean {
-  if (delivery !== "private") return url.protocol === "https:";
-  return (
-    ["http:", "https:"].includes(url.protocol) &&
-    url.pathname === `/media/private/${requestedId}` &&
-    url.search === "" &&
-    url.hash === ""
-  );
+  if (delivery === "private") {
+    return (
+      ["http:", "https:"].includes(url.protocol) &&
+      url.pathname === `/media/private/${requestedId}` &&
+      url.search === "" &&
+      url.hash === ""
+    );
+  }
+  if (delivery === "public") {
+    return (
+      ["http:", "https:"].includes(url.protocol) &&
+      /^\/media\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(
+        url.pathname,
+      ) &&
+      url.search === "" &&
+      url.hash === ""
+    );
+  }
+  return url.protocol === "https:";
 }
 
 function renderFigure(

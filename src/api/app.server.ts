@@ -408,6 +408,8 @@ function createApi(getBindings: () => RuntimeBindings) {
         try {
           result = await publishArticle(
             bindings.DB,
+            bindings.MEDIA_BUCKET,
+            bindings.APP_ORIGIN,
             params.articleId,
             body.draftVersion,
           );

@@ -103,8 +103,15 @@ export interface PublicArticle {
   tags: string[];
   byline: Byline;
   language: string;
-  cover: null;
+  cover: PublicArticleCover | null;
   publishedAt: string;
   updatedAt: string;
   html: string;
+}
+
+export interface PublicArticleCover {
+  url: string;
+  width: number;
+  height: number;
+  alt: string;
 }

@@ -1291,6 +1291,10 @@ function ArticleDraftManager() {
         Publishing is available only for a server-confirmed Draft Version and
         requires deliberate confirmation.
       </p>
+      <p className="text-sm text-default-500">
+        Published media URLs remain public permanently, including after the
+        Article is unpublished.
+      </p>
       <Button
         fullWidth
         type="button"

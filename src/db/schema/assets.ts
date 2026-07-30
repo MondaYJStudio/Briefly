@@ -28,6 +28,11 @@ export const asset = sqliteTable(
   (table) => [
     uniqueIndex("asset_object_key_unique").on(table.objectKey),
     uniqueIndex("asset_public_asset_id_unique").on(table.publicAssetId),
+    uniqueIndex("asset_public_reference_unique").on(
+      table.id,
+      table.publicAssetId,
+      table.lifecycleState,
+    ),
     index("asset_library_order_idx").on(table.lifecycleState, table.uploadedAt),
     check("asset_byte_size_positive", sql`${table.byteSize} > 0`),
     check("asset_width_positive", sql`${table.width} > 0`),

@@ -239,7 +239,7 @@ describe("first immutable Publication", () => {
       cover: null,
       document_schema_version: 1,
       document: JSON.stringify(document),
-      renderer_version: 2,
+      renderer_version: 3,
       html: "<p>Hello <strong>immutable world</strong></p>",
     });
     expect(stored?.published_at).toBeTypeOf("number");
@@ -349,46 +349,35 @@ describe("first immutable Publication", () => {
     20_000,
   );
 
-  it("cleanly rejects publishing a valid cover-bearing Draft until public Asset delivery lands", async () => {
+  it("publishes a valid cover-bearing Draft through public Asset delivery", async () => {
     const cookie = await initializeAndSignIn();
     const articleId = await createArticle(cookie);
     const coverAsset = await uploadOnePixelPngAsset(cookie, "cover.png");
 
     const saved = await saveDraft(cookie, articleId, {
-      title: "No covers yet",
-      slug: "no-covers-yet",
-      cover: { assetId: coverAsset.id, alt: "Not public yet" },
+      title: "Public cover",
+      slug: "public-cover",
+      cover: { assetId: coverAsset.id, alt: "Published cover" },
       document: textDocument("Text body"),
     });
     expect(saved.status).toBe(200);
 
-    const rejected = await publish(cookie, articleId);
+    const published = await publish(cookie, articleId);
 
-    expect(rejected.status).toBe(400);
-    expect(await rejected.json()).toMatchObject({
-      status: "error",
-      code: "PUBLICATION_INVALID",
-      issues: [
-        expect.objectContaining({
-          path: "cover",
-          message: expect.stringContaining("cover"),
-        }),
-      ],
-    });
-    const preserved = await (
-      await SELF.fetch(`http://briefly.test/api/admin/articles/${articleId}`, {
-        headers: { cookie },
-      })
-    ).json<{ draft: { version: number; title: string } }>();
-    expect(preserved).toMatchObject({
-      currentPublicationId: null,
-      draft: { version: 2, title: "No covers yet" },
+    expect(published.status).toBe(201);
+    expect(await published.json()).toMatchObject({
+      cover: {
+        url: expect.stringMatching(/^http:\/\/briefly\.test\/media\//u),
+        width: 1,
+        height: 1,
+        alt: "Published cover",
+      },
     });
     expect(
       await env.DB.prepare("SELECT id FROM publication WHERE article_id = ?")
         .bind(articleId)
         .first(),
-    ).toBeNull();
+    ).not.toBeNull();
   }, 20_000);
 
   it.each([
