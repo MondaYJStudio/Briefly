@@ -446,29 +446,6 @@ describe("first immutable Publication", () => {
         },
       },
     },
-    {
-      name: "video embed",
-      document: {
-        documentSchemaVersion: 1,
-        doc: {
-          type: "doc",
-          content: [
-            {
-              type: "paragraph",
-              content: [{ type: "text", text: "Text before video" }],
-            },
-            {
-              type: "videoEmbed",
-              attrs: {
-                provider: "youtube",
-                id: "dQw4w9WgXcQ",
-                title: "Unavailable video",
-              },
-            },
-          ],
-        },
-      },
-    },
   ])(
     "rejects a $name before it can become a saved Publication candidate",
     async ({ document }) => {

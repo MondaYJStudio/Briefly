@@ -257,6 +257,58 @@ describe("Article Draft administration", () => {
     });
   }, 15_000);
 
+  it("persists a normalized supported video embed without raw iframe data", async () => {
+    const cookie = await initializeAndSignIn();
+    const created = await (
+      await SELF.fetch("http://briefly.test/api/admin/articles", {
+        method: "POST",
+        headers: { cookie },
+      })
+    ).json<{ id: string }>();
+    const document = {
+      documentSchemaVersion: 1,
+      doc: {
+        type: "doc",
+        content: [
+          {
+            type: "videoEmbed",
+            attrs: {
+              provider: "youtube",
+              id: "dQw4w9WgXcQ",
+              title: "An understandable video title",
+            },
+          },
+        ],
+      },
+    };
+
+    const response = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${created.id}/draft`,
+      {
+        method: "PUT",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          version: 1,
+          title: "Video Draft",
+          slug: null,
+          summary: null,
+          tags: [],
+          byline: null,
+          language: null,
+          document,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const saved = await response.json<{ draft: { document: unknown } }>();
+    expect(saved.draft.document).toEqual(document);
+    expect(JSON.stringify(saved.draft.document)).not.toContain("iframe");
+    expect(JSON.stringify(saved.draft.document)).not.toContain(
+      "www.youtube.com",
+    );
+  }, 15_000);
+
   it("normalizes an accepted programmatic document before persistence", async () => {
     const cookie = await initializeAndSignIn();
     const created = await (

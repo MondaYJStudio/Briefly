@@ -104,7 +104,7 @@ function publicationMetadataIssues(input: {
     });
   }
 
-  let hasSubstantiveText = false;
+  let hasSubstantiveContent = false;
   const visit = (value: unknown, path: string): void => {
     if (value === null || typeof value !== "object") return;
     const node = value as Record<string, unknown>;
@@ -113,13 +113,17 @@ function publicationMetadataIssues(input: {
       typeof node.text === "string" &&
       node.text.trim().length > 0
     ) {
-      hasSubstantiveText = true;
+      hasSubstantiveContent = true;
     }
-    if (node.type === "figure" || node.type === "videoEmbed") {
+    if (node.type === "videoEmbed") {
+      hasSubstantiveContent = true;
+    }
+    if (node.type === "figure") {
       issues.push({
         code: "UNSUPPORTED_DOCUMENT_FEATURE",
         path,
-        message: `${node.type === "figure" ? "Figures" : "Video embeds"} are not supported by the first Publication tracer`,
+        message:
+          "Figures are not supported until public Asset delivery is available",
       });
     }
     for (const [key, child] of Object.entries(node)) {
@@ -133,7 +137,7 @@ function publicationMetadataIssues(input: {
     }
   };
   visit(input.document, "document");
-  if (!hasSubstantiveText) {
+  if (!hasSubstantiveContent) {
     issues.push({
       code: "SUBSTANTIVE_BODY_REQUIRED",
       path: "document.doc",
@@ -228,8 +232,9 @@ export async function publishArticle(
         `INSERT INTO publication
            (id, article_id, slug, slug_key, publication_number, title,
             summary, tags, byline, language, cover, document_schema_version,
-            document, renderer_version, html, published_at, created_at)
-         SELECT ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?
+            document, renderer_version, provider_facts, html, published_at,
+            created_at)
+         SELECT ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?
          WHERE EXISTS (
            SELECT 1
            FROM article_draft
@@ -253,6 +258,7 @@ export async function publishArticle(
         article.draft.document.documentSchemaVersion,
         JSON.stringify(article.draft.document),
         rendered.value.rendererVersion,
+        JSON.stringify(rendered.value.referencedProviders),
         rendered.value.html,
         publishedAt,
         publishedAt,

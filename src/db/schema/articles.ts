@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 import { asset } from "./assets";
+import type { VideoProviderFacts } from "../../articles/video-embeds";
 
 export const article = sqliteTable(
   "article",
@@ -86,6 +87,10 @@ export const publication = sqliteTable(
         doc: { type: "doc", content: [{ type: "paragraph" }] },
       }),
     rendererVersion: integer("renderer_version").notNull().default(1),
+    providerFacts: text("provider_facts", { mode: "json" })
+      .$type<VideoProviderFacts[]>()
+      .notNull()
+      .default([]),
     html: text("html").notNull().default(""),
     publishedAt: integer("published_at", { mode: "timestamp_ms" })
       .notNull()

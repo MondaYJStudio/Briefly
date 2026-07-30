@@ -17,6 +17,7 @@ import {
   ARTICLE_FIGURE_CAPTION_MAXIMUM_LENGTH,
   type ArticleDocument,
 } from "./articles";
+import { VIDEO_PROVIDER_IDENTIFIERS } from "./video-embeds";
 
 const ARTICLE_LINK_MAXIMUM_LENGTH = 2_048;
 const ORDERED_LIST_START_MAXIMUM = 1_000_000;
@@ -114,6 +115,26 @@ const ArticleFigure = Node.create({
   },
 });
 
+const ArticleVideoEmbed = Node.create({
+  name: "videoEmbed",
+  group: "block",
+  atom: true,
+  selectable: true,
+  addAttributes: () => ({
+    provider: { default: null },
+    id: { default: null },
+    title: { default: null },
+  }),
+  renderHTML: ({ node }) => [
+    "div",
+    {
+      "data-video-provider": node.attrs.provider,
+      "data-video-id": node.attrs.id,
+      "aria-label": node.attrs.title,
+    },
+  ],
+});
+
 export function createArticleEditorExtensions(): Extensions {
   return [
     StarterKit.configure({
@@ -127,6 +148,7 @@ export function createArticleEditorExtensions(): Extensions {
     ArticleCodeBlock,
     ArticleOrderedList,
     ArticleFigure,
+    ArticleVideoEmbed,
     ArticleLink.configure({
       autolink: true,
       linkOnPaste: true,
@@ -203,6 +225,28 @@ const figureNodeSchema = z
     }
   });
 
+const videoEmbedNodeSchema = z
+  .object({
+    type: z.literal("videoEmbed"),
+    attrs: z.discriminatedUnion("provider", [
+      z
+        .object({
+          provider: z.literal("youtube"),
+          id: z.string().regex(VIDEO_PROVIDER_IDENTIFIERS.youtube),
+          title: z.string().trim().min(1).max(200),
+        })
+        .strict(),
+      z
+        .object({
+          provider: z.literal("bilibili"),
+          id: z.string().regex(VIDEO_PROVIDER_IDENTIFIERS.bilibili),
+          title: z.string().trim().min(1).max(200),
+        })
+        .strict(),
+    ]),
+  })
+  .strict();
+
 const blockNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
   z.discriminatedUnion("type", [
     z
@@ -254,6 +298,7 @@ const blockNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
       .strict(),
     z.object({ type: z.literal("horizontalRule") }).strict(),
     figureNodeSchema,
+    videoEmbedNodeSchema,
   ]),
 );
 

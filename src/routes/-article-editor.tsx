@@ -13,6 +13,7 @@ import {
   type ArticleCoverUsage,
   type ArticleDocument,
 } from "../articles/articles";
+import type { VideoProviderFacts } from "../articles/video-embeds";
 import type { Asset } from "../assets/assets";
 import { getApiClient } from "./api.$";
 
@@ -221,6 +222,10 @@ export function ArticleEditor({
         </Button>
       </div>
       <EditorContent editor={editor} />
+      <ArticleVideoAuthoring
+        editor={activeEditor}
+        editorRevision={editorRevision}
+      />
       <ArticleAssetAuthoring
         editor={activeEditor}
         editorRevision={editorRevision}
@@ -228,6 +233,212 @@ export function ArticleEditor({
         onCoverChange={onCoverChange}
       />
     </div>
+  );
+}
+
+interface VideoEmbedUsage extends VideoProviderFacts {
+  pos: number;
+  nodeSize: number;
+  title: string;
+}
+
+function articleVideoEmbeds(editor: Editor): VideoEmbedUsage[] {
+  const videos: VideoEmbedUsage[] = [];
+  editor.state.doc.descendants((node, pos) => {
+    if (node.type.name !== "videoEmbed") return;
+    videos.push({
+      pos,
+      nodeSize: node.nodeSize,
+      provider: node.attrs.provider as VideoProviderFacts["provider"],
+      id: String(node.attrs.id),
+      title: String(node.attrs.title),
+    });
+  });
+  return videos;
+}
+
+function ArticleVideoAuthoring({
+  editor,
+  editorRevision,
+}: {
+  editor: Editor;
+  editorRevision: number;
+}) {
+  const [input, setInput] = useState("");
+  const [title, setTitle] = useState("");
+  const [recognized, setRecognized] = useState<VideoProviderFacts | null>(null);
+  const [state, setState] = useState<
+    "ready" | "recognizing" | "recognized" | "invalid"
+  >("ready");
+  const [message, setMessage] = useState("");
+  void editorRevision;
+  const videos = articleVideoEmbeds(editor);
+
+  async function recognizeProvider() {
+    const candidate = input.trim();
+    setRecognized(null);
+    if (/[<>]/u.test(candidate)) {
+      setState("invalid");
+      setMessage("Paste a video URL or identifier, not iframe or HTML markup.");
+      return;
+    }
+    setState("recognizing");
+    setMessage("Recognizing supported video provider…");
+    try {
+      const response = await getApiClient().admin[
+        "video-embeds"
+      ].recognize.post({ input: candidate });
+      if (response.status === 200 && response.data) {
+        const facts = response.data as VideoProviderFacts;
+        setRecognized(facts);
+        setState("recognized");
+        setMessage(
+          `Recognized ${facts.provider === "youtube" ? "YouTube" : "Bilibili"} identifier ${facts.id}.`,
+        );
+        return;
+      }
+      setState("invalid");
+      setMessage(
+        "This is not a supported YouTube or Bilibili URL or identifier. Keep unsupported providers as ordinary links.",
+      );
+    } catch {
+      setState("invalid");
+      setMessage("The video provider could not be recognized. Please retry.");
+    }
+  }
+
+  function insertVideo() {
+    const accessibleTitle = title.trim();
+    if (!recognized) {
+      setState("invalid");
+      setMessage("Recognize a supported provider before inserting the video.");
+      return;
+    }
+    if (accessibleTitle.length === 0) {
+      setState("invalid");
+      setMessage("Enter an understandable iframe title before inserting.");
+      return;
+    }
+    editor
+      .chain()
+      .focus()
+      .insertContent({
+        type: "videoEmbed",
+        attrs: { ...recognized, title: accessibleTitle },
+      })
+      .run();
+    setInput("");
+    setTitle("");
+    setRecognized(null);
+    setState("ready");
+    setMessage("Structured video embed inserted into the Draft.");
+  }
+
+  function updateVideoTitle(video: VideoEmbedUsage, nextTitle: string) {
+    const node = editor.state.doc.nodeAt(video.pos);
+    if (!node || node.type.name !== "videoEmbed") return;
+    editor.view.dispatch(
+      editor.state.tr.setNodeMarkup(video.pos, undefined, {
+        ...node.attrs,
+        title: nextTitle,
+      }),
+    );
+  }
+
+  function removeVideo(video: VideoEmbedUsage) {
+    editor.view.dispatch(
+      editor.state.tr.delete(video.pos, video.pos + video.nodeSize),
+    );
+    setMessage("Video embed removed from the Draft.");
+  }
+
+  return (
+    <section
+      className="space-y-4 rounded-xl border border-default-200 p-4"
+      aria-labelledby="article-videos-heading"
+    >
+      <div className="space-y-1">
+        <h4 id="article-videos-heading" className="font-semibold">
+          YouTube and Bilibili video embeds
+        </h4>
+        <p className="text-sm text-default-500">
+          Convert only a supported provider URL or identifier. Raw iframe HTML,
+          origins, query parameters, and iframe privileges are never stored.
+        </p>
+      </div>
+      <Label htmlFor="videoEmbedInput">
+        YouTube or Bilibili URL or identifier
+      </Label>
+      <Input
+        id="videoEmbedInput"
+        value={input}
+        onChange={(event) => {
+          setInput(event.target.value);
+          setRecognized(null);
+          setState("ready");
+          setMessage("");
+        }}
+      />
+      <Button
+        type="button"
+        isPending={state === "recognizing"}
+        onPress={recognizeProvider}
+      >
+        Recognize supported provider
+      </Button>
+      {message ? (
+        <p
+          className={state === "invalid" ? "text-sm text-danger" : "text-sm"}
+          role={state === "invalid" ? "alert" : "status"}
+          aria-live="polite"
+        >
+          {message}
+        </p>
+      ) : null}
+      <Label htmlFor="videoEmbedTitle">
+        Understandable iframe title (required)
+      </Label>
+      <Input
+        id="videoEmbedTitle"
+        maxLength={200}
+        value={title}
+        onChange={(event) => setTitle(event.target.value)}
+      />
+      <Button type="button" isDisabled={!recognized} onPress={insertVideo}>
+        Insert recognized video
+      </Button>
+
+      {videos.length > 0 ? (
+        <ol className="space-y-3" aria-label="Video embeds in this Draft">
+          {videos.map((video, index) => (
+            <li
+              key={`${video.pos}:${video.provider}:${video.id}`}
+              className="space-y-2 rounded-lg border border-default-200 p-3"
+            >
+              <p className="font-medium">
+                Video {index + 1} · {video.provider} · {video.id}
+              </p>
+              <Label htmlFor={`videoTitle-${video.pos}`}>Iframe title</Label>
+              <Input
+                id={`videoTitle-${video.pos}`}
+                maxLength={200}
+                value={video.title}
+                onChange={(event) =>
+                  updateVideoTitle(video, event.target.value)
+                }
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onPress={() => removeVideo(video)}
+              >
+                Remove video
+              </Button>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </section>
   );
 }
 

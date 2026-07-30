@@ -1042,6 +1042,18 @@ function ArticleDraftManager() {
           value.
         </p>
       </section>
+      <section
+        className="space-y-1"
+        aria-labelledby="video-authoring-shell-heading"
+      >
+        <h3 id="video-authoring-shell-heading" className="font-semibold">
+          YouTube and Bilibili video embeds
+        </h3>
+        <p className="text-sm text-default-500">
+          Recognize a supported URL or identifier and provide an understandable
+          iframe title. Unsupported providers can remain ordinary links.
+        </p>
+      </section>
       {selected ? (
         <Form
           className="space-y-4"

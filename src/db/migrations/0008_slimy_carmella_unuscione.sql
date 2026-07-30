@@ -1,0 +1,1 @@
+ALTER TABLE `publication` ADD `provider_facts` text DEFAULT '[]' NOT NULL;

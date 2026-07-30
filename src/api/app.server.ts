@@ -12,6 +12,7 @@ import {
   publishArticle,
   readPublicArticle,
 } from "../articles/publications.server";
+import { recognizeVideoEmbed } from "../articles/video-embeds";
 import {
   listAssets,
   resolvePrivateAssetForRendering,
@@ -280,6 +281,29 @@ function createApi(getBindings: () => RuntimeBindings) {
         params: t.Object({ articleId: t.String({ format: "uuid" }) }),
         body: t.Any(),
       },
+    )
+    .post(
+      "/admin/video-embeds/recognize",
+      async ({ body, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        const recognized = recognizeVideoEmbed(body.input);
+        return recognized
+          ? recognized
+          : status(400, {
+              status: "error" as const,
+              code: "VIDEO_EMBED_UNSUPPORTED" as const,
+              message:
+                "Use a supported YouTube or Bilibili URL or identifier; other providers can remain ordinary links.",
+            });
+      },
+      { body: t.Object({ input: t.String({ maxLength: 2_048 }) }) },
     )
     .get("/admin/assets", async ({ request, set, status }) => {
       const bindings = getBindings();
