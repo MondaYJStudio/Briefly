@@ -510,7 +510,7 @@ describe("Article Draft Asset usages", () => {
     expect(JSON.parse(responseText)).toMatchObject({
       articleId: article.id,
       draftVersion: 2,
-      rendererVersion: 1,
+      rendererVersion: 2,
       coverHtml: `<figure><img src="http://briefly.test/media/private/${coverAsset.id}" width="1" height="1" alt="Preview cover"/></figure>`,
       html: `<figure><img src="http://briefly.test/media/private/${figureAsset.id}" width="1" height="1" alt="Figure meaning"/><figcaption>Caption &lt;must be escaped&gt;</figcaption></figure><figure><img src="http://briefly.test/media/private/${figureAsset.id}" width="1" height="1" alt=""/></figure>`,
     });

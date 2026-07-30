@@ -192,7 +192,7 @@ describe("structured video embeds", () => {
     expect(stored).toEqual({
       document_schema_version: 1,
       document: JSON.stringify(document),
-      renderer_version: 1,
+      renderer_version: 2,
       provider_facts: JSON.stringify([
         { provider: "youtube", id: "dQw4w9WgXcQ" },
         { provider: "bilibili", id: "BV1xx411c7mD" },

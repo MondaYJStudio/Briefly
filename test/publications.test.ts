@@ -239,7 +239,7 @@ describe("first immutable Publication", () => {
       cover: null,
       document_schema_version: 1,
       document: JSON.stringify(document),
-      renderer_version: 1,
+      renderer_version: 2,
       html: "<p>Hello <strong>immutable world</strong></p>",
     });
     expect(stored?.published_at).toBeTypeOf("number");

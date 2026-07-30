@@ -10,26 +10,25 @@ import {
 import { z } from "zod";
 
 import type { ArticleCoverUsage, PublicationIssue } from "./articles";
+import { VIDEO_PROVIDER_IDENTIFIERS, type VideoProvider } from "./video-embeds";
 
 export type { PublicationIssue } from "./articles";
 
 const DOCUMENT_SCHEMA_VERSION = 1;
-export const PUBLICATION_RENDERER_VERSION = 1;
+export const PUBLICATION_RENDERER_VERSION = 2;
 const VIDEO_PROVIDER_POLICIES = {
   youtube: {
-    idPattern: /^[A-Za-z0-9_-]{11}$/,
+    idPattern: VIDEO_PROVIDER_IDENTIFIERS.youtube,
     source: (id: string) => `https://www.youtube-nocookie.com/embed/${id}`,
     allow: "encrypted-media; picture-in-picture; fullscreen",
   },
   bilibili: {
-    idPattern: /^BV[A-Za-z0-9]{10}$/,
+    idPattern: VIDEO_PROVIDER_IDENTIFIERS.bilibili,
     source: (id: string) =>
       `https://player.bilibili.com/player.html?bvid=${id}`,
     allow: "fullscreen",
   },
 } as const;
-
-type VideoProvider = keyof typeof VIDEO_PROVIDER_POLICIES;
 
 const Document = Node.create({
   name: "doc",

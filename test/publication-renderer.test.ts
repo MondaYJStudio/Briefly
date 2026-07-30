@@ -31,7 +31,7 @@ describe("Publication renderer", () => {
     expect(result).toEqual({
       ok: true,
       value: {
-        rendererVersion: 1,
+        rendererVersion: 2,
         html: '<p>Hello &lt;script&gt;alert("workerd")&lt;/script&gt; 世界</p>',
         referencedAssets: [],
         referencedProviders: [],
@@ -176,7 +176,7 @@ describe("Publication renderer", () => {
     expect(result).toEqual({
       ok: true,
       value: {
-        rendererVersion: 1,
+        rendererVersion: 2,
         html: '<h2>语义化 Publication</h2><h3>Portable</h3><h4>Safe</h4><p><strong>Bold</strong> <em>Italic</em> <s>Strike</s> <code>inline &lt;code&gt;</code><br/><a href="https://example.com/a?b=1" rel="noopener noreferrer">safe link</a></p><ul><li><p>Outer</p><ol start="3"><li><p>Nested</p></li></ol></li></ul><blockquote><p>Quoted &amp; escaped</p></blockquote><pre><code data-language="typescript">&lt;script&gt;alert(\'no\')&lt;/script&gt;</code></pre><hr/><figure><img src="https://media.example.com/assets/moon.webp" width="1200" height="800" alt="Moon over water"/><figcaption>Night &amp; tide</figcaption></figure><iframe src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ" title="YouTube example" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen=""></iframe><iframe src="https://player.bilibili.com/player.html?bvid=BV1xx411c7mD" title="Bilibili example" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="fullscreen" allowfullscreen=""></iframe>',
         referencedAssets: [
           {
@@ -690,7 +690,7 @@ describe("Publication renderer", () => {
     expect(result).toEqual({
       ok: true,
       value: {
-        rendererVersion: 1,
+        rendererVersion: 2,
         html: '<figure><img src="https://media.example.com/assets/divider.svg" width="800" height="40" alt=""/></figure>',
         referencedAssets: [
           {
@@ -737,7 +737,7 @@ describe("Publication renderer", () => {
     expect(result).toEqual({
       ok: true,
       value: {
-        rendererVersion: 1,
+        rendererVersion: 2,
         html: '<figure><img src="https://media.example.com/assets/public.webp" width="640" height="480" alt="Safe public projection"/></figure>',
         referencedAssets: [
           {
@@ -821,7 +821,7 @@ describe("Publication renderer", () => {
       result: {
         ok: true,
         value: {
-          rendererVersion: 1,
+          rendererVersion: 2,
           html: "<p>workerd proof</p>",
           referencedAssets: [],
           referencedProviders: [],
