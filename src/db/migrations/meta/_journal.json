@@ -43,6 +43,20 @@
       "when": 1785372589503,
       "tag": "0005_assets",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785374730823,
+      "tag": "0006_red_fabian_cortez",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1785375079638,
+      "tag": "0007_talented_roulette",
+      "breakpoints": true
     }
   ]
 }

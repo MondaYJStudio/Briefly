@@ -9,6 +9,13 @@ export const ARTICLE_TAG_MAXIMUM_LENGTH = 80;
 export const ARTICLE_TAGS_MAXIMUM_COUNT = 20;
 export const ARTICLE_DRAFT_AUTOSAVE_DEBOUNCE_MS = 1_000;
 export const ARTICLE_DOCUMENT_SCHEMA_VERSION = 1 as const;
+export const ARTICLE_ASSET_ALT_MAXIMUM_LENGTH = 1_000;
+export const ARTICLE_FIGURE_CAPTION_MAXIMUM_LENGTH = 2_000;
+
+export interface ArticleCoverUsage {
+  assetId: string;
+  alt: string;
+}
 
 export interface ArticleDocument {
   documentSchemaVersion: typeof ARTICLE_DOCUMENT_SCHEMA_VERSION;
@@ -26,6 +33,7 @@ export interface ArticleDraft {
   tags: string[];
   byline: Byline | null;
   language: string | null;
+  cover: ArticleCoverUsage | null;
   document: ArticleDocument;
   createdAt: string;
   updatedAt: string;
@@ -52,6 +60,7 @@ export interface RenderedArticleDraft {
     language: string;
   };
   rendererVersion: number;
+  coverHtml: string | null;
   html: string;
 }
 
@@ -82,6 +91,7 @@ export interface ArticleDraftUpdate {
   tags: string[];
   byline: Byline | null;
   language: string | null;
+  cover: ArticleCoverUsage | null;
   document: ArticleDocument;
 }
 

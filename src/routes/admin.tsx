@@ -383,12 +383,20 @@ type ArticleDraftManagerState =
 
 type EditableArticleDraft = Pick<
   Article["draft"],
-  "title" | "slug" | "summary" | "tags" | "byline" | "language" | "document"
+  | "title"
+  | "slug"
+  | "summary"
+  | "tags"
+  | "byline"
+  | "language"
+  | "cover"
+  | "document"
 >;
 
 function editableArticleDraft(draft: Article["draft"]): EditableArticleDraft {
-  const { title, slug, summary, tags, byline, language, document } = draft;
-  return { title, slug, summary, tags, byline, language, document };
+  const { title, slug, summary, tags, byline, language, cover, document } =
+    draft;
+  return { title, slug, summary, tags, byline, language, cover, document };
 }
 
 function draftUpdate(
@@ -1021,6 +1029,19 @@ function ArticleDraftManager() {
           ))}
         </ul>
       )}
+      <section
+        className="space-y-1"
+        aria-labelledby="asset-authoring-shell-heading"
+      >
+        <h3 id="asset-authoring-shell-heading" className="font-semibold">
+          Figures and cover
+        </h3>
+        <p className="text-sm text-default-500">
+          Select or upload verified Assets, then describe each Article usage.
+          Decorative figures expose that state and save an empty alternative
+          value.
+        </p>
+      </section>
       {selected ? (
         <Form
           className="space-y-4"
@@ -1147,7 +1168,9 @@ function ArticleDraftManager() {
                 <ArticleEditor
                   key={`${selected.id}:${editorGeneration}`}
                   document={selected.draft.document}
+                  cover={selected.draft.cover}
                   onChange={(document) => updateDraft({ document })}
+                  onCoverChange={(cover) => updateDraft({ cover })}
                 />
               </Suspense>
             </ClientOnly>
@@ -1244,6 +1267,9 @@ function ArticleDraftManager() {
                   {preview.metadata.language}
                 </p>
               </header>
+              {preview.coverHtml ? (
+                <div dangerouslySetInnerHTML={{ __html: preview.coverHtml }} />
+              ) : null}
               <div dangerouslySetInnerHTML={{ __html: preview.html }} />
             </article>
           </div>

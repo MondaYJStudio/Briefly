@@ -12,7 +12,11 @@ import {
   publishArticle,
   readPublicArticle,
 } from "../articles/publications.server";
-import { listAssets, uploadAsset } from "../assets/assets.server";
+import {
+  listAssets,
+  resolvePrivateAssetForRendering,
+  uploadAsset,
+} from "../assets/assets.server";
 import {
   initializeAdministrator,
   installationIsInitialized,
@@ -333,7 +337,15 @@ function createApi(getBindings: () => RuntimeBindings) {
           bindings.DB,
           params.articleId,
           (body as { version?: unknown })?.version,
-          { resolveAsset: async () => null },
+          {
+            resolveAsset: (assetId) =>
+              resolvePrivateAssetForRendering(
+                bindings.DB,
+                bindings.MEDIA_BUCKET,
+                bindings.APP_ORIGIN,
+                assetId,
+              ),
+          },
         );
         if (result.ok) return result.renderedDraft;
         if (result.reason === "not-found")

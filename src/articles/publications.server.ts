@@ -3,7 +3,7 @@ import { z } from "zod";
 import { readSiteSettings } from "../site-settings/site-settings.server";
 import { resolveArticleMetadata } from "../site-settings/site-settings";
 import { readArticle } from "./articles.server";
-import type { PublicArticle } from "./articles";
+import type { ArticleCoverUsage, PublicArticle } from "./articles";
 import {
   renderPublication,
   type PublicationIssue,
@@ -77,6 +77,7 @@ function slugKeyFor(value: string): string {
 function publicationMetadataIssues(input: {
   title: string;
   slug: string | null;
+  cover: ArticleCoverUsage | null;
   document: unknown;
 }): PublicationIssue[] {
   const issues: PublicationIssue[] = [];
@@ -92,6 +93,14 @@ function publicationMetadataIssues(input: {
       code: "SLUG_REQUIRED",
       path: "slug",
       message: "A Publication requires a canonical slug",
+    });
+  }
+  if (input.cover !== null) {
+    issues.push({
+      code: "UNSUPPORTED_DOCUMENT_FEATURE",
+      path: "cover",
+      message:
+        "Asset-backed cover publication is not supported until public Asset delivery is available",
     });
   }
 

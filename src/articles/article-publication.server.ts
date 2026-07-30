@@ -181,6 +181,7 @@ export async function renderSavedArticleDraft(
   const rendered = await renderPublication(
     article.draft.document,
     rendererDependencies,
+    article.draft.cover,
   );
   if (!rendered.ok) {
     return { ok: false, reason: "invalid", issues: rendered.issues };
@@ -201,6 +202,7 @@ export async function renderSavedArticleDraft(
         language: metadata.language,
       },
       rendererVersion: rendered.value.rendererVersion,
+      coverHtml: rendered.value.coverHtml ?? null,
       html: rendered.value.html,
     },
   };

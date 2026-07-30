@@ -5,10 +5,13 @@ import {
   foreignKey,
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+
+import { asset } from "./assets";
 
 export const article = sqliteTable(
   "article",
@@ -125,6 +128,10 @@ export const articleDraft = sqliteTable(
       url: string | null;
     } | null>(),
     language: text("language"),
+    cover: text("cover", { mode: "json" }).$type<{
+      assetId: string;
+      alt: string;
+    } | null>(),
     document: text("document", { mode: "json" }).$type<unknown>().notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
@@ -136,5 +143,21 @@ export const articleDraft = sqliteTable(
       name: "article_draft_slug_belongs_to_article",
     }),
     check("article_draft_version_positive", sql`${table.version} >= 1`),
+  ],
+);
+
+export const articleDraftAssetReference = sqliteTable(
+  "article_draft_asset_reference",
+  {
+    articleId: text("article_id")
+      .notNull()
+      .references(() => articleDraft.articleId, { onDelete: "cascade" }),
+    assetId: text("asset_id")
+      .notNull()
+      .references(() => asset.id, { onDelete: "restrict" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.articleId, table.assetId] }),
+    index("article_draft_asset_reference_asset_idx").on(table.assetId),
   ],
 );

@@ -1,4 +1,9 @@
-import { getSchema, type Extensions, type JSONContent } from "@tiptap/core";
+import {
+  getSchema,
+  Node,
+  type Extensions,
+  type JSONContent,
+} from "@tiptap/core";
 import CodeBlock from "@tiptap/extension-code-block";
 import Link from "@tiptap/extension-link";
 import { OrderedList } from "@tiptap/extension-list";
@@ -7,7 +12,9 @@ import StarterKit from "@tiptap/starter-kit";
 import { z } from "zod";
 
 import {
+  ARTICLE_ASSET_ALT_MAXIMUM_LENGTH,
   ARTICLE_DOCUMENT_SCHEMA_VERSION,
+  ARTICLE_FIGURE_CAPTION_MAXIMUM_LENGTH,
   type ArticleDocument,
 } from "./articles";
 
@@ -82,6 +89,31 @@ const ArticleOrderedList = OrderedList.extend({
   },
 });
 
+const ArticleFigure = Node.create({
+  name: "figure",
+  group: "block",
+  atom: true,
+  selectable: true,
+  addAttributes: () => ({
+    assetId: { default: null },
+    alt: { default: "" },
+    decorative: { default: false },
+    caption: { default: null },
+  }),
+  renderHTML: ({ node }) => {
+    const image = [
+      "img",
+      {
+        src: `/media/private/${String(node.attrs.assetId)}`,
+        alt: node.attrs.decorative ? "" : String(node.attrs.alt),
+      },
+    ];
+    return node.attrs.caption
+      ? ["figure", image, ["figcaption", String(node.attrs.caption)]]
+      : ["figure", image];
+  },
+});
+
 export function createArticleEditorExtensions(): Extensions {
   return [
     StarterKit.configure({
@@ -94,6 +126,7 @@ export function createArticleEditorExtensions(): Extensions {
     }),
     ArticleCodeBlock,
     ArticleOrderedList,
+    ArticleFigure,
     ArticleLink.configure({
       autolink: true,
       linkOnPaste: true,
@@ -143,6 +176,32 @@ const inlineNodeSchema = z.discriminatedUnion("type", [
   textNodeSchema,
   hardBreakNodeSchema,
 ]);
+
+const figureNodeSchema = z
+  .object({
+    type: z.literal("figure"),
+    attrs: z
+      .object({
+        assetId: z.string().uuid(),
+        alt: z.string().max(ARTICLE_ASSET_ALT_MAXIMUM_LENGTH),
+        decorative: z.boolean(),
+        caption: z
+          .string()
+          .max(ARTICLE_FIGURE_CAPTION_MAXIMUM_LENGTH)
+          .nullable(),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((figure, context) => {
+    if (!figure.attrs.decorative && figure.attrs.alt.trim().length === 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["attrs", "alt"],
+        message: "A non-decorative figure requires alternative text.",
+      });
+    }
+  });
 
 const blockNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
   z.discriminatedUnion("type", [
@@ -194,6 +253,7 @@ const blockNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
       })
       .strict(),
     z.object({ type: z.literal("horizontalRule") }).strict(),
+    figureNodeSchema,
   ]),
 );
 
@@ -268,4 +328,35 @@ export function validateArticleDocument(
       ],
     };
   }
+}
+
+export interface ArticleDocumentAssetReference {
+  assetId: string;
+  path: string;
+}
+
+export function articleDocumentAssetReferences(
+  document: ArticleDocument,
+): ArticleDocumentAssetReference[] {
+  const references: ArticleDocumentAssetReference[] = [];
+
+  function visit(value: unknown, path: string) {
+    if (Array.isArray(value)) {
+      value.forEach((child, index) => visit(child, `${path}.${index}`));
+      return;
+    }
+    if (value === null || typeof value !== "object") return;
+    const node = value as Record<string, unknown>;
+    if (node.type === "figure") {
+      const attrs = node.attrs as { assetId: string };
+      references.push({
+        assetId: attrs.assetId,
+        path: `${path}.attrs.assetId`,
+      });
+    }
+    visit(node.content, `${path}.content`);
+  }
+
+  visit(document.doc, "doc");
+  return references;
 }

@@ -115,6 +115,7 @@ describe("private saved Draft preview", () => {
         language: "zh-Hans",
       },
       rendererVersion: 1,
+      coverHtml: null,
       html: "<p>Server-confirmed &lt;Draft&gt;</p>",
     });
     const after = await (

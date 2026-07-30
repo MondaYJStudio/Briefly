@@ -440,6 +440,78 @@ describe("Publication renderer", () => {
     });
   });
 
+  it.each([
+    ["an arbitrary image URL", "https://attacker.example/image.png"],
+    ["a raw R2 object key", "private-assets/raw-object-key"],
+  ])(
+    "rejects %s when it is submitted as a figure Asset identity",
+    async (_, assetId) => {
+      const result = await renderPublication(
+        {
+          documentSchemaVersion: 1,
+          doc: {
+            type: "doc",
+            content: [
+              {
+                type: "figure",
+                attrs: {
+                  assetId,
+                  alt: "Untrusted identity",
+                  decorative: false,
+                  caption: null,
+                },
+              },
+            ],
+          },
+        },
+        {
+          resolveAsset: async (requestedId) => ({
+            assetId: requestedId,
+            publicUrl: "https://media.example.com/attacker-controlled.png",
+            width: 640,
+            height: 480,
+          }),
+        },
+      );
+
+      expect(result).toEqual({
+        ok: false,
+        issues: [
+          {
+            code: "INVALID_ASSET_IDENTITY",
+            path: "doc.content.0.attrs.assetId",
+            message: "Figure must reference an internal Asset identity",
+          },
+        ],
+      });
+    },
+  );
+
+  it("rejects a raw R2 object key submitted as a cover Asset identity", async () => {
+    const result = await renderPublication(
+      {
+        documentSchemaVersion: 1,
+        doc: { type: "doc", content: [{ type: "paragraph" }] },
+      },
+      { resolveAsset: async () => null },
+      {
+        assetId: "private-assets/raw-cover-key",
+        alt: "Untrusted cover",
+      } as never,
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      issues: [
+        {
+          code: "INVALID_ASSET_IDENTITY",
+          path: "cover.assetId",
+          message: "Cover must reference an internal Asset identity",
+        },
+      ],
+    });
+  });
+
   it("returns complete Asset-resolution issues without partial HTML", async () => {
     const result = await renderPublication(
       {

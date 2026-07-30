@@ -1,0 +1,1 @@
+ALTER TABLE `article_draft` ADD `cover` text;

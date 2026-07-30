@@ -9,7 +9,7 @@ import {
 } from "@tiptap/static-renderer/pm/html-string";
 import { z } from "zod";
 
-import type { PublicationIssue } from "./articles";
+import type { ArticleCoverUsage, PublicationIssue } from "./articles";
 
 export type { PublicationIssue } from "./articles";
 
@@ -200,6 +200,17 @@ const safeLinkSchema = z
   .string()
   .max(2_048)
   .refine(isSafeLink, "Link must use an allowed absolute URL protocol");
+const assetIdentitySchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z0-9_-]+$/u);
+const coverUsageSchema = z
+  .object({
+    assetId: assetIdentitySchema,
+    alt: z.string().trim().min(1).max(1_000),
+  })
+  .strict();
 
 const linkMarkSchema = z
   .object({
@@ -308,7 +319,7 @@ const figureNodeSchema = z
     type: z.literal("figure"),
     attrs: z
       .object({
-        assetId: z.string().min(1).max(128),
+        assetId: assetIdentitySchema,
         alt: z.string().max(1_000),
         decorative: z.boolean(),
         caption: z.string().max(2_000).nullable().optional(),
@@ -377,6 +388,7 @@ export interface ResolvedPublicationAsset {
   publicUrl: string;
   width: number;
   height: number;
+  delivery?: "private" | "public";
 }
 
 export interface PublicationRendererDependencies {
@@ -389,6 +401,7 @@ export type PublicationRenderResult =
       value: {
         rendererVersion: typeof PUBLICATION_RENDERER_VERSION;
         html: string;
+        coverHtml?: string | null;
         referencedAssets: ResolvedPublicationAsset[];
         referencedProviders: Array<{ provider: VideoProvider; id: string }>;
       };
@@ -398,11 +411,37 @@ export type PublicationRenderResult =
 export function renderPublication(
   document: VersionedPublicationDocument,
   dependencies: PublicationRendererDependencies,
+  cover?: ArticleCoverUsage | null,
 ): Promise<PublicationRenderResult>;
 export async function renderPublication(
   document: unknown,
   dependencies: PublicationRendererDependencies,
+  cover?: ArticleCoverUsage | null,
 ): Promise<PublicationRenderResult> {
+  let normalizedCover: ArticleCoverUsage | null | undefined;
+  if (cover !== undefined) {
+    const parsedCover = coverUsageSchema.nullable().safeParse(cover);
+    if (!parsedCover.success) {
+      return {
+        ok: false,
+        issues: parsedCover.error.issues.map((issue) =>
+          issue.path.at(-1) === "assetId"
+            ? {
+                code: "INVALID_ASSET_IDENTITY",
+                path: "cover.assetId",
+                message: "Cover must reference an internal Asset identity",
+              }
+            : {
+                code: "INVALID_COVER",
+                path: `cover.${issue.path.join(".")}`,
+                message: issue.message,
+              },
+        ),
+      };
+    }
+    normalizedCover = parsedCover.data;
+  }
+
   const envelope = documentEnvelopeSchema.safeParse(document);
   if (!envelope.success) {
     return invalidDocumentIssues(document, envelope.error);
@@ -448,6 +487,12 @@ export async function renderPublication(
   }
 
   const references = collectReferences(node);
+  if (
+    normalizedCover &&
+    !references.assetIds.includes(normalizedCover.assetId)
+  ) {
+    references.assetIds.unshift(normalizedCover.assetId);
+  }
   const resolvedAssets = await resolveAssets(
     references.assetIds,
     dependencies.resolveAsset,
@@ -485,14 +530,25 @@ export async function renderPublication(
     };
   }
 
+  const value: Extract<PublicationRenderResult, { ok: true }>["value"] = {
+    rendererVersion: PUBLICATION_RENDERER_VERSION,
+    html,
+    referencedAssets: resolvedAssets.assets,
+    referencedProviders: references.providers,
+  };
+  if (normalizedCover !== undefined) {
+    value.coverHtml =
+      normalizedCover === null
+        ? null
+        : renderFigure(
+            { ...normalizedCover, decorative: false, caption: null },
+            assetsById,
+          );
+  }
+
   return {
     ok: true,
-    value: {
-      rendererVersion: PUBLICATION_RENDERER_VERSION,
-      html,
-      referencedAssets: resolvedAssets.assets,
-      referencedProviders: references.providers,
-    },
+    value,
   };
 }
 
@@ -532,6 +588,14 @@ function invalidDocumentIssues(
           code: "UNSAFE_LINK",
           path,
           message: "Link must use an allowed absolute URL protocol",
+        };
+      }
+
+      if (issue.path.at(-1) === "assetId") {
+        return {
+          code: "INVALID_ASSET_IDENTITY",
+          path,
+          message: "Figure must reference an internal Asset identity",
         };
       }
 
@@ -688,7 +752,7 @@ function normalizeResolvedAsset(
 
   if (
     asset.assetId !== requestedId ||
-    publicUrl.protocol !== "https:" ||
+    !isAllowedResolvedAssetUrl(requestedId, publicUrl, asset.delivery) ||
     publicUrl.username !== "" ||
     publicUrl.password !== "" ||
     !Number.isInteger(asset.width) ||
@@ -705,6 +769,20 @@ function normalizeResolvedAsset(
     width: asset.width,
     height: asset.height,
   };
+}
+
+function isAllowedResolvedAssetUrl(
+  requestedId: string,
+  url: URL,
+  delivery: ResolvedPublicationAsset["delivery"],
+): boolean {
+  if (delivery !== "private") return url.protocol === "https:";
+  return (
+    ["http:", "https:"].includes(url.protocol) &&
+    url.pathname === `/media/private/${requestedId}` &&
+    url.search === "" &&
+    url.hash === ""
+  );
 }
 
 function renderFigure(

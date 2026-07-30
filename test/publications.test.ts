@@ -2,6 +2,8 @@ import { SELF } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { uploadOnePixelPngAsset } from "./asset-fixture";
+
 const administrator = {
   email: "administrator@example.com",
   password: "correct horse battery staple",
@@ -117,12 +119,19 @@ function publish(
 
 describe("first immutable Publication", () => {
   beforeEach(async () => {
+    const { results } = await env.DB.prepare(
+      "SELECT object_key FROM asset",
+    ).all<{ object_key: string }>();
+    await Promise.all(
+      results.map(({ object_key }) => env.MEDIA_BUCKET.delete(object_key)),
+    );
     await env.DB.batch([
       env.DB.prepare("DROP TRIGGER IF EXISTS reject_publication_insert"),
       env.DB.prepare("UPDATE article SET current_publication_id = NULL"),
       env.DB.prepare("DELETE FROM publication"),
       env.DB.prepare("DELETE FROM article_draft"),
       env.DB.prepare("DELETE FROM article"),
+      env.DB.prepare("DELETE FROM asset"),
       env.DB.prepare("DELETE FROM auth_session"),
       env.DB.prepare("DELETE FROM auth_account"),
       env.DB.prepare("DELETE FROM auth_user"),
@@ -340,23 +349,28 @@ describe("first immutable Publication", () => {
     20_000,
   );
 
-  it("cleanly rejects a cover-bearing Draft before the asset tickets land", async () => {
+  it("cleanly rejects publishing a valid cover-bearing Draft until public Asset delivery lands", async () => {
     const cookie = await initializeAndSignIn();
     const articleId = await createArticle(cookie);
+    const coverAsset = await uploadOnePixelPngAsset(cookie, "cover.png");
 
-    const rejected = await saveDraft(cookie, articleId, {
+    const saved = await saveDraft(cookie, articleId, {
       title: "No covers yet",
       slug: "no-covers-yet",
-      cover: { assetId: "private-asset", alt: "Not supported yet" },
+      cover: { assetId: coverAsset.id, alt: "Not public yet" },
       document: textDocument("Text body"),
     });
+    expect(saved.status).toBe(200);
+
+    const rejected = await publish(cookie, articleId);
 
     expect(rejected.status).toBe(400);
     expect(await rejected.json()).toMatchObject({
       status: "error",
-      code: "ARTICLE_DRAFT_INVALID",
+      code: "PUBLICATION_INVALID",
       issues: [
         expect.objectContaining({
+          path: "cover",
           message: expect.stringContaining("cover"),
         }),
       ],
@@ -366,7 +380,15 @@ describe("first immutable Publication", () => {
         headers: { cookie },
       })
     ).json<{ draft: { version: number; title: string } }>();
-    expect(preserved.draft).toMatchObject({ version: 1, title: "" });
+    expect(preserved).toMatchObject({
+      currentPublicationId: null,
+      draft: { version: 2, title: "No covers yet" },
+    });
+    expect(
+      await env.DB.prepare("SELECT id FROM publication WHERE article_id = ?")
+        .bind(articleId)
+        .first(),
+    ).toBeNull();
   }, 20_000);
 
   it.each([

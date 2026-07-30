@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  ARTICLE_ASSET_ALT_MAXIMUM_LENGTH,
   ARTICLE_DOCUMENT_SCHEMA_VERSION,
   ARTICLE_SLUG_MAXIMUM_LENGTH,
   ARTICLE_SUMMARY_MAXIMUM_LENGTH,
@@ -8,8 +9,12 @@ import {
   ARTICLE_TAGS_MAXIMUM_COUNT,
   ARTICLE_TITLE_MAXIMUM_LENGTH,
   type Article,
+  type ArticleCoverUsage,
 } from "./articles";
-import { validateArticleDocument } from "./article-document";
+import {
+  articleDocumentAssetReferences,
+  validateArticleDocument,
+} from "./article-document";
 
 const emptyDocument = {
   documentSchemaVersion: ARTICLE_DOCUMENT_SCHEMA_VERSION,
@@ -45,6 +50,19 @@ const language = z
   })
   .transform((value) => Intl.getCanonicalLocales(value)[0]);
 
+const coverUsage = z
+  .object({
+    assetId: z.string().uuid({
+      message: "A cover must reference an existing internal Asset.",
+    }),
+    alt: z
+      .string()
+      .trim()
+      .min(1, { message: "A cover requires meaningful alternative text." })
+      .max(ARTICLE_ASSET_ALT_MAXIMUM_LENGTH),
+  })
+  .strict();
+
 const pathReservedCharacter = /[:/?#\[\]@!$&'()*+,;=%\\]/u;
 const controlCharacter = /\p{Cc}/u;
 
@@ -79,6 +97,7 @@ const draftInput = z
     tags: z.array(tag).max(ARTICLE_TAGS_MAXIMUM_COUNT),
     byline: byline.nullable(),
     language: language.nullable(),
+    cover: coverUsage.nullable().optional(),
     document: z.unknown().optional(),
   })
   .strict()
@@ -120,6 +139,21 @@ const persistedArticleBase = z.object({
       }
     }),
   language: z.string().nullable(),
+  cover: z
+    .string()
+    .nullable()
+    .transform((value, context): ArticleCoverUsage | null => {
+      if (value === null) return null;
+      try {
+        return coverUsage.parse(JSON.parse(value));
+      } catch {
+        context.addIssue({
+          code: "custom",
+          message: "Invalid persisted cover",
+        });
+        return z.NEVER;
+      }
+    }),
   draft_created_at: z.number().int(),
   draft_updated_at: z.number().int(),
 });
@@ -163,7 +197,14 @@ type ArticleRow = z.input<typeof persistedArticle>;
 
 type ArticleDraftMetadata = Pick<
   Article["draft"],
-  "version" | "title" | "slug" | "summary" | "tags" | "byline" | "language"
+  | "version"
+  | "title"
+  | "slug"
+  | "summary"
+  | "tags"
+  | "byline"
+  | "language"
+  | "cover"
 >;
 
 export class NonCanonicalArticleDraftMetadataError extends Error {
@@ -184,6 +225,7 @@ function articleDraftMetadataFromRow(
     tags: row.tags,
     byline: row.byline,
     language: row.language,
+    cover: row.cover,
   });
   const metadata = {
     version: parsed.version,
@@ -193,6 +235,7 @@ function articleDraftMetadataFromRow(
     tags: parsed.tags,
     byline: parsed.byline,
     language: parsed.language,
+    cover: parsed.cover ?? null,
   };
   const persistedMetadata = {
     version: row.version,
@@ -202,6 +245,7 @@ function articleDraftMetadataFromRow(
     tags: row.tags,
     byline: row.byline,
     language: row.language,
+    cover: row.cover,
   };
   if (JSON.stringify(metadata) !== JSON.stringify(persistedMetadata)) {
     throw new NonCanonicalArticleDraftMetadataError();
@@ -232,7 +276,7 @@ const articleSelection = `
          article.updated_at AS article_updated_at,
          article_draft.version, article_draft.title, article_draft.slug,
          article_draft.summary, article_draft.tags, article_draft.byline,
-         article_draft.language, article_draft.document,
+         article_draft.language, article_draft.cover, article_draft.document,
          article_draft.created_at AS draft_created_at,
          article_draft.updated_at AS draft_updated_at
   FROM article
@@ -242,6 +286,49 @@ const articleSelection = `
 export interface ArticleValidationIssue {
   path: string;
   message: string;
+}
+
+interface DraftAssetReference {
+  assetId: string;
+  path: string;
+}
+
+function draftAssetReferences(
+  document: Article["draft"]["document"],
+  cover: ArticleCoverUsage | null,
+): DraftAssetReference[] {
+  return [
+    ...(cover ? [{ assetId: cover.assetId, path: "cover.assetId" }] : []),
+    ...articleDocumentAssetReferences(document).map(({ assetId, path }) => ({
+      assetId,
+      path: `document.${path}`,
+    })),
+  ];
+}
+
+async function unavailableDraftAssetIssues(
+  database: D1Database,
+  references: DraftAssetReference[],
+): Promise<ArticleValidationIssue[]> {
+  const assetIds = [...new Set(references.map(({ assetId }) => assetId))];
+  if (assetIds.length === 0) return [];
+  const { results } = await database
+    .prepare(
+      `SELECT requested.value AS asset_id
+       FROM json_each(?) AS requested
+       LEFT JOIN asset
+         ON asset.id = requested.value AND asset.lifecycle_state = 'ready'
+       WHERE asset.id IS NULL`,
+    )
+    .bind(JSON.stringify(assetIds))
+    .all<{ asset_id: string }>();
+  const unavailable = new Set(results.map(({ asset_id }) => asset_id));
+  return references
+    .filter(({ assetId }) => unavailable.has(assetId))
+    .map(({ path }) => ({
+      path,
+      message: "Referenced Asset must exist and be ready.",
+    }));
 }
 
 export type UpdateArticleDraftResult =
@@ -262,8 +349,8 @@ export async function createArticle(database: D1Database): Promise<Article> {
       .prepare(
         `INSERT INTO article_draft
            (article_id, version, title, slug, slug_key, summary, tags,
-            byline, language, document, created_at, updated_at)
-         VALUES (?, 1, '', NULL, NULL, NULL, '[]', NULL, NULL, ?, ?, ?)`,
+            byline, language, cover, document, created_at, updated_at)
+         VALUES (?, 1, '', NULL, NULL, NULL, '[]', NULL, NULL, NULL, ?, ?, ?)`,
       )
       .bind(id, JSON.stringify(emptyDocument), now, now),
   ]);
@@ -369,6 +456,18 @@ export async function updateArticleDraft(
       })),
     };
   }
+  const cover = value.cover === undefined ? before.draft.cover : value.cover;
+  const assetReferences = draftAssetReferences(documentResult.document, cover);
+  const assetIssues = await unavailableDraftAssetIssues(
+    database,
+    assetReferences,
+  );
+  if (assetIssues.length > 0) {
+    return { ok: false, reason: "invalid", issues: assetIssues };
+  }
+  const assetIds = [...new Set(assetReferences.map(({ assetId }) => assetId))];
+  const serializedCover = cover === null ? null : JSON.stringify(cover);
+  const serializedDocument = JSON.stringify(documentResult.document);
   const previousSlugKey = slugKeyFor(before.draft.slug);
   const statements: D1PreparedStatement[] = [];
   if (slugKey !== null) {
@@ -381,9 +480,23 @@ export async function updateArticleDraft(
                SELECT 1 FROM article_draft
                WHERE article_id = ? AND version = ?
              )
+               AND NOT EXISTS (
+                 SELECT 1
+                 FROM json_each(?) AS referenced
+                 LEFT JOIN asset
+                   ON asset.id = referenced.value
+                     AND asset.lifecycle_state = 'ready'
+                 WHERE asset.id IS NULL
+               )
              ON CONFLICT (slug_key) DO NOTHING`,
         )
-        .bind(slugKey, articleId, articleId, value.version),
+        .bind(
+          slugKey,
+          articleId,
+          articleId,
+          value.version,
+          JSON.stringify(assetIds),
+        ),
     );
   }
   const updateIndex = statements.length;
@@ -392,7 +505,7 @@ export async function updateArticleDraft(
       .prepare(
         `UPDATE article_draft
          SET version = version + 1, title = ?, slug = ?, slug_key = ?,
-             summary = ?, tags = ?, byline = ?, language = ?, document = ?,
+             summary = ?, tags = ?, byline = ?, language = ?, cover = ?, document = ?,
              updated_at = ?
          WHERE article_id = ? AND version = ?
            AND (
@@ -407,6 +520,14 @@ export async function updateArticleDraft(
              WHERE article.id = article_draft.article_id
                AND article.trashed_at IS NULL
            )
+           AND NOT EXISTS (
+             SELECT 1
+             FROM json_each(?) AS referenced
+             LEFT JOIN asset
+               ON asset.id = referenced.value
+                 AND asset.lifecycle_state = 'ready'
+             WHERE asset.id IS NULL
+           )
          RETURNING version`,
       )
       .bind(
@@ -417,12 +538,63 @@ export async function updateArticleDraft(
         JSON.stringify(value.tags),
         value.byline === null ? null : JSON.stringify(value.byline),
         value.language,
-        JSON.stringify(documentResult.document),
+        serializedCover,
+        serializedDocument,
         now,
         articleId,
         value.version,
         slugKey,
         slugKey,
+        JSON.stringify(assetIds),
+      ),
+  );
+  statements.push(
+    database
+      .prepare(
+        `DELETE FROM article_draft_asset_reference
+         WHERE article_id = ?
+           AND EXISTS (
+             SELECT 1 FROM article_draft
+             WHERE article_draft.article_id = ?
+               AND article_draft.version = ?
+               AND article_draft.updated_at = ?
+               AND article_draft.cover IS ?
+               AND article_draft.document = ?
+           )`,
+      )
+      .bind(
+        articleId,
+        articleId,
+        value.version + 1,
+        now,
+        serializedCover,
+        serializedDocument,
+      ),
+  );
+  statements.push(
+    database
+      .prepare(
+        `INSERT INTO article_draft_asset_reference (article_id, asset_id)
+         SELECT ?, referenced.value
+         FROM json_each(?) AS referenced
+         WHERE EXISTS (
+           SELECT 1 FROM article_draft
+           WHERE article_draft.article_id = ?
+             AND article_draft.version = ?
+             AND article_draft.updated_at = ?
+             AND article_draft.cover IS ?
+             AND article_draft.document = ?
+         )
+         ON CONFLICT (article_id, asset_id) DO NOTHING`,
+      )
+      .bind(
+        articleId,
+        JSON.stringify(assetIds),
+        articleId,
+        value.version + 1,
+        now,
+        serializedCover,
+        serializedDocument,
       ),
   );
   if (previousSlugKey !== null && previousSlugKey !== slugKey) {
@@ -478,6 +650,13 @@ export async function updateArticleDraft(
 
   if (!updated) {
     if (!article) return { ok: false, reason: "not-found" };
+    const racedAssetIssues = await unavailableDraftAssetIssues(
+      database,
+      assetReferences,
+    );
+    if (racedAssetIssues.length > 0) {
+      return { ok: false, reason: "invalid", issues: racedAssetIssues };
+    }
     return article.draft.version === value.version
       ? { ok: false, reason: "slug-conflict" }
       : { ok: false, reason: "conflict" };
