@@ -30,6 +30,7 @@ import {
   type ArticleDraftUpdate,
   type ArticlePublicationHistory,
   type ArticlePublicationHistoryEntry,
+  type ArticleTrashEntry,
   type PublicationIssue,
   type RenderedArticleDraft,
 } from "../articles/articles";
@@ -384,6 +385,15 @@ type ArticleDraftManagerState =
   | "failed"
   | "offline";
 
+type ArticleTrashActionState =
+  | "ready"
+  | "trashing"
+  | "trashed"
+  | "trash-error"
+  | "restoring"
+  | "restored"
+  | "restore-error";
+
 type EditableArticleDraft = Pick<
   Article["draft"],
   | "title"
@@ -456,8 +466,23 @@ function replaceArticlePreservingConcurrentCurrentPublication(
   );
 }
 
+async function loadTrashedArticles(): Promise<ArticleTrashEntry[]> {
+  const response = await getApiClient().admin.trash.articles.get();
+  if (response.status !== 200 || !response.data)
+    throw new Error("Trash unavailable");
+  return response.data.articles as ArticleTrashEntry[];
+}
+
 function ArticleDraftManager() {
   const [articles, setArticles] = useState<Article[]>([]);
+  const [trashedArticles, setTrashedArticles] = useState<ArticleTrashEntry[]>(
+    [],
+  );
+  const [trashViewState, setTrashViewState] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [trashActionState, setTrashActionState] =
+    useState<ArticleTrashActionState>("ready");
   const [selected, setSelected] = useState<Article | null>(null);
   const [state, setState] = useState<ArticleDraftManagerState>("loading");
   const [isOnline, setIsOnline] = useState(
@@ -475,6 +500,7 @@ function ArticleDraftManager() {
   const confirmedRevisionRef = useRef(0);
   const savingRef = useRef(false);
   const restorePendingRef = useRef(false);
+  const trashLifecyclePendingRef = useRef(false);
   const [preview, setPreview] = useState<RenderedArticleDraft | null>(null);
   const [previewIssues, setPreviewIssues] = useState<PublicationIssue[]>([]);
   const [previewState, setPreviewState] = useState<
@@ -557,6 +583,16 @@ function ArticleDraftManager() {
       .catch(() => {
         if (active) setState("failed");
       });
+    void loadTrashedArticles()
+      .then((trashEntries) => {
+        if (active) {
+          setTrashedArticles(trashEntries);
+          setTrashViewState("ready");
+        }
+      })
+      .catch(() => {
+        if (active) setTrashViewState("error");
+      });
     return () => {
       active = false;
     };
@@ -576,6 +612,7 @@ function ArticleDraftManager() {
       setState("ready");
       setPublishState("ready");
       setPublicationAction(null);
+      setTrashActionState("ready");
     } catch {
       setState("failed");
     }
@@ -601,6 +638,7 @@ function ArticleDraftManager() {
       setState("ready");
       setPublishState("ready");
       setPublicationAction(null);
+      setTrashActionState("ready");
     } catch {
       setState("failed");
     }
@@ -608,7 +646,13 @@ function ArticleDraftManager() {
 
   const persistCurrentDraft = useCallback(async (version?: number) => {
     const snapshot = selectedRef.current;
-    if (!snapshot || savingRef.current || restorePendingRef.current) return;
+    if (
+      !snapshot ||
+      savingRef.current ||
+      restorePendingRef.current ||
+      trashLifecyclePendingRef.current
+    )
+      return;
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       setState("offline");
       return;
@@ -719,7 +763,12 @@ function ArticleDraftManager() {
 
   function updateDraft(changes: Partial<Article["draft"]>) {
     const current = selectedRef.current;
-    if (!current || restorePendingRef.current) return;
+    if (
+      !current ||
+      restorePendingRef.current ||
+      trashLifecyclePendingRef.current
+    )
+      return;
     const next = { ...current, draft: { ...current.draft, ...changes } };
     const nextRevision = revisionRef.current + 1;
     selectedRef.current = next;
@@ -807,7 +856,9 @@ function ArticleDraftManager() {
   const lifecycleActionPending =
     publishState === "publishing" ||
     unpublishState === "unpublishing" ||
-    restoreState === "restoring";
+    restoreState === "restoring" ||
+    trashActionState === "trashing" ||
+    trashActionState === "restoring";
   const publishActionDisabled =
     !selected ||
     !serverConfirmed ||
@@ -818,6 +869,13 @@ function ArticleDraftManager() {
     lifecycleActionPending ||
     state === "loading" ||
     state === "creating";
+  const trashActionDisabled =
+    !selected || !serverConfirmed || lifecycleActionPending;
+  const articleSelectionDisabled = hasUnsavedChanges || lifecycleActionPending;
+  const editorLocked =
+    restoreState === "restoring" ||
+    trashActionState === "trashing" ||
+    trashActionState === "restoring";
   const blocker = useBlocker({
     shouldBlockFn: () => hasUnsavedChanges,
     enableBeforeUnload: hasUnsavedChanges,
@@ -825,7 +883,7 @@ function ArticleDraftManager() {
   });
 
   async function previewSavedDraft() {
-    if (!selected) return;
+    if (!selected || lifecycleActionPending) return;
     const previewGeneration = ++previewRequestGeneration.current;
     const articleId = selected.id;
     const version = selected.draft.version;
@@ -891,6 +949,7 @@ function ArticleDraftManager() {
           setPublishState("published");
           setPublicationAction(isRepublish ? "republished" : "published");
           setUnpublishState("ready");
+          setTrashActionState("ready");
           resetPublicationHistory();
         }
         try {
@@ -1078,22 +1137,161 @@ function ArticleDraftManager() {
     }
   }
 
+  function clearSelectedArticle() {
+    selectedRef.current = null;
+    revisionRef.current = 0;
+    confirmedRevisionRef.current = 0;
+    setSelected(null);
+    setRevision(0);
+    setConfirmedRevision(0);
+    setConflictCopy(null);
+    setIssues([]);
+    setState("ready");
+    setPublishState("ready");
+    setPublicationAction(null);
+    setUnpublishState("ready");
+    resetPublicationHistory();
+    resetPreview();
+  }
+
+  async function reloadTrashView() {
+    setTrashViewState("loading");
+    try {
+      setTrashedArticles(await loadTrashedArticles());
+      setTrashViewState("ready");
+    } catch {
+      setTrashViewState("error");
+    }
+  }
+
+  async function moveSelectedArticleToTrash() {
+    const snapshot = selectedRef.current;
+    if (!snapshot || trashActionDisabled || trashLifecyclePendingRef.current)
+      return;
+    trashLifecyclePendingRef.current = true;
+    setTrashActionState("trashing");
+    try {
+      const response = await getApiClient()
+        .admin.articles({ articleId: snapshot.id })
+        .trash.post();
+      if (response.status !== 200 || !response.data) {
+        setTrashActionState("trash-error");
+        return;
+      }
+
+      setArticles((current) =>
+        current.filter((article) => article.id !== snapshot.id),
+      );
+      if (selectedRef.current?.id === snapshot.id) clearSelectedArticle();
+      setTrashActionState("trashed");
+      await reloadTrashView();
+    } catch {
+      setTrashActionState("trash-error");
+    } finally {
+      trashLifecyclePendingRef.current = false;
+    }
+  }
+
+  async function restoreArticleFromTrash(article: ArticleTrashEntry) {
+    if (
+      articleSelectionDisabled ||
+      revisionRef.current !== confirmedRevisionRef.current ||
+      trashLifecyclePendingRef.current
+    )
+      return;
+    trashLifecyclePendingRef.current = true;
+    setTrashActionState("restoring");
+    let restoreConfirmed = false;
+    try {
+      const response = await getApiClient()
+        .admin.trash.articles({ articleId: article.id })
+        .restore.post();
+      if (response.status !== 200 || !response.data) {
+        setTrashActionState("restore-error");
+        return;
+      }
+      restoreConfirmed = true;
+
+      setTrashedArticles((current) =>
+        current.filter((candidate) => candidate.id !== article.id),
+      );
+      setTrashActionState("restored");
+
+      const restored = await getApiClient()
+        .admin.articles({ articleId: article.id })
+        .get();
+      if (restored.status === 200 && restored.data) {
+        const serverArticle = restored.data as Article;
+        setArticles((current) => [
+          serverArticle,
+          ...current.filter((candidate) => candidate.id !== serverArticle.id),
+        ]);
+        selectServerDraft(serverArticle);
+        setState("saved");
+        setPublishState("ready");
+        setPublicationAction(null);
+        setUnpublishState("ready");
+        setTrashActionState("restored");
+      }
+    } catch {
+      setTrashActionState(restoreConfirmed ? "restored" : "restore-error");
+    } finally {
+      trashLifecyclePendingRef.current = false;
+    }
+  }
+
   return (
     <section
       className="space-y-5"
-      aria-labelledby="article-drafts-heading"
+      aria-labelledby="article-administration-heading"
       data-server-confirmed={serverConfirmed}
     >
       <div className="space-y-1">
-        <h2 id="article-drafts-heading" className="text-xl font-semibold">
-          Article Drafts
+        <h2
+          id="article-administration-heading"
+          className="text-xl font-semibold"
+        >
+          Articles and Trash
         </h2>
         <p className="text-sm text-default-500">
           Create incomplete Articles and autosave complete versioned Drafts. The
           text-rich editor loads after hydration while this shell remains
           server-rendered.
         </p>
+        <p className="text-sm text-default-500">
+          Move Article to Trash is reversible; Restore Article always returns it
+          as unpublished, so you must explicitly publish it again. Permanent
+          purge is separate and irreversible.
+        </p>
+        <p className="text-sm text-default-500">
+          The Restore this Article from Trash? confirmation makes the result
+          explicit: Article restored as unpublished means it remains private
+          until another deliberate publish.
+        </p>
       </div>
+      {trashActionState === "restored" ? (
+        <Alert status="success" role="status">
+          <Alert.Content>
+            <Alert.Title>Article restored as unpublished</Alert.Title>
+            <Alert.Description>
+              Its Draft and Publication history are intact. It has no Current
+              Publication and remains unavailable from public endpoints until
+              you explicitly publish it again.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : trashActionState === "trash-error" ? (
+        <Alert status="danger" role="alert">
+          <Alert.Content>
+            <Alert.Title>Unable to move Article to Trash</Alert.Title>
+            <Alert.Description>
+              Briefly did not confirm the transition. The prior Article and
+              public visibility state remain authoritative; reload and try
+              again.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : null}
       {blocker.status === "blocked" ? (
         <Alert status="warning" role="alert">
           <Alert.Content>
@@ -1315,7 +1513,7 @@ function ArticleDraftManager() {
         fullWidth
         type="button"
         isPending={state === "creating"}
-        isDisabled={hasUnsavedChanges || lifecycleActionPending}
+        isDisabled={articleSelectionDisabled}
         onPress={createDraft}
       >
         Create Article Draft
@@ -1335,7 +1533,7 @@ function ArticleDraftManager() {
                 fullWidth
                 type="button"
                 variant="secondary"
-                isDisabled={hasUnsavedChanges || lifecycleActionPending}
+                isDisabled={articleSelectionDisabled}
                 onPress={() => loadDraft(article.id)}
               >
                 {article.draft.title || "Untitled Article"} · Version{" "}
@@ -1379,9 +1577,9 @@ function ArticleDraftManager() {
           }}
         >
           <fieldset
-            aria-busy={restoreState === "restoring"}
+            aria-busy={editorLocked}
             className="min-w-0 space-y-4 border-0 p-0"
-            disabled={restoreState === "restoring"}
+            disabled={editorLocked}
           >
             <p className="text-sm text-default-500">
               Draft Version {selected.draft.version}
@@ -1394,6 +1592,15 @@ function ArticleDraftManager() {
             {restoreState === "restoring" ? (
               <p className="text-sm text-default-600" role="status">
                 Restoring Publication… Draft editing is temporarily paused.
+              </p>
+            ) : trashActionState === "trashing" ? (
+              <p className="text-sm text-default-600" role="status">
+                Moving Article to Trash… Draft editing is temporarily paused.
+              </p>
+            ) : trashActionState === "restoring" ? (
+              <p className="text-sm text-default-600" role="status">
+                Restoring Article from Trash… Draft editing is temporarily
+                paused.
               </p>
             ) : null}
             <SettingsField label="Title" htmlFor="articleTitle">
@@ -1517,7 +1724,7 @@ function ArticleDraftManager() {
                     key={`${selected.id}:${editorGeneration}`}
                     document={selected.draft.document}
                     cover={selected.draft.cover}
-                    isDisabled={restoreState === "restoring"}
+                    isDisabled={editorLocked}
                     onChange={(document) => updateDraft({ document })}
                     onCoverChange={(cover) => updateDraft({ cover })}
                   />
@@ -1551,6 +1758,7 @@ function ArticleDraftManager() {
             fullWidth
             type="button"
             variant="secondary"
+            isDisabled={lifecycleActionPending}
             isPending={previewState === "loading"}
             onPress={previewSavedDraft}
           >
@@ -1909,6 +2117,205 @@ function ArticleDraftManager() {
           </AlertDialog.Container>
         </AlertDialog.Backdrop>
       </AlertDialog.Root>
+      <p className="text-sm text-default-500">
+        Trash removes an Article from normal administration and public Article
+        endpoints while retaining its Draft, Publication history, slug claims,
+        and Asset references. Restore always returns it as unpublished. This is
+        not permanent purge, and previously published media remains public.
+      </p>
+      <AlertDialog.Root>
+        <Button
+          fullWidth
+          type="button"
+          variant="danger-soft"
+          aria-label="Move this Article to Trash?"
+          isDisabled={trashActionDisabled}
+          isPending={trashActionState === "trashing"}
+        >
+          Move Article to Trash
+        </Button>
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog>
+              <AlertDialog.Header>
+                <AlertDialog.Heading>
+                  Move this Article to Trash?
+                </AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>
+                <p>
+                  Move {selected?.draft.title || "this Article"} to Trash? This
+                  reversible action removes it from normal administration and
+                  public Article list and detail endpoints immediately. If it is
+                  public, its Current Publication is cleared. Its Draft,
+                  retained Publications, slug claims, and Asset references stay
+                  intact. Restoring it leaves it unpublished. This is not
+                  permanent purge, and previously published media remains
+                  public.
+                </p>
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button type="button" variant="secondary" slot="close">
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger-soft"
+                  slot="close"
+                  isDisabled={trashActionDisabled}
+                  onPress={() => void moveSelectedArticleToTrash()}
+                >
+                  Move Article to Trash
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog.Root>
+      <section
+        className="space-y-4 border-t border-default-200 pt-5"
+        aria-labelledby="article-trash-heading"
+      >
+        <div className="space-y-1">
+          <h3 id="article-trash-heading" className="text-lg font-semibold">
+            Trash
+          </h3>
+          <p className="text-sm text-default-500">
+            This separate authenticated view contains recoverable Articles only.
+            Choose Restore Article to return one to normal administration as
+            editable and unpublished.
+          </p>
+          <p className="text-sm text-default-500">
+            Permanent purge is separate and irreversible; it is not available
+            from this reversible flow.
+          </p>
+        </div>
+        {trashActionState === "trashed" ? (
+          <Alert status="success" role="status">
+            <Alert.Content>
+              <Alert.Title>Article moved to Trash</Alert.Title>
+              <Alert.Description>
+                It is absent from normal administration and public Article
+                endpoints. Its recoverable work is intact; restoring it will
+                leave it unpublished.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : trashActionState === "restore-error" ? (
+          <Alert status="danger" role="alert">
+            <Alert.Content>
+              <Alert.Title>Unable to restore Article</Alert.Title>
+              <Alert.Description>
+                Briefly did not confirm the restore. The Article remains in
+                Trash; reload the Trash view and try again.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : null}
+        {trashViewState === "loading" ? (
+          <div className="flex items-center gap-3" role="status">
+            <Spinner aria-label="Loading Trash" />
+            <span>Loading Trash…</span>
+          </div>
+        ) : trashViewState === "error" ? (
+          <Alert status="danger" role="alert">
+            <Alert.Content>
+              <Alert.Title>Unable to load Trash</Alert.Title>
+              <Alert.Description>
+                <Button
+                  className="mt-3"
+                  type="button"
+                  variant="secondary"
+                  onPress={() => void reloadTrashView()}
+                >
+                  Reload Trash
+                </Button>
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : trashedArticles.length === 0 ? (
+          <p className="text-sm text-default-500">
+            No recoverable Articles are in Trash.
+          </p>
+        ) : (
+          <ul className="space-y-3" aria-label="Articles in Trash">
+            {trashedArticles.map((article) => (
+              <li
+                key={article.id}
+                className="space-y-3 rounded-xl border border-default-200 p-4"
+              >
+                <div className="space-y-1">
+                  <p className="font-medium">
+                    {article.title || "Untitled Article"}
+                  </p>
+                  <p className="break-all text-sm text-default-500">
+                    Article ID {article.id}
+                  </p>
+                  <p className="text-sm text-default-500">
+                    Draft Version {article.draftVersion} ·{" "}
+                    {article.publicationCount} retained Publication
+                    {article.publicationCount === 1 ? "" : "s"} · moved{" "}
+                    <time dateTime={article.trashedAt}>
+                      {article.trashedAt}
+                    </time>
+                  </p>
+                </div>
+                <AlertDialog.Root>
+                  <Button
+                    fullWidth
+                    type="button"
+                    variant="secondary"
+                    aria-label={`Restore ${article.title || article.id} from Trash`}
+                    isDisabled={articleSelectionDisabled}
+                    isPending={trashActionState === "restoring"}
+                  >
+                    Restore Article
+                  </Button>
+                  <AlertDialog.Backdrop>
+                    <AlertDialog.Container>
+                      <AlertDialog.Dialog>
+                        <AlertDialog.Header>
+                          <AlertDialog.Heading>
+                            Restore this Article from Trash?
+                          </AlertDialog.Heading>
+                        </AlertDialog.Header>
+                        <AlertDialog.Body>
+                          <p>
+                            Restore {article.title || article.id} to normal
+                            administration? Its Draft and Publication history
+                            remain intact and editable, but it will have no
+                            Current Publication. You must explicitly publish it
+                            again before anonymous Article endpoints can see it.
+                          </p>
+                        </AlertDialog.Body>
+                        <AlertDialog.Footer>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            slot="close"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            slot="close"
+                            isDisabled={articleSelectionDisabled}
+                            onPress={() =>
+                              void restoreArticleFromTrash(article)
+                            }
+                          >
+                            Restore Article
+                          </Button>
+                        </AlertDialog.Footer>
+                      </AlertDialog.Dialog>
+                    </AlertDialog.Container>
+                  </AlertDialog.Backdrop>
+                </AlertDialog.Root>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </section>
   );
 }

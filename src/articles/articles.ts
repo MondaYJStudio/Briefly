@@ -47,6 +47,27 @@ export interface Article {
   draft: ArticleDraft;
 }
 
+export interface ArticleTrashEntry {
+  id: string;
+  title: string;
+  slug: string | null;
+  draftVersion: number;
+  publicationCount: number;
+  currentPublicationId: null;
+  trashedAt: string;
+}
+
+export interface ArticleTrashTransition {
+  id: string;
+  currentPublicationId: null;
+  trashedAt: string;
+}
+
+export interface ArticleRestoreTransition {
+  id: string;
+  currentPublicationId: null;
+}
+
 export interface RenderedArticleDraft {
   articleId: string;
   draftVersion: number;

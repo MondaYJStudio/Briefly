@@ -7,6 +7,11 @@ import {
   readArticle,
   updateArticleDraft,
 } from "../articles/articles.server";
+import {
+  listTrashedArticles,
+  restoreTrashedArticle,
+  trashArticle,
+} from "../articles/article-trash.server";
 import { renderSavedArticleDraft } from "../articles/article-publication.server";
 import {
   listArticlePublicationHistory,
@@ -298,6 +303,75 @@ function createApi(getBindings: () => RuntimeBindings) {
 
       return { articles: await listArticles(bindings.DB) };
     })
+    .get("/admin/trash/articles", async ({ request, set, status }) => {
+      const bindings = getBindings();
+      set.headers["cache-control"] = "no-store";
+      if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        return status(401, {
+          status: "error" as const,
+          code: "AUTHENTICATION_REQUIRED" as const,
+        });
+
+      return { articles: await listTrashedArticles(bindings.DB) };
+    })
+    .post(
+      "/admin/articles/:articleId/trash",
+      async ({ params, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        let result: Awaited<ReturnType<typeof trashArticle>>;
+        try {
+          result = await trashArticle(bindings.DB, params.articleId);
+        } catch {
+          return status(500, {
+            status: "error" as const,
+            code: "INTERNAL_ERROR" as const,
+          });
+        }
+        return result.ok
+          ? result.article
+          : status(404, {
+              status: "error" as const,
+              code: "ARTICLE_NOT_FOUND" as const,
+            });
+      },
+      { params: t.Object({ articleId: t.String({ format: "uuid" }) }) },
+    )
+    .post(
+      "/admin/trash/articles/:articleId/restore",
+      async ({ params, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        let result: Awaited<ReturnType<typeof restoreTrashedArticle>>;
+        try {
+          result = await restoreTrashedArticle(bindings.DB, params.articleId);
+        } catch {
+          return status(500, {
+            status: "error" as const,
+            code: "INTERNAL_ERROR" as const,
+          });
+        }
+        return result.ok
+          ? result.article
+          : status(404, {
+              status: "error" as const,
+              code: "TRASHED_ARTICLE_NOT_FOUND" as const,
+            });
+      },
+      { params: t.Object({ articleId: t.String({ format: "uuid" }) }) },
+    )
     .get(
       "/admin/articles/:articleId",
       async ({ params, request, set, status }) => {
