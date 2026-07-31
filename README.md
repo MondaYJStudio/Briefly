@@ -96,10 +96,14 @@ pnpm format
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm exec playwright install chromium
+pnpm test:e2e
 pnpm build
 ```
 
 `pnpm test` runs the exported Worker HTTP interface inside Cloudflare's workerd-compatible Vitest environment with real isolated test D1 and R2 bindings. Local development uses Wrangler's local storage under `.wrangler/`; it does not connect to production unless an operator explicitly adds a remote flag. Do not use remote bindings for routine development.
+
+`pnpm test:e2e` runs exactly one Playwright case for the critical browser journey. It starts the Cloudflare-compatible application with freshly migrated, isolated local D1 and R2 state under `.output/playwright/`; it never reuses local development or production storage. Install Playwright's pinned Chromium once before running it locally. Failure output retains the step name, trace, and screenshot.
 
 Non-secret runtime values and binding names are declared in `wrangler.jsonc`:
 

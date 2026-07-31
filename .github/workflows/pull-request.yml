@@ -33,7 +33,11 @@ jobs:
         run: pnpm lint
       - name: Type-check application and tests
         run: pnpm typecheck
-      - name: Run all tests
+      - name: Run Vitest suite
         run: pnpm test
+      - name: Install the critical-journey browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run the single critical browser journey
+        run: pnpm test:e2e
       - name: Build the production artifact
         run: pnpm build

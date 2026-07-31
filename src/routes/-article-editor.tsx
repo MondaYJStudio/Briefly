@@ -58,7 +58,7 @@ export function ArticleEditor({
   });
 
   useEffect(() => {
-    editor?.setEditable(!isDisabled);
+    editor?.setEditable(!isDisabled, false);
   }, [editor, isDisabled]);
 
   if (!editor) return <p role="status">Preparing the text-rich editor…</p>;

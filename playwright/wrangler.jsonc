@@ -1,0 +1,32 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "briefly-playwright",
+  "main": "../src/server.ts",
+  "send_metrics": false,
+  "dependencies_instrumentation": {
+    "enabled": false,
+  },
+  "compatibility_date": "2026-07-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "APP_ENV": "test",
+    "APP_ORIGIN": "http://127.0.0.1:3000",
+    "BETTER_AUTH_SECRET": "playwright-only-better-auth-secret-32-characters",
+    "RECOVERY_SECRET": "playwright-only-recovery-secret-32-characters",
+    "SETUP_SECRET": "playwright-only-setup-secret-32-characters",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "briefly-playwright",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../src/db/migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_BUCKET",
+      "bucket_name": "briefly-playwright",
+    },
+  ],
+}

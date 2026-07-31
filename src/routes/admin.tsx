@@ -609,7 +609,10 @@ function ArticleDraftManager() {
       const response = await getApiClient().admin.articles.post();
       if (response.status !== 201 || !response.data)
         throw new Error("Article creation failed");
-      setArticles((current) => [response.data, ...current]);
+      setArticles((current) => [
+        response.data,
+        ...current.filter((article) => article.id !== response.data.id),
+      ]);
       selectServerDraft(response.data);
       setConflictCopy(null);
       setState("ready");

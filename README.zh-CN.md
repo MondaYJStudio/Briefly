@@ -96,10 +96,14 @@ pnpm format
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm exec playwright install chromium
+pnpm test:e2e
 pnpm build
 ```
 
 `pnpm test` 会在 Cloudflare 的 workerd 兼容 Vitest 环境中，通过导出的 Worker HTTP 接口运行测试，并使用真实且隔离的测试 D1/R2 绑定。本地开发使用 `.wrangler/` 下的 Wrangler 本地存储；除非运维人员显式添加远程标志，否则不会连接生产资源。日常开发不得使用远程绑定。
+
+`pnpm test:e2e` 只运行一个覆盖关键浏览器旅程的 Playwright 用例。它会在 `.output/playwright/` 下使用全新迁移且隔离的本地 D1/R2 状态启动 Cloudflare 兼容应用，不会复用本地开发或生产存储。本地首次运行前安装 Playwright 锁定版本的 Chromium；失败输出会保留步骤名称、trace 和截图。
 
 非秘密运行时配置和绑定名称在 `wrangler.jsonc` 中声明：
 
