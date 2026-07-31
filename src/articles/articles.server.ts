@@ -9,6 +9,7 @@ import {
   ARTICLE_TITLE_MAXIMUM_LENGTH,
   type Article,
   type ArticleCoverUsage,
+  type ArticleDraftUpdate,
 } from "./articles";
 import {
   articleDocumentAssetReferences,
@@ -317,6 +318,219 @@ async function unavailableDraftAssetIssues(
     }));
 }
 
+export interface ReplaceArticleDraftStateResult {
+  updated: boolean;
+  article: Article | null;
+}
+
+export async function replaceArticleDraftState(
+  database: D1Database,
+  before: Article,
+  replacement: ArticleDraftUpdate,
+  options: { updateArticleTimestamp?: boolean } = {},
+): Promise<ReplaceArticleDraftStateResult> {
+  const articleId = before.id;
+  const slugKey =
+    replacement.slug === null ? null : articleSlugKey(replacement.slug);
+  const previousSlugKey =
+    before.draft.slug === null ? null : articleSlugKey(before.draft.slug);
+  const assetIds = [
+    ...new Set(
+      draftAssetReferences(replacement.document, replacement.cover).map(
+        ({ assetId }) => assetId,
+      ),
+    ),
+  ];
+  const serializedAssetIds = JSON.stringify(assetIds);
+  const serializedCover =
+    replacement.cover === null ? null : JSON.stringify(replacement.cover);
+  const serializedDocument = JSON.stringify(replacement.document);
+  const now = Date.now();
+  const statements: D1PreparedStatement[] = [];
+  if (slugKey !== null) {
+    statements.push(
+      database
+        .prepare(
+          `INSERT INTO article_slug (slug_key, article_id, was_published)
+             SELECT ?, ?, 0
+             WHERE EXISTS (
+               SELECT 1 FROM article_draft
+               WHERE article_id = ? AND version = ?
+             )
+               AND NOT EXISTS (
+                 SELECT 1
+                 FROM json_each(?) AS referenced
+                 LEFT JOIN asset
+                   ON asset.id = referenced.value
+                     AND asset.lifecycle_state = 'ready'
+                 WHERE asset.id IS NULL
+               )
+             ON CONFLICT (slug_key) DO NOTHING`,
+        )
+        .bind(
+          slugKey,
+          articleId,
+          articleId,
+          replacement.version,
+          serializedAssetIds,
+        ),
+    );
+  }
+  const updateIndex = statements.length;
+  statements.push(
+    database
+      .prepare(
+        `UPDATE article_draft
+         SET version = version + 1, title = ?, slug = ?, slug_key = ?,
+             summary = ?, tags = ?, byline = ?, language = ?, cover = ?, document = ?,
+             updated_at = ?
+         WHERE article_id = ? AND version = ?
+           AND (
+             ? IS NULL OR EXISTS (
+               SELECT 1 FROM article_slug
+               WHERE article_slug.slug_key = ?
+                 AND article_slug.article_id = article_draft.article_id
+             )
+           )
+           AND EXISTS (
+             SELECT 1 FROM article
+             WHERE article.id = article_draft.article_id
+               AND article.trashed_at IS NULL
+           )
+           AND NOT EXISTS (
+             SELECT 1
+             FROM json_each(?) AS referenced
+             LEFT JOIN asset
+               ON asset.id = referenced.value
+                 AND asset.lifecycle_state = 'ready'
+             WHERE asset.id IS NULL
+           )
+         RETURNING version`,
+      )
+      .bind(
+        replacement.title,
+        replacement.slug,
+        slugKey,
+        replacement.summary,
+        JSON.stringify(replacement.tags),
+        replacement.byline === null ? null : JSON.stringify(replacement.byline),
+        replacement.language,
+        serializedCover,
+        serializedDocument,
+        now,
+        articleId,
+        replacement.version,
+        slugKey,
+        slugKey,
+        serializedAssetIds,
+      ),
+  );
+  statements.push(
+    database
+      .prepare(
+        `DELETE FROM article_draft_asset_reference
+         WHERE article_id = ?
+           AND EXISTS (
+             SELECT 1 FROM article_draft
+             WHERE article_draft.article_id = ?
+               AND article_draft.version = ?
+               AND article_draft.updated_at = ?
+               AND article_draft.cover IS ?
+               AND article_draft.document = ?
+           )`,
+      )
+      .bind(
+        articleId,
+        articleId,
+        replacement.version + 1,
+        now,
+        serializedCover,
+        serializedDocument,
+      ),
+  );
+  statements.push(
+    database
+      .prepare(
+        `INSERT INTO article_draft_asset_reference (article_id, asset_id)
+         SELECT ?, referenced.value
+         FROM json_each(?) AS referenced
+         WHERE EXISTS (
+           SELECT 1 FROM article_draft
+           WHERE article_draft.article_id = ?
+             AND article_draft.version = ?
+             AND article_draft.updated_at = ?
+             AND article_draft.cover IS ?
+             AND article_draft.document = ?
+         )
+         ON CONFLICT (article_id, asset_id) DO NOTHING`,
+      )
+      .bind(
+        articleId,
+        serializedAssetIds,
+        articleId,
+        replacement.version + 1,
+        now,
+        serializedCover,
+        serializedDocument,
+      ),
+  );
+  if (previousSlugKey !== null && previousSlugKey !== slugKey) {
+    statements.push(
+      database
+        .prepare(
+          `DELETE FROM article_slug
+             WHERE slug_key = ? AND article_id = ? AND was_published = 0
+               AND NOT EXISTS (
+                 SELECT 1 FROM article_draft
+                 WHERE article_draft.slug_key = article_slug.slug_key
+                   AND article_draft.article_id = article_slug.article_id
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM publication
+                 WHERE publication.slug_key = article_slug.slug_key
+                   AND publication.article_id = article_slug.article_id
+               )`,
+        )
+        .bind(previousSlugKey, articleId),
+    );
+  }
+  if (options.updateArticleTimestamp !== false) {
+    statements.push(
+      database
+        .prepare(
+          `UPDATE article
+           SET updated_at = ?
+           WHERE id = ?
+             AND EXISTS (
+               SELECT 1 FROM article_draft
+               WHERE article_draft.article_id = article.id
+                 AND article_draft.version = ?
+                 AND article_draft.updated_at = ?
+             )`,
+        )
+        .bind(now, articleId, replacement.version + 1, now),
+    );
+  }
+  const readIndex = statements.length;
+  statements.push(
+    database
+      .prepare(
+        `${articleSelection}
+         WHERE article.id = ? AND article.trashed_at IS NULL
+         LIMIT 1`,
+      )
+      .bind(articleId),
+  );
+  const batch = await database.batch(statements);
+  const updated = batch[updateIndex]?.results[0] as
+    { version: number } | undefined;
+  const row = batch[readIndex]?.results[0] as ArticleRow | undefined;
+  return {
+    updated: updated !== undefined,
+    article: row ? articleFromRow(row) : null,
+  };
+}
+
 export type UpdateArticleDraftResult =
   | { ok: true; article: Article }
   | { ok: false; reason: "invalid"; issues: ArticleValidationIssue[] }
@@ -423,8 +637,6 @@ export async function updateArticleDraft(
   }
 
   const value = parsed.data;
-  const slugKey = value.slug === null ? null : articleSlugKey(value.slug);
-  const now = Date.now();
   const before = await readArticle(database, articleId);
   if (!before) return { ok: false, reason: "not-found" };
   if (before.draft.version !== value.version)
@@ -451,189 +663,22 @@ export async function updateArticleDraft(
   if (assetIssues.length > 0) {
     return { ok: false, reason: "invalid", issues: assetIssues };
   }
-  const assetIds = [...new Set(assetReferences.map(({ assetId }) => assetId))];
-  const serializedCover = cover === null ? null : JSON.stringify(cover);
-  const serializedDocument = JSON.stringify(documentResult.document);
-  const previousSlugKey =
-    before.draft.slug === null ? null : articleSlugKey(before.draft.slug);
-  const statements: D1PreparedStatement[] = [];
-  if (slugKey !== null) {
-    statements.push(
-      database
-        .prepare(
-          `INSERT INTO article_slug (slug_key, article_id, was_published)
-             SELECT ?, ?, 0
-             WHERE EXISTS (
-               SELECT 1 FROM article_draft
-               WHERE article_id = ? AND version = ?
-             )
-               AND NOT EXISTS (
-                 SELECT 1
-                 FROM json_each(?) AS referenced
-                 LEFT JOIN asset
-                   ON asset.id = referenced.value
-                     AND asset.lifecycle_state = 'ready'
-                 WHERE asset.id IS NULL
-               )
-             ON CONFLICT (slug_key) DO NOTHING`,
-        )
-        .bind(
-          slugKey,
-          articleId,
-          articleId,
-          value.version,
-          JSON.stringify(assetIds),
-        ),
-    );
-  }
-  const updateIndex = statements.length;
-  statements.push(
-    database
-      .prepare(
-        `UPDATE article_draft
-         SET version = version + 1, title = ?, slug = ?, slug_key = ?,
-             summary = ?, tags = ?, byline = ?, language = ?, cover = ?, document = ?,
-             updated_at = ?
-         WHERE article_id = ? AND version = ?
-           AND (
-             ? IS NULL OR EXISTS (
-               SELECT 1 FROM article_slug
-               WHERE article_slug.slug_key = ?
-                 AND article_slug.article_id = article_draft.article_id
-             )
-           )
-           AND EXISTS (
-             SELECT 1 FROM article
-             WHERE article.id = article_draft.article_id
-               AND article.trashed_at IS NULL
-           )
-           AND NOT EXISTS (
-             SELECT 1
-             FROM json_each(?) AS referenced
-             LEFT JOIN asset
-               ON asset.id = referenced.value
-                 AND asset.lifecycle_state = 'ready'
-             WHERE asset.id IS NULL
-           )
-         RETURNING version`,
-      )
-      .bind(
-        value.title,
-        value.slug,
-        slugKey,
-        value.summary,
-        JSON.stringify(value.tags),
-        value.byline === null ? null : JSON.stringify(value.byline),
-        value.language,
-        serializedCover,
-        serializedDocument,
-        now,
-        articleId,
-        value.version,
-        slugKey,
-        slugKey,
-        JSON.stringify(assetIds),
-      ),
+  const replacement: ArticleDraftUpdate = {
+    version: value.version,
+    title: value.title,
+    slug: value.slug,
+    summary: value.summary,
+    tags: value.tags,
+    byline: value.byline,
+    language: value.language,
+    cover,
+    document: documentResult.document,
+  };
+  const { updated, article } = await replaceArticleDraftState(
+    database,
+    before,
+    replacement,
   );
-  statements.push(
-    database
-      .prepare(
-        `DELETE FROM article_draft_asset_reference
-         WHERE article_id = ?
-           AND EXISTS (
-             SELECT 1 FROM article_draft
-             WHERE article_draft.article_id = ?
-               AND article_draft.version = ?
-               AND article_draft.updated_at = ?
-               AND article_draft.cover IS ?
-               AND article_draft.document = ?
-           )`,
-      )
-      .bind(
-        articleId,
-        articleId,
-        value.version + 1,
-        now,
-        serializedCover,
-        serializedDocument,
-      ),
-  );
-  statements.push(
-    database
-      .prepare(
-        `INSERT INTO article_draft_asset_reference (article_id, asset_id)
-         SELECT ?, referenced.value
-         FROM json_each(?) AS referenced
-         WHERE EXISTS (
-           SELECT 1 FROM article_draft
-           WHERE article_draft.article_id = ?
-             AND article_draft.version = ?
-             AND article_draft.updated_at = ?
-             AND article_draft.cover IS ?
-             AND article_draft.document = ?
-         )
-         ON CONFLICT (article_id, asset_id) DO NOTHING`,
-      )
-      .bind(
-        articleId,
-        JSON.stringify(assetIds),
-        articleId,
-        value.version + 1,
-        now,
-        serializedCover,
-        serializedDocument,
-      ),
-  );
-  if (previousSlugKey !== null && previousSlugKey !== slugKey) {
-    statements.push(
-      database
-        .prepare(
-          `DELETE FROM article_slug
-             WHERE slug_key = ? AND article_id = ? AND was_published = 0
-               AND NOT EXISTS (
-                 SELECT 1 FROM article_draft
-                 WHERE article_draft.slug_key = article_slug.slug_key
-                   AND article_draft.article_id = article_slug.article_id
-               )
-               AND NOT EXISTS (
-                 SELECT 1 FROM publication
-                 WHERE publication.slug_key = article_slug.slug_key
-                   AND publication.article_id = article_slug.article_id
-               )`,
-        )
-        .bind(previousSlugKey, articleId),
-    );
-  }
-  statements.push(
-    database
-      .prepare(
-        `UPDATE article
-         SET updated_at = ?
-         WHERE id = ?
-           AND EXISTS (
-             SELECT 1 FROM article_draft
-             WHERE article_draft.article_id = article.id
-               AND article_draft.version = ?
-               AND article_draft.updated_at = ?
-           )`,
-      )
-      .bind(now, articleId, value.version + 1, now),
-  );
-  const readIndex = statements.length;
-  statements.push(
-    database
-      .prepare(
-        `${articleSelection}
-         WHERE article.id = ? AND article.trashed_at IS NULL
-         LIMIT 1`,
-      )
-      .bind(articleId),
-  );
-  const batch = await database.batch(statements);
-  const updated = batch[updateIndex]?.results[0] as
-    { version: number } | undefined;
-  const row = batch[readIndex]?.results[0] as ArticleRow | undefined;
-  const article = row ? articleFromRow(row) : null;
 
   if (!updated) {
     if (!article) return { ok: false, reason: "not-found" };

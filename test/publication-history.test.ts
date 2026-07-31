@@ -2,7 +2,10 @@ import { SELF } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import type { Article } from "../src/articles/articles";
+import type {
+  Article,
+  ArticlePublicationHistory,
+} from "../src/articles/articles";
 import { initializeAndSignIn } from "./administrator-fixture";
 import { uploadOnePixelPngAsset } from "./asset-fixture";
 
@@ -16,20 +19,6 @@ interface DraftPayload {
   language: string | null;
   cover: { assetId: string; alt: string } | null;
   document: unknown;
-}
-
-interface PublicationHistoryEntry {
-  id: string;
-  publicationNumber: number;
-  title: string;
-  slug: string;
-  publishedAt: string;
-  isCurrent: boolean;
-}
-
-interface PublicationHistory {
-  publications: PublicationHistoryEntry[];
-  hasUnpublishedChanges: boolean;
 }
 
 function textDocument(text: string) {
@@ -256,7 +245,7 @@ describe("Publication history and restore", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    const history = await response.json<PublicationHistory>();
+    const history = await response.json<ArticlePublicationHistory>();
     expect(history.hasUnpublishedChanges).toBe(false);
     expect(history.publications).toHaveLength(2);
     expect(history.publications).toMatchObject([
@@ -351,7 +340,8 @@ describe("Publication history and restore", () => {
 
     const historyResponse = await listHistory(cookie, articleId);
     expect(historyResponse.status).toBe(200);
-    const historyBefore = await historyResponse.json<PublicationHistory>();
+    const historyBefore =
+      await historyResponse.json<ArticlePublicationHistory>();
     const historical = historyBefore.publications.find(
       ({ publicationNumber }) => publicationNumber === 1,
     );
@@ -450,6 +440,20 @@ describe("Publication history and restore", () => {
       },
     });
 
+    const claimReuseArticleId = await createArticle(cookie);
+    const reusedPrivateSlug = await saveDraft(cookie, claimReuseArticleId, {
+      version: 1,
+      title: "Reuse abandoned private slug",
+      slug: "unpublished-replacement",
+      summary: null,
+      tags: [],
+      byline: null,
+      language: null,
+      cover: null,
+      document: textDocument("The restored Article released this claim"),
+    });
+    expect(reusedPrivateSlug.status).toBe(200);
+
     const publicDetailAfter = await SELF.fetch(
       "http://briefly.test/api/articles/current-public-slug",
     );
@@ -486,7 +490,7 @@ describe("Publication history and restore", () => {
 
     const historyAfterRestore = await (
       await listHistory(cookie, articleId)
-    ).json<PublicationHistory>();
+    ).json<ArticlePublicationHistory>();
     expect(historyAfterRestore.publications).toEqual(
       historyBefore.publications,
     );
@@ -509,7 +513,7 @@ describe("Publication history and restore", () => {
     });
     const historyAfterRepublish = await (
       await listHistory(cookie, articleId)
-    ).json<PublicationHistory>();
+    ).json<ArticlePublicationHistory>();
     expect(
       historyAfterRepublish.publications.map(
         ({ publicationNumber }) => publicationNumber,
@@ -545,7 +549,7 @@ describe("Publication history and restore", () => {
     expect((await publish(cookie, articleId, 2)).status).toBe(201);
     const history = await (
       await listHistory(cookie, articleId)
-    ).json<PublicationHistory>();
+    ).json<ArticlePublicationHistory>();
     const source = history.publications[0];
     if (!source) throw new Error("Expected a Publication");
     await env.DB.prepare(

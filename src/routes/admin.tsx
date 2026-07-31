@@ -730,7 +730,7 @@ function ArticleDraftManager() {
     setPublishState("ready");
     setPublicationAction(null);
     if (historyState === "ready") setHistoryHasUnpublishedChanges(true);
-    setRestoreState("ready");
+    setRestoreState((current) => (current === "restoring" ? current : "ready"));
     setRestoreIssues([]);
   }
 

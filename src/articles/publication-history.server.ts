@@ -11,7 +11,11 @@ import {
   articleDocumentAssetReferences,
   validateArticleDocument,
 } from "./article-document";
-import { normalizeArticleTag, readArticle } from "./articles.server";
+import {
+  normalizeArticleTag,
+  readArticle,
+  replaceArticleDraftState,
+} from "./articles.server";
 import {
   ARTICLE_ASSET_ALT_MAXIMUM_LENGTH,
   ARTICLE_DOCUMENT_SCHEMA_VERSION,
@@ -25,7 +29,7 @@ import {
   type ArticlePublicationHistory,
   type PublicationIssue,
 } from "./articles";
-import { articleSlugKey, articleSlugSchema } from "./article-slug";
+import { articleSlugSchema } from "./article-slug";
 
 const historyRow = z.object({
   id: z.string().uuid(),
@@ -73,7 +77,6 @@ interface RestorableDraft {
   language: string;
   cover: ArticleCoverUsage | null;
   document: ArticleDocument;
-  assetIds: string[];
 }
 
 type PublicationConversionResult =
@@ -399,7 +402,6 @@ function convertPublicationSource(
       language: metadata.data.language,
       cover: cover.cover,
       document: migrated.document,
-      assetIds: [...usedAssetIds].sort(),
     },
   };
 }
@@ -565,115 +567,29 @@ export async function restoreArticlePublication(
   }
 
   const restored = converted.draft;
-  const now = Date.now();
-  const serializedTags = JSON.stringify(restored.tags);
-  const serializedByline = JSON.stringify(restored.byline);
-  const serializedCover =
-    restored.cover === null ? null : JSON.stringify(restored.cover);
-  const serializedDocument = JSON.stringify(restored.document);
-  const serializedAssetIds = JSON.stringify(restored.assetIds);
-  const slugKey = articleSlugKey(restored.slug);
-  const updateIndex = 0;
-  const batch = await database.batch([
-    database
-      .prepare(
-        `UPDATE article_draft
-         SET version = version + 1, title = ?, slug = ?, slug_key = ?,
-             summary = ?, tags = ?, byline = ?, language = ?, cover = ?,
-             document = ?, updated_at = ?
-         WHERE article_id = ? AND version = ?
-           AND EXISTS (
-             SELECT 1 FROM article
-             WHERE article.id = article_draft.article_id
-               AND article.trashed_at IS NULL
-           )
-           AND EXISTS (
-             SELECT 1 FROM article_slug
-             WHERE article_slug.slug_key = ?
-               AND article_slug.article_id = article_draft.article_id
-           )
-           AND NOT EXISTS (
-             SELECT 1
-             FROM json_each(?) AS referenced
-             LEFT JOIN asset
-               ON asset.id = referenced.value
-                 AND asset.lifecycle_state = 'ready'
-             WHERE asset.id IS NULL
-           )
-         RETURNING version`,
-      )
-      .bind(
-        restored.title,
-        restored.slug,
-        slugKey,
-        restored.summary,
-        serializedTags,
-        serializedByline,
-        restored.language,
-        serializedCover,
-        serializedDocument,
-        now,
-        articleId,
-        draftVersion,
-        slugKey,
-        serializedAssetIds,
-      ),
-    database
-      .prepare(
-        `DELETE FROM article_draft_asset_reference
-         WHERE article_id = ?
-           AND EXISTS (
-             SELECT 1 FROM article_draft
-             WHERE article_draft.article_id = ?
-               AND article_draft.version = ?
-               AND article_draft.updated_at = ?
-               AND article_draft.cover IS ?
-               AND article_draft.document = ?
-           )`,
-      )
-      .bind(
-        articleId,
-        articleId,
-        draftVersion + 1,
-        now,
-        serializedCover,
-        serializedDocument,
-      ),
-    database
-      .prepare(
-        `INSERT INTO article_draft_asset_reference (article_id, asset_id)
-         SELECT ?, referenced.value
-         FROM json_each(?) AS referenced
-         WHERE EXISTS (
-           SELECT 1 FROM article_draft
-           WHERE article_draft.article_id = ?
-             AND article_draft.version = ?
-             AND article_draft.updated_at = ?
-             AND article_draft.cover IS ?
-             AND article_draft.document = ?
-         )
-         ON CONFLICT (article_id, asset_id) DO NOTHING`,
-      )
-      .bind(
-        articleId,
-        serializedAssetIds,
-        articleId,
-        draftVersion + 1,
-        now,
-        serializedCover,
-        serializedDocument,
-      ),
-  ]);
-  const updated = batch[updateIndex]?.results[0] as
-    { version: number } | undefined;
+  const { updated, article: articleAfterRestore } =
+    await replaceArticleDraftState(
+      database,
+      article,
+      {
+        version: draftVersion,
+        title: restored.title,
+        slug: restored.slug,
+        summary: restored.summary,
+        tags: restored.tags,
+        byline: restored.byline,
+        language: restored.language,
+        cover: restored.cover,
+        document: restored.document,
+      },
+      { updateArticleTimestamp: false },
+    );
   if (!updated) {
-    const current = await readArticle(database, articleId);
-    return current
+    return articleAfterRestore
       ? { ok: false, reason: "conflict" }
       : { ok: false, reason: "article-not-found" };
   }
 
-  const articleAfterRestore = await readArticle(database, articleId);
   if (!articleAfterRestore) {
     throw new Error("Restored Article could not be read");
   }
