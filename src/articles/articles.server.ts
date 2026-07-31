@@ -358,6 +358,10 @@ export async function replaceArticleDraftState(
                WHERE article_id = ? AND version = ?
              )
                AND NOT EXISTS (
+                 SELECT 1 FROM purged_article_slug
+                 WHERE purged_article_slug.slug_key = ?
+               )
+               AND NOT EXISTS (
                  SELECT 1
                  FROM json_each(?) AS referenced
                  LEFT JOIN asset
@@ -372,6 +376,7 @@ export async function replaceArticleDraftState(
           articleId,
           articleId,
           replacement.version,
+          slugKey,
           serializedAssetIds,
         ),
     );

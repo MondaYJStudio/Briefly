@@ -392,7 +392,10 @@ type ArticleTrashActionState =
   | "trash-error"
   | "restoring"
   | "restored"
-  | "restore-error";
+  | "restore-error"
+  | "purging"
+  | "purged"
+  | "purge-error";
 
 type EditableArticleDraft = Pick<
   Article["draft"],
@@ -858,7 +861,8 @@ function ArticleDraftManager() {
     unpublishState === "unpublishing" ||
     restoreState === "restoring" ||
     trashActionState === "trashing" ||
-    trashActionState === "restoring";
+    trashActionState === "restoring" ||
+    trashActionState === "purging";
   const publishActionDisabled =
     !selected ||
     !serverConfirmed ||
@@ -875,7 +879,8 @@ function ArticleDraftManager() {
   const editorLocked =
     restoreState === "restoring" ||
     trashActionState === "trashing" ||
-    trashActionState === "restoring";
+    trashActionState === "restoring" ||
+    trashActionState === "purging";
   const blocker = useBlocker({
     shouldBlockFn: () => hasUnsavedChanges,
     enableBeforeUnload: hasUnsavedChanges,
@@ -1240,6 +1245,29 @@ function ArticleDraftManager() {
     }
   }
 
+  async function purgeArticleFromTrash(article: ArticleTrashEntry) {
+    if (articleSelectionDisabled || trashLifecyclePendingRef.current) return;
+    trashLifecyclePendingRef.current = true;
+    setTrashActionState("purging");
+    try {
+      const response = await getApiClient()
+        .admin.trash.articles({ articleId: article.id })
+        .delete({ confirmationArticleId: article.id });
+      if (response.status !== 200 || !response.data) {
+        setTrashActionState("purge-error");
+        return;
+      }
+      setTrashedArticles((current) =>
+        current.filter((candidate) => candidate.id !== article.id),
+      );
+      setTrashActionState("purged");
+    } catch {
+      setTrashActionState("purge-error");
+    } finally {
+      trashLifecyclePendingRef.current = false;
+    }
+  }
+
   return (
     <section
       className="space-y-5"
@@ -1267,6 +1295,11 @@ function ArticleDraftManager() {
           The Restore this Article from Trash? confirmation makes the result
           explicit: Article restored as unpublished means it remains private
           until another deliberate publish.
+        </p>
+        <p className="text-sm text-default-500">
+          The Permanently purge this Article? confirmation identifies the
+          Article ID, states that its Draft and Publication history cannot be
+          restored, and is visually separate from reversible Trash.
         </p>
       </div>
       {trashActionState === "restored" ? (
@@ -2186,8 +2219,10 @@ function ArticleDraftManager() {
             editable and unpublished.
           </p>
           <p className="text-sm text-default-500">
-            Permanent purge is separate and irreversible; it is not available
-            from this reversible flow.
+            Permanent purge is a separate destructive confirmation. It removes
+            the identified Article, its Draft, and all Publication history
+            forever. Only minimal formerly public slug tombstones remain; Asset
+            objects are never deleted automatically.
           </p>
         </div>
         {trashActionState === "trashed" ? (
@@ -2198,6 +2233,26 @@ function ArticleDraftManager() {
                 It is absent from normal administration and public Article
                 endpoints. Its recoverable work is intact; restoring it will
                 leave it unpublished.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : trashActionState === "purged" ? (
+          <Alert status="success" role="status">
+            <Alert.Content>
+              <Alert.Title>Article permanently purged</Alert.Title>
+              <Alert.Description>
+                The deleted content and authorship cannot be restored. Formerly
+                public slugs remain reserved and return 410 Gone.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : trashActionState === "purge-error" ? (
+          <Alert status="danger" role="alert">
+            <Alert.Content>
+              <Alert.Title>Unable to permanently purge Article</Alert.Title>
+              <Alert.Description>
+                Briefly did not confirm the destructive operation. The Article
+                remains in Trash and can be retried safely.
               </Alert.Description>
             </Alert.Content>
           </Alert>
@@ -2305,6 +2360,58 @@ function ArticleDraftManager() {
                             }
                           >
                             Restore Article
+                          </Button>
+                        </AlertDialog.Footer>
+                      </AlertDialog.Dialog>
+                    </AlertDialog.Container>
+                  </AlertDialog.Backdrop>
+                </AlertDialog.Root>
+                <AlertDialog.Root>
+                  <Button
+                    fullWidth
+                    type="button"
+                    variant="danger"
+                    aria-label={`Permanently purge ${article.title || article.id}`}
+                    isDisabled={articleSelectionDisabled}
+                    isPending={trashActionState === "purging"}
+                  >
+                    Permanently purge Article
+                  </Button>
+                  <AlertDialog.Backdrop>
+                    <AlertDialog.Container>
+                      <AlertDialog.Dialog>
+                        <AlertDialog.Header>
+                          <AlertDialog.Heading>
+                            Permanently purge this Article?
+                          </AlertDialog.Heading>
+                        </AlertDialog.Header>
+                        <AlertDialog.Body>
+                          <p>
+                            Permanently purge Article ID {article.id}? This
+                            cannot be undone. Its Draft and all Publication
+                            history, including title, body, summary, tags,
+                            Byline, language, and rendered HTML, will be deleted
+                            and cannot be restored. Formerly public slugs remain
+                            reserved and return 410 Gone. Asset objects are not
+                            deleted automatically.
+                          </p>
+                        </AlertDialog.Body>
+                        <AlertDialog.Footer>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            slot="close"
+                          >
+                            Cancel — keep Article
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="danger"
+                            slot="close"
+                            isDisabled={articleSelectionDisabled}
+                            onPress={() => void purgeArticleFromTrash(article)}
+                          >
+                            Confirm permanent purge
                           </Button>
                         </AlertDialog.Footer>
                       </AlertDialog.Dialog>

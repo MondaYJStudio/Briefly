@@ -32,6 +32,10 @@ export type RestoreTrashedArticleResult =
   | { ok: true; article: ArticleRestoreTransition }
   | { ok: false; reason: "not-found" };
 
+export type PurgeTrashedArticleResult =
+  | { ok: true; article: { id: string; purged: true } }
+  | { ok: false; reason: "confirmation-required" | "not-found" };
+
 function trashTransitionFromRow(
   input: z.input<typeof persistedTrashTransition>,
 ): ArticleTrashTransition {
@@ -119,4 +123,41 @@ export async function restoreTrashedArticle(
     ok: true,
     article: { id: restored.id, currentPublicationId: null },
   };
+}
+
+export async function purgeTrashedArticle(
+  database: D1Database,
+  articleId: string,
+  confirmationArticleId: string,
+): Promise<PurgeTrashedArticleResult> {
+  if (confirmationArticleId !== articleId) {
+    return { ok: false, reason: "confirmation-required" };
+  }
+
+  const purgedAt = Date.now();
+  const [, deleted] = await database.batch([
+    database
+      .prepare(
+        `INSERT INTO purged_article_slug (slug_key, purged_at)
+         SELECT article_slug.slug_key, ?
+         FROM article_slug
+         JOIN article ON article.id = article_slug.article_id
+         WHERE article.id = ?
+           AND article.trashed_at IS NOT NULL
+           AND article_slug.was_published = 1
+         ON CONFLICT (slug_key) DO NOTHING`,
+      )
+      .bind(purgedAt, articleId),
+    database
+      .prepare(
+        `DELETE FROM article
+         WHERE id = ? AND trashed_at IS NOT NULL
+         RETURNING id`,
+      )
+      .bind(articleId),
+  ]);
+  const row = deleted?.results.at(0) as { id: string } | undefined;
+  return row
+    ? { ok: true, article: { id: row.id, purged: true } }
+    : { ok: false, reason: "not-found" };
 }

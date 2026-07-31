@@ -54,6 +54,11 @@ export const articleSlug = sqliteTable(
   ],
 );
 
+export const purgedArticleSlug = sqliteTable("purged_article_slug", {
+  slugKey: text("slug_key").primaryKey(),
+  purgedAt: integer("purged_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 export const publication = sqliteTable(
   "publication",
   {

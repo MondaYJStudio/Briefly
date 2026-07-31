@@ -645,6 +645,7 @@ export async function resolvePublicArticle(
 ): Promise<
   | { kind: "article"; article: PublicArticle; publicationId: string }
   | { kind: "redirect"; canonicalSlug: string }
+  | { kind: "gone" }
   | null
 > {
   const requestedSlugKey = articleSlugKey(slug);
@@ -659,7 +660,13 @@ export async function resolvePublicArticle(
     )
     .bind(requestedSlugKey)
     .first<PublicArticleRow>();
-  if (!row) return null;
+  if (!row) {
+    const tombstone = await database
+      .prepare("SELECT 1 FROM purged_article_slug WHERE slug_key = ? LIMIT 1")
+      .bind(requestedSlugKey)
+      .first();
+    return tombstone ? { kind: "gone" } : null;
+  }
   const parsed = persistedPublicArticle.parse(row);
   if (slug !== parsed.slug) {
     return { kind: "redirect", canonicalSlug: parsed.slug };

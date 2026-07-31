@@ -29,6 +29,8 @@ const articleUnavailableDescription =
   "The Article is unavailable; this response intentionally does not disclose why.";
 const canonicalRedirectDescription =
   "The requested formerly public slug permanently redirects to the Current Publication's canonical detail URL.";
+const purgedArticleDescription =
+  "The normalized slug is permanently reserved because its Article was purged.";
 
 const listParameters = [
   {
@@ -244,6 +246,19 @@ export const publicOpenApiDocument = {
               },
             },
           },
+          410: {
+            description: purgedArticleDescription,
+            headers: {
+              "Access-Control-Allow-Origin":
+                publicResponseHeaders["Access-Control-Allow-Origin"],
+              "Cache-Control": publicResponseHeaders["Cache-Control"],
+            },
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ArticleGoneError" },
+              },
+            },
+          },
         },
       },
       head: {
@@ -265,6 +280,14 @@ export const publicOpenApiDocument = {
           },
           404: {
             description: articleUnavailableDescription,
+            headers: {
+              "Access-Control-Allow-Origin":
+                publicResponseHeaders["Access-Control-Allow-Origin"],
+              "Cache-Control": publicResponseHeaders["Cache-Control"],
+            },
+          },
+          410: {
+            description: purgedArticleDescription,
             headers: {
               "Access-Control-Allow-Origin":
                 publicResponseHeaders["Access-Control-Allow-Origin"],
@@ -391,6 +414,20 @@ export const publicOpenApiDocument = {
             enum: ["ARTICLE_NOT_FOUND"],
             description:
               "Generic unavailable code shared by unknown, Draft-only, unpublished, and other non-public Articles.",
+          },
+        },
+      },
+      ArticleGoneError: {
+        type: "object",
+        additionalProperties: false,
+        required: ["status", "code"],
+        properties: {
+          status: { type: "string", enum: ["error"] },
+          code: {
+            type: "string",
+            enum: ["ARTICLE_GONE"],
+            description:
+              "The normalized slug is a minimal permanent tombstone and no Article content is retained.",
           },
         },
       },

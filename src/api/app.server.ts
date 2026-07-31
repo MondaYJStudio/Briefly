@@ -9,6 +9,7 @@ import {
 } from "../articles/articles.server";
 import {
   listTrashedArticles,
+  purgeTrashedArticle,
   restoreTrashedArticle,
   trashArticle,
 } from "../articles/article-trash.server";
@@ -182,6 +183,13 @@ async function publicArticleResponse(
       request,
       { status: "error", code: "ARTICLE_NOT_FOUND" },
       { status: 404, head },
+    );
+  }
+  if (resolution.kind === "gone") {
+    return publicJsonResponse(
+      request,
+      { status: "error", code: "ARTICLE_GONE" },
+      { status: 410, head },
     );
   }
   if (resolution.kind === "redirect") {
@@ -371,6 +379,46 @@ function createApi(getBindings: () => RuntimeBindings) {
             });
       },
       { params: t.Object({ articleId: t.String({ format: "uuid" }) }) },
+    )
+    .delete(
+      "/admin/trash/articles/:articleId",
+      async ({ body, params, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        let result: Awaited<ReturnType<typeof purgeTrashedArticle>>;
+        try {
+          result = await purgeTrashedArticle(
+            bindings.DB,
+            params.articleId,
+            body.confirmationArticleId,
+          );
+        } catch {
+          return status(500, {
+            status: "error" as const,
+            code: "INTERNAL_ERROR" as const,
+          });
+        }
+        if (result.ok) return result.article;
+        return status(result.reason === "not-found" ? 404 : 409, {
+          status: "error" as const,
+          code:
+            result.reason === "not-found"
+              ? ("TRASHED_ARTICLE_NOT_FOUND" as const)
+              : ("ARTICLE_PURGE_CONFIRMATION_REQUIRED" as const),
+        });
+      },
+      {
+        params: t.Object({ articleId: t.String({ format: "uuid" }) }),
+        body: t.Object({
+          confirmationArticleId: t.String({ format: "uuid" }),
+        }),
+      },
     )
     .get(
       "/admin/articles/:articleId",

@@ -12,6 +12,7 @@ export {
   articleDraft,
   articleDraftAssetReference,
   articleSlug,
+  purgedArticleSlug,
   publication,
   publicationAssetReference,
 } from "./articles";
