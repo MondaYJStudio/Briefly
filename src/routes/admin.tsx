@@ -28,6 +28,8 @@ import {
   isPublicationIssue,
   type Article,
   type ArticleDraftUpdate,
+  type ArticlePublicationHistory,
+  type ArticlePublicationHistoryEntry,
   type PublicationIssue,
   type RenderedArticleDraft,
 } from "../articles/articles";
@@ -488,6 +490,26 @@ function ArticleDraftManager() {
   const [unpublishState, setUnpublishState] = useState<
     "ready" | "unpublishing" | "unpublished" | "error"
   >("ready");
+  const [publicationHistory, setPublicationHistory] = useState<
+    ArticlePublicationHistoryEntry[]
+  >([]);
+  const [historyHasUnpublishedChanges, setHistoryHasUnpublishedChanges] =
+    useState(false);
+  const [historyState, setHistoryState] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
+  const [restoreState, setRestoreState] = useState<
+    "ready" | "restoring" | "restored" | "invalid" | "conflict" | "error"
+  >("ready");
+  const [restoreIssues, setRestoreIssues] = useState<PublicationIssue[]>([]);
+
+  function resetPublicationHistory() {
+    setPublicationHistory([]);
+    setHistoryHasUnpublishedChanges(false);
+    setHistoryState("idle");
+    setRestoreState("ready");
+    setRestoreIssues([]);
+  }
 
   function resetPreview() {
     previewRequestGeneration.current += 1;
@@ -498,7 +520,10 @@ function ArticleDraftManager() {
 
   function selectServerDraft(
     article: Article,
-    options: { preserveUnpublishFeedback?: boolean } = {},
+    options: {
+      preservePublicationHistory?: boolean;
+      preserveUnpublishFeedback?: boolean;
+    } = {},
   ) {
     selectedRef.current = article;
     revisionRef.current = 0;
@@ -512,6 +537,7 @@ function ArticleDraftManager() {
         current === "unpublishing" ? current : "ready",
       );
     }
+    if (!options.preservePublicationHistory) resetPublicationHistory();
     resetPreview();
   }
 
@@ -703,6 +729,9 @@ function ArticleDraftManager() {
     setState("dirty");
     setPublishState("ready");
     setPublicationAction(null);
+    if (historyState === "ready") setHistoryHasUnpublishedChanges(true);
+    setRestoreState("ready");
+    setRestoreIssues([]);
   }
 
   async function reloadDraft() {
@@ -775,7 +804,9 @@ function ArticleDraftManager() {
     !hasUnsavedChanges &&
     ["ready", "saved"].includes(state);
   const lifecycleActionPending =
-    publishState === "publishing" || unpublishState === "unpublishing";
+    publishState === "publishing" ||
+    unpublishState === "unpublishing" ||
+    restoreState === "restoring";
   const publishActionDisabled =
     !selected ||
     !serverConfirmed ||
@@ -859,6 +890,7 @@ function ArticleDraftManager() {
           setPublishState("published");
           setPublicationAction(isRepublish ? "republished" : "published");
           setUnpublishState("ready");
+          resetPublicationHistory();
         }
         try {
           const refreshed = await getApiClient()
@@ -932,6 +964,7 @@ function ArticleDraftManager() {
         .admin.articles({ articleId: snapshot.id })
         ["current-publication"].delete();
       if (response.status === 200 && response.data) {
+        resetPublicationHistory();
         setArticles((current) =>
           current.map((article) =>
             article.id === snapshot.id
@@ -954,6 +987,98 @@ function ArticleDraftManager() {
       if (selectedRef.current?.id === snapshot.id) setUnpublishState("error");
     } catch {
       if (selectedRef.current?.id === snapshot.id) setUnpublishState("error");
+    }
+  }
+
+  async function loadPublicationHistory() {
+    const snapshot = selectedRef.current;
+    if (!snapshot || !serverConfirmed || lifecycleActionPending) return;
+    setHistoryState("loading");
+    setRestoreState("ready");
+    setRestoreIssues([]);
+    try {
+      const response = await getApiClient()
+        .admin.articles({ articleId: snapshot.id })
+        .publications.get();
+      if (selectedRef.current?.id !== snapshot.id) return;
+      if (response.status !== 200 || !response.data) {
+        setHistoryState("error");
+        return;
+      }
+      const history = response.data as ArticlePublicationHistory;
+      setPublicationHistory(history.publications);
+      setHistoryHasUnpublishedChanges(history.hasUnpublishedChanges);
+      setHistoryState("ready");
+    } catch {
+      if (selectedRef.current?.id === snapshot.id) setHistoryState("error");
+    }
+  }
+
+  async function restoreFromHistory(
+    publication: ArticlePublicationHistoryEntry,
+  ) {
+    const snapshot = selectedRef.current;
+    const capturedRevision = revisionRef.current;
+    if (!snapshot || !serverConfirmed || lifecycleActionPending) return;
+    setRestoreState("restoring");
+    setRestoreIssues([]);
+
+    try {
+      const response = await getApiClient()
+        .admin.articles({ articleId: snapshot.id })
+        .publications({ publicationId: publication.id })
+        .restore.post({
+          draftVersion: snapshot.draft.version,
+          confirmDiscardUnpublishedChanges: true,
+        });
+      if (selectedRef.current?.id !== snapshot.id) return;
+      if (response.status === 200 && response.data) {
+        const serverArticle = response.data as Article;
+        const local = selectedRef.current;
+        const localChanged = revisionRef.current !== capturedRevision;
+        const next =
+          localChanged && local
+            ? preserveLocalDraft(serverArticle, local)
+            : serverArticle;
+        if (localChanged) {
+          selectedRef.current = next;
+          confirmedRevisionRef.current = capturedRevision;
+          setSelected(next);
+          setConfirmedRevision(capturedRevision);
+          setState("dirty");
+          resetPreview();
+        } else {
+          selectServerDraft(next, { preservePublicationHistory: true });
+          setState("saved");
+        }
+        setArticles((current) =>
+          current.map((article) => (article.id === next.id ? next : article)),
+        );
+        setHistoryHasUnpublishedChanges(true);
+        setPublishState("ready");
+        setPublicationAction(null);
+        setUnpublishState("ready");
+        setRestoreState("restored");
+        return;
+      }
+
+      const error: unknown = response.error?.value;
+      if (
+        response.status === 400 &&
+        typeof error === "object" &&
+        error !== null &&
+        "issues" in error &&
+        Array.isArray(error.issues)
+      ) {
+        setRestoreIssues(error.issues.filter(isPublicationIssue));
+        setRestoreState("invalid");
+      } else if (response.status === 409) {
+        setRestoreState("conflict");
+      } else {
+        setRestoreState("error");
+      }
+    } catch {
+      if (selectedRef.current?.id === snapshot.id) setRestoreState("error");
     }
   }
 
@@ -1486,6 +1611,168 @@ function ArticleDraftManager() {
               <div dangerouslySetInnerHTML={{ __html: preview.html }} />
             </article>
           </div>
+        ) : null}
+      </section>
+      <section
+        className="space-y-4 border-t border-default-200 pt-5"
+        aria-labelledby="publication-history-heading"
+      >
+        <div className="space-y-1">
+          <h3
+            id="publication-history-heading"
+            className="text-lg font-semibold"
+          >
+            Publication History
+          </h3>
+          <p className="text-sm text-default-500">
+            Browse every retained immutable Publication. Restoring one
+            permanently replaces the current Draft; when it contains unpublished
+            Draft changes, a destructive warning requires you to choose Confirm
+            and restore Publication explicitly. The public Current Publication
+            stays unchanged, so you can preview the restored Draft before
+            publishing.
+          </p>
+        </div>
+        <Button
+          fullWidth
+          type="button"
+          variant="secondary"
+          isDisabled={!serverConfirmed || lifecycleActionPending}
+          isPending={historyState === "loading"}
+          onPress={loadPublicationHistory}
+        >
+          Load retained Publications
+        </Button>
+        {historyState === "error" ? (
+          <Alert status="danger" role="alert">
+            <Alert.Content>
+              <Alert.Title>Unable to load Publication History</Alert.Title>
+              <Alert.Description>Please reload the history.</Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : historyState === "ready" && publicationHistory.length === 0 ? (
+          <p className="text-sm text-default-500">
+            This Article has no retained Publications yet.
+          </p>
+        ) : null}
+        {restoreState === "restored" ? (
+          <Alert status="success" role="status">
+            <Alert.Content>
+              <Alert.Title>Publication restored into the Draft</Alert.Title>
+              <Alert.Description>
+                Draft Version advanced. Preview it privately, then publish only
+                when it is ready to replace the Current Publication.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : restoreState === "conflict" ? (
+          <Alert status="warning" role="alert">
+            <Alert.Content>
+              <Alert.Title>Draft changed before restore</Alert.Title>
+              <Alert.Description>
+                Reload the latest server-confirmed Draft and Publication
+                History; no historical source was changed.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : restoreState === "invalid" ? (
+          <Alert status="danger" role="alert">
+            <Alert.Content>
+              <Alert.Title>Publication cannot be restored safely</Alert.Title>
+              <Alert.Description>
+                <ul className="list-disc pl-5">
+                  {restoreIssues.map((issue) => (
+                    <li key={issue.code + ":" + issue.path}>
+                      {issue.path}: {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : restoreState === "error" ? (
+          <Alert status="danger" role="alert">
+            <Alert.Content>
+              <Alert.Title>Unable to restore Publication</Alert.Title>
+              <Alert.Description>
+                The current Draft and public output were not confirmed as
+                changed. Reload and try again.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : null}
+        {publicationHistory.length > 0 ? (
+          <ol className="space-y-3" aria-label="Retained Publications">
+            {publicationHistory.map((publication) => (
+              <li
+                key={publication.id}
+                className="space-y-3 rounded-xl border border-default-200 p-4"
+              >
+                <div className="space-y-1">
+                  <p className="font-medium">
+                    Publication {publication.publicationNumber}
+                    {publication.isCurrent ? " · Current" : ""}
+                  </p>
+                  <p>{publication.title}</p>
+                  <p className="text-sm text-default-500">
+                    /{publication.slug} · {publication.publishedAt}
+                  </p>
+                </div>
+                <AlertDialog.Root>
+                  <Button
+                    fullWidth
+                    type="button"
+                    variant="danger-soft"
+                    isDisabled={!serverConfirmed || lifecycleActionPending}
+                    isPending={restoreState === "restoring"}
+                  >
+                    Restore Publication {publication.publicationNumber}
+                  </Button>
+                  <AlertDialog.Backdrop>
+                    <AlertDialog.Container>
+                      <AlertDialog.Dialog>
+                        <AlertDialog.Header>
+                          <AlertDialog.Heading>
+                            Restore Publication {publication.publicationNumber}?
+                          </AlertDialog.Heading>
+                        </AlertDialog.Header>
+                        <AlertDialog.Body>
+                          <p>
+                            {historyHasUnpublishedChanges
+                              ? "This Article has unpublished Draft changes. Restoring this immutable source permanently replaces them with a new Draft Version."
+                              : "Restoring this immutable source replaces the current Draft with a new Draft Version."}{" "}
+                            The selected Publication, Current Publication,
+                            public timestamps, and anonymous output remain
+                            unchanged.
+                          </p>
+                        </AlertDialog.Body>
+                        <AlertDialog.Footer>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            slot="close"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="danger-soft"
+                            slot="close"
+                            isDisabled={
+                              !serverConfirmed || lifecycleActionPending
+                            }
+                            onPress={() => void restoreFromHistory(publication)}
+                          >
+                            Confirm and restore Publication
+                          </Button>
+                        </AlertDialog.Footer>
+                      </AlertDialog.Dialog>
+                    </AlertDialog.Container>
+                  </AlertDialog.Backdrop>
+                </AlertDialog.Root>
+              </li>
+            ))}
+          </ol>
         ) : null}
       </section>
       <p className="text-sm text-default-500">

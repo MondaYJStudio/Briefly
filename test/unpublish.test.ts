@@ -402,34 +402,42 @@ describe("Article unpublish", () => {
     )
       .bind(articleId)
       .first<Record<string, unknown>>();
-    const publicationsBefore = await env.DB.prepare(
-      "SELECT * FROM publication WHERE article_id = ? ORDER BY publication_number",
-    )
-      .bind(articleId)
-      .all<Record<string, unknown>>();
-    const slugsBefore = await env.DB.prepare(
-      "SELECT * FROM article_slug WHERE article_id = ? ORDER BY slug_key",
-    )
-      .bind(articleId)
-      .all<Record<string, unknown>>();
+    const publicationsBefore = (
+      await env.DB.prepare(
+        "SELECT * FROM publication WHERE article_id = ? ORDER BY publication_number",
+      )
+        .bind(articleId)
+        .all<Record<string, unknown>>()
+    ).results;
+    const slugsBefore = (
+      await env.DB.prepare(
+        "SELECT * FROM article_slug WHERE article_id = ? ORDER BY slug_key",
+      )
+        .bind(articleId)
+        .all<Record<string, unknown>>()
+    ).results;
     const assetBefore = await env.DB.prepare("SELECT * FROM asset WHERE id = ?")
       .bind(asset.id)
       .first<Record<string, unknown>>();
-    const draftReferencesBefore = await env.DB.prepare(
-      "SELECT * FROM article_draft_asset_reference WHERE article_id = ? ORDER BY asset_id",
-    )
-      .bind(articleId)
-      .all<Record<string, unknown>>();
-    const publicationReferencesBefore = await env.DB.prepare(
-      `SELECT publication_asset_reference.*
-       FROM publication_asset_reference
-       JOIN publication
-         ON publication.id = publication_asset_reference.publication_id
-       WHERE publication.article_id = ?
-       ORDER BY publication_asset_reference.asset_id`,
-    )
-      .bind(articleId)
-      .all<Record<string, unknown>>();
+    const draftReferencesBefore = (
+      await env.DB.prepare(
+        "SELECT * FROM article_draft_asset_reference WHERE article_id = ? ORDER BY asset_id",
+      )
+        .bind(articleId)
+        .all<Record<string, unknown>>()
+    ).results;
+    const publicationReferencesBefore = (
+      await env.DB.prepare(
+        `SELECT publication_asset_reference.*
+         FROM publication_asset_reference
+         JOIN publication
+           ON publication.id = publication_asset_reference.publication_id
+         WHERE publication.article_id = ?
+         ORDER BY publication_asset_reference.asset_id`,
+      )
+        .bind(articleId)
+        .all<Record<string, unknown>>()
+    ).results;
 
     const unpublished = await SELF.fetch(
       `http://briefly.test/api/admin/articles/${articleId}/current-publication`,
@@ -452,18 +460,22 @@ describe("Article unpublish", () => {
         .first(),
     ).toEqual(draftBefore);
     expect(
-      await env.DB.prepare(
-        "SELECT * FROM publication WHERE article_id = ? ORDER BY publication_number",
-      )
-        .bind(articleId)
-        .all(),
+      (
+        await env.DB.prepare(
+          "SELECT * FROM publication WHERE article_id = ? ORDER BY publication_number",
+        )
+          .bind(articleId)
+          .all()
+      ).results,
     ).toEqual(publicationsBefore);
     expect(
-      await env.DB.prepare(
-        "SELECT * FROM article_slug WHERE article_id = ? ORDER BY slug_key",
-      )
-        .bind(articleId)
-        .all(),
+      (
+        await env.DB.prepare(
+          "SELECT * FROM article_slug WHERE article_id = ? ORDER BY slug_key",
+        )
+          .bind(articleId)
+          .all()
+      ).results,
     ).toEqual(slugsBefore);
     expect(
       await env.DB.prepare("SELECT * FROM asset WHERE id = ?")
@@ -471,23 +483,27 @@ describe("Article unpublish", () => {
         .first(),
     ).toEqual(assetBefore);
     expect(
-      await env.DB.prepare(
-        "SELECT * FROM article_draft_asset_reference WHERE article_id = ? ORDER BY asset_id",
-      )
-        .bind(articleId)
-        .all(),
+      (
+        await env.DB.prepare(
+          "SELECT * FROM article_draft_asset_reference WHERE article_id = ? ORDER BY asset_id",
+        )
+          .bind(articleId)
+          .all()
+      ).results,
     ).toEqual(draftReferencesBefore);
     expect(
-      await env.DB.prepare(
-        `SELECT publication_asset_reference.*
-         FROM publication_asset_reference
-         JOIN publication
-           ON publication.id = publication_asset_reference.publication_id
-         WHERE publication.article_id = ?
-         ORDER BY publication_asset_reference.asset_id`,
-      )
-        .bind(articleId)
-        .all(),
+      (
+        await env.DB.prepare(
+          `SELECT publication_asset_reference.*
+           FROM publication_asset_reference
+           JOIN publication
+             ON publication.id = publication_asset_reference.publication_id
+           WHERE publication.article_id = ?
+           ORDER BY publication_asset_reference.asset_id`,
+        )
+          .bind(articleId)
+          .all()
+      ).results,
     ).toEqual(publicationReferencesBefore);
 
     const publicMediaAfter = await SELF.fetch(publicArticle.cover.url);

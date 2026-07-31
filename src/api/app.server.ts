@@ -9,6 +9,10 @@ import {
 } from "../articles/articles.server";
 import { renderSavedArticleDraft } from "../articles/article-publication.server";
 import {
+  listArticlePublicationHistory,
+  restoreArticlePublication,
+} from "../articles/publication-history.server";
+import {
   listPublicArticles,
   publishArticle,
   resolvePublicArticle,
@@ -466,6 +470,30 @@ function createApi(getBindings: () => RuntimeBindings) {
         body: t.Any(),
       },
     )
+    .get(
+      "/admin/articles/:articleId/publications",
+      async ({ params, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        const result = await listArticlePublicationHistory(
+          bindings.DB,
+          params.articleId,
+        );
+        return result.ok
+          ? result.history
+          : status(404, {
+              status: "error" as const,
+              code: "ARTICLE_NOT_FOUND" as const,
+            });
+      },
+      { params: t.Object({ articleId: t.String({ format: "uuid" }) }) },
+    )
     .post(
       "/admin/articles/:articleId/publications",
       async ({ body, params, request, set, status }) => {
@@ -512,6 +540,71 @@ function createApi(getBindings: () => RuntimeBindings) {
       {
         params: t.Object({ articleId: t.String({ format: "uuid" }) }),
         body: t.Object({ draftVersion: t.Number({ minimum: 1 }) }),
+      },
+    )
+    .post(
+      "/admin/articles/:articleId/publications/:publicationId/restore",
+      async ({ body, params, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        let result: Awaited<ReturnType<typeof restoreArticlePublication>>;
+        try {
+          result = await restoreArticlePublication(
+            bindings.DB,
+            params.articleId,
+            params.publicationId,
+            body.draftVersion,
+            body.confirmDiscardUnpublishedChanges,
+          );
+        } catch {
+          return status(500, {
+            status: "error" as const,
+            code: "INTERNAL_ERROR" as const,
+          });
+        }
+        if (result.ok) return result.article;
+        if (result.reason === "invalid") {
+          return status(400, {
+            status: "error" as const,
+            code: "PUBLICATION_RESTORE_INVALID" as const,
+            issues: result.issues,
+          });
+        }
+        if (result.reason === "article-not-found") {
+          return status(404, {
+            status: "error" as const,
+            code: "ARTICLE_NOT_FOUND" as const,
+          });
+        }
+        if (result.reason === "publication-not-found") {
+          return status(404, {
+            status: "error" as const,
+            code: "PUBLICATION_NOT_FOUND" as const,
+          });
+        }
+        return status(409, {
+          status: "error" as const,
+          code:
+            result.reason === "confirmation-required"
+              ? ("ARTICLE_DRAFT_RESTORE_CONFIRMATION_REQUIRED" as const)
+              : ("ARTICLE_DRAFT_VERSION_CONFLICT" as const),
+        });
+      },
+      {
+        params: t.Object({
+          articleId: t.String({ format: "uuid" }),
+          publicationId: t.String({ format: "uuid" }),
+        }),
+        body: t.Object({
+          draftVersion: t.Number({ minimum: 1 }),
+          confirmDiscardUnpublishedChanges: t.Boolean(),
+        }),
       },
     )
     .delete(

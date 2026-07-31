@@ -70,6 +70,20 @@ export interface PublicationIssue {
   message: string;
 }
 
+export interface ArticlePublicationHistoryEntry {
+  id: string;
+  publicationNumber: number;
+  title: string;
+  slug: string;
+  publishedAt: string;
+  isCurrent: boolean;
+}
+
+export interface ArticlePublicationHistory {
+  publications: ArticlePublicationHistoryEntry[];
+  hasUnpublishedChanges: boolean;
+}
+
 export function isPublicationIssue(value: unknown): value is PublicationIssue {
   return (
     typeof value === "object" &&
