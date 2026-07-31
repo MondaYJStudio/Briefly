@@ -1,9 +1,11 @@
 import { SELF } from "cloudflare:test";
 import { env } from "cloudflare:workers";
+import type { OpenAPIV3_1 } from "openapi-types";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { initializeAndSignIn } from "./administrator-fixture";
 import { uploadOnePixelPngAsset } from "./asset-fixture";
+import { expectResponseMatchesContract } from "./openapi-contract";
 
 function textDocument(text: string) {
   return {
@@ -68,6 +70,30 @@ async function publish(
   expect(published.status).toBe(201);
 }
 
+async function trashArticle(cookie: string, articleId: string) {
+  const response = await SELF.fetch(
+    `http://briefly.test/api/admin/articles/${articleId}/trash`,
+    { method: "POST", headers: { cookie } },
+  );
+  expect(response.status).toBe(200);
+  return response;
+}
+
+function purgeArticle(
+  cookie: string,
+  articleId: string,
+  confirmationArticleId = articleId,
+) {
+  return SELF.fetch(
+    `http://briefly.test/api/admin/trash/articles/${articleId}`,
+    {
+      method: "DELETE",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ confirmationArticleId }),
+    },
+  );
+}
+
 describe("Article purge", () => {
   beforeEach(async () => {
     const { results } = await env.DB.prepare(
@@ -102,23 +128,9 @@ describe("Article purge", () => {
     await saveDraft(cookie, article.id, 2, "second-slug", "Second title");
     await publish(cookie, article.id, 3);
     await saveDraft(cookie, article.id, 3, "never-public", "Private revision");
-    expect(
-      (
-        await SELF.fetch(
-          `http://briefly.test/api/admin/articles/${article.id}/trash`,
-          { method: "POST", headers: { cookie } },
-        )
-      ).status,
-    ).toBe(200);
+    await trashArticle(cookie, article.id);
 
-    const purged = await SELF.fetch(
-      `http://briefly.test/api/admin/trash/articles/${article.id}`,
-      {
-        method: "DELETE",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ confirmationArticleId: article.id }),
-      },
-    );
+    const purged = await purgeArticle(cookie, article.id);
     expect(purged.status).toBe(200);
     expect(await purged.json()).toEqual({ id: article.id, purged: true });
 
@@ -155,27 +167,33 @@ describe("Article purge", () => {
 
     const contract = await (
       await SELF.fetch("http://briefly.test/api/openapi.json")
-    ).json<{
-      paths: Record<
-        string,
-        Record<string, { responses: Record<string, { description: string }> }>
-      >;
-      components: { schemas: Record<string, unknown> };
-    }>();
-    for (const method of ["get", "head"]) {
-      expect(
-        contract.paths["/api/articles/{slug}"]?.[method]?.responses[410]
-          ?.description,
-      ).toBe(
+    ).json<OpenAPIV3_1.Document>();
+    for (const method of ["get", "head"] as const) {
+      const response =
+        contract.paths?.["/api/articles/{slug}"]?.[method]?.responses?.[410];
+      if (!response || "$ref" in response)
+        throw new Error(`Missing inline 410 response for ${method}`);
+      expect(response.description).toBe(
         "The normalized slug is permanently reserved because its Article was purged.",
       );
     }
-    expect(contract.components.schemas.ArticleGoneError).toMatchObject({
+    expect(contract.components?.schemas?.ArticleGoneError).toMatchObject({
       required: ["status", "code"],
       properties: {
         code: { type: "string", enum: ["ARTICLE_GONE"] },
       },
     });
+    const goneResponse = await SELF.fetch(
+      "http://briefly.test/api/articles/second-slug",
+    );
+    const goneBody = await goneResponse.json();
+    expectResponseMatchesContract(
+      contract,
+      "/api/articles/{slug}",
+      "get",
+      goneResponse.status,
+      goneBody,
+    );
   }, 30_000);
 
   it("requires authentication, Trash state, and an exact Article identity confirmation", async () => {
@@ -207,14 +225,7 @@ describe("Article purge", () => {
       code: "TRASHED_ARTICLE_NOT_FOUND",
     });
 
-    expect(
-      (
-        await SELF.fetch(
-          `http://briefly.test/api/admin/articles/${article.id}/trash`,
-          { method: "POST", headers: { cookie } },
-        )
-      ).status,
-    ).toBe(200);
+    await trashArticle(cookie, article.id);
     const wrongConfirmation = await request(
       { cookie },
       "00000000-0000-4000-8000-000000000000",
@@ -292,23 +303,9 @@ describe("Article purge", () => {
     await publish(cookie, article.id, 2);
     await saveWithAsset(2, "retained-two", "Secret title two");
     await publish(cookie, article.id, 3);
-    expect(
-      (
-        await SELF.fetch(
-          `http://briefly.test/api/admin/articles/${article.id}/trash`,
-          { method: "POST", headers: { cookie } },
-        )
-      ).status,
-    ).toBe(200);
+    await trashArticle(cookie, article.id);
 
-    const purged = await SELF.fetch(
-      `http://briefly.test/api/admin/trash/articles/${article.id}`,
-      {
-        method: "DELETE",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ confirmationArticleId: article.id }),
-      },
-    );
+    const purged = await purgeArticle(cookie, article.id);
     expect(purged.status).toBe(200);
 
     for (const table of [
@@ -358,14 +355,7 @@ describe("Article purge", () => {
     const article = await createArticle(cookie);
     await saveDraft(cookie, article.id, 1, "atomic-purge", "Atomic title");
     await publish(cookie, article.id, 2);
-    expect(
-      (
-        await SELF.fetch(
-          `http://briefly.test/api/admin/articles/${article.id}/trash`,
-          { method: "POST", headers: { cookie } },
-        )
-      ).status,
-    ).toBe(200);
+    await trashArticle(cookie, article.id);
     await env.DB.prepare(
       `CREATE TRIGGER reject_article_purge
        BEFORE DELETE ON article
@@ -374,12 +364,7 @@ describe("Article purge", () => {
        END`,
     ).run();
 
-    const purge = () =>
-      SELF.fetch(`http://briefly.test/api/admin/trash/articles/${article.id}`, {
-        method: "DELETE",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ confirmationArticleId: article.id }),
-      });
+    const purge = () => purgeArticle(cookie, article.id);
     const failed = await purge();
     expect(failed.status).toBe(500);
     expect(await failed.json()).toEqual({
@@ -421,26 +406,44 @@ describe("Article purge", () => {
     const original = await createArticle(cookie);
     await saveDraft(cookie, original.id, 1, "Caf\u00e9", "Original");
     await publish(cookie, original.id, 2);
-    expect(
-      (
-        await SELF.fetch(
-          `http://briefly.test/api/admin/articles/${original.id}/trash`,
-          { method: "POST", headers: { cookie } },
-        )
-      ).status,
-    ).toBe(200);
-    expect(
-      (
-        await SELF.fetch(
-          `http://briefly.test/api/admin/trash/articles/${original.id}`,
-          {
-            method: "DELETE",
-            headers: { cookie, "content-type": "application/json" },
-            body: JSON.stringify({ confirmationArticleId: original.id }),
-          },
-        )
-      ).status,
-    ).toBe(200);
+    await trashArticle(cookie, original.id);
+
+    const concurrent = await createArticle(cookie);
+    const [purged, concurrentClaim] = await Promise.all([
+      purgeArticle(cookie, original.id),
+      SELF.fetch(
+        `http://briefly.test/api/admin/articles/${concurrent.id}/draft`,
+        {
+          method: "PUT",
+          headers: { cookie, "content-type": "application/json" },
+          body: JSON.stringify({
+            version: 1,
+            title: "Concurrent reclaim",
+            slug: "CAFE\u0301",
+            summary: null,
+            tags: [],
+            byline: null,
+            language: null,
+            cover: null,
+            document: textDocument("Concurrent reclaim"),
+          }),
+        },
+      ),
+    ]);
+    expect(purged.status).toBe(200);
+    expect(concurrentClaim.status).toBe(409);
+    expect(await concurrentClaim.json()).toEqual({
+      status: "error",
+      code: "ARTICLE_SLUG_CONFLICT",
+    });
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO article_slug (slug_key, article_id, was_published)
+         VALUES (?, ?, 0)`,
+      )
+        .bind("caf\u00e9", concurrent.id)
+        .run(),
+    ).rejects.toThrow(/permanently tombstoned/u);
 
     const attempts = await Promise.all(
       ["CAFE\u0301", "caf\u00e9"].map(async (slug) => {
