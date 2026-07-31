@@ -20,6 +20,7 @@ import {
 } from "../articles/publications.server";
 import { recognizeVideoEmbed } from "../articles/video-embeds";
 import {
+  cleanupAsset,
   listAssets,
   resolvePrivateAssetForRendering,
   uploadAsset,
@@ -422,6 +423,44 @@ function createApi(getBindings: () => RuntimeBindings) {
             });
       },
       { body: t.Object({ file: t.File() }) },
+    )
+    .delete(
+      "/admin/assets/:assetId",
+      async ({ params, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        const result = await cleanupAsset(
+          bindings.DB,
+          bindings.MEDIA_BUCKET,
+          params.assetId,
+        );
+        if (result.ok)
+          return new Response(null, {
+            status: 204,
+            headers: { "cache-control": "no-store" },
+          });
+        if (!result.ok) {
+          if (result.reason === "referenced") {
+            return status(409, {
+              status: "error" as const,
+              code: "ASSET_CLEANUP_BLOCKED" as const,
+              references: result.references,
+            });
+          }
+          return status(503, {
+            status: "error" as const,
+            code: "ASSET_CLEANUP_RETRY_REQUIRED" as const,
+            asset: result.asset,
+          });
+        }
+      },
+      { params: t.Object({ assetId: t.String({ format: "uuid" }) }) },
     )
     .post(
       "/admin/articles/:articleId/preview",

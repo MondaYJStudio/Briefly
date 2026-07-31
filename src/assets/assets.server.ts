@@ -1,13 +1,19 @@
 import { z } from "zod";
 
 import {
+  ASSET_CLEANUP_FAILURE_CODES,
   ASSET_MAXIMUM_BYTE_SIZE,
   ASSET_MAXIMUM_DIMENSION,
   ASSET_MAXIMUM_PIXEL_COUNT,
   ASSET_ORIGINAL_FILENAME_MAXIMUM_LENGTH,
-  type Asset,
+  assetHasReferences,
+  type AssetCleanupFailureCode,
+  type AssetLibraryEntry,
   type AssetMimeType,
+  type AssetReferences,
   type AssetValidationIssue,
+  type ReadyAsset,
+  type ReadyAssetLibraryEntry,
 } from "./assets";
 import { decodeImage } from "./image-decoder.server";
 
@@ -29,21 +35,67 @@ interface VerifiedImage {
   height: number;
 }
 
-interface ReadyAssetRow {
-  id: string;
-  original_filename: string;
-  mime_type: string;
-  byte_size: number;
-  width: number;
-  height: number;
-  uploaded_at: number;
-  lifecycle_state: string;
-  public_asset_id: string | null;
-}
+const storedAssetRowSchema = z.object({
+  id: z.string().uuid(),
+  original_filename: z.string(),
+  mime_type: z.enum(["image/avif", "image/jpeg", "image/png", "image/webp"]),
+  byte_size: z.number().int().positive(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  uploaded_at: z.number().int(),
+  public_asset_id: z.string().uuid().nullable(),
+});
+const readyAssetRowSchema = storedAssetRowSchema.extend({
+  lifecycle_state: z.literal("ready"),
+  failure_code: z.null(),
+});
+const libraryReferenceRowSchema = {
+  object_key: z.string(),
+  current_draft_references: z.number().int().nonnegative(),
+  retained_publication_references: z.number().int().nonnegative(),
+};
+const libraryAssetRowSchema = z.discriminatedUnion("lifecycle_state", [
+  readyAssetRowSchema.extend(libraryReferenceRowSchema),
+  storedAssetRowSchema.extend({
+    ...libraryReferenceRowSchema,
+    lifecycle_state: z.literal("pending_deletion"),
+    failure_code: z.enum(ASSET_CLEANUP_FAILURE_CODES).nullable(),
+  }),
+]);
+
+type ReadyAssetRow = z.infer<typeof readyAssetRowSchema>;
+type LibraryAssetRow = z.infer<typeof libraryAssetRowSchema>;
 
 interface PrivateAssetRow extends ReadyAssetRow {
   object_key: string;
 }
+
+const assetLibrarySelection = `
+  SELECT asset.id, asset.original_filename, asset.mime_type, asset.byte_size,
+         asset.width, asset.height, asset.uploaded_at, asset.lifecycle_state,
+         asset.failure_code, asset.public_asset_id, asset.object_key,
+         (
+           SELECT COUNT(*)
+           FROM article_draft_asset_reference
+           WHERE asset_id = asset.id
+         ) AS current_draft_references,
+         (
+           SELECT COUNT(*)
+           FROM publication_asset_reference
+           WHERE asset_id = asset.id
+         ) AS retained_publication_references
+  FROM asset
+`;
+const assetHasNoReferencesCondition = `
+  NOT EXISTS (
+    SELECT 1 FROM article_draft_asset_reference
+    WHERE asset_id = asset.id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM publication_asset_reference
+    WHERE asset_id = asset.id
+  )
+`;
 
 export interface PublicationAssetResolution {
   assetId: string;
@@ -55,40 +107,56 @@ export interface PublicationAssetResolution {
 }
 
 export type UploadAssetResult =
-  | { ok: true; asset: Asset }
+  | { ok: true; asset: ReadyAssetLibraryEntry }
   | { ok: false; reason: "invalid"; issues: AssetValidationIssue[] }
   | { ok: false; reason: "storage-failed" };
 
-function readyAssetFromRow(row: ReadyAssetRow): Asset {
-  return z
-    .object({
-      id: z.string().uuid(),
-      original_filename: z.string(),
-      mime_type: z.enum([
-        "image/avif",
-        "image/jpeg",
-        "image/png",
-        "image/webp",
-      ]),
-      byte_size: z.number().int().positive(),
-      width: z.number().int().positive(),
-      height: z.number().int().positive(),
-      uploaded_at: z.number().int(),
-      lifecycle_state: z.literal("ready"),
-      public_asset_id: z.string().uuid().nullable(),
-    })
-    .transform((value) => ({
-      id: value.id,
-      originalFilename: value.original_filename,
-      mimeType: value.mime_type,
-      byteSize: value.byte_size,
-      width: value.width,
-      height: value.height,
-      uploadedAt: new Date(value.uploaded_at).toISOString(),
-      lifecycleState: value.lifecycle_state,
-      publicAssetId: value.public_asset_id,
-    }))
-    .parse(row);
+function assetMetadataFromRow(row: z.infer<typeof storedAssetRowSchema>) {
+  return {
+    id: row.id,
+    originalFilename: row.original_filename,
+    mimeType: row.mime_type,
+    byteSize: row.byte_size,
+    width: row.width,
+    height: row.height,
+    uploadedAt: new Date(row.uploaded_at).toISOString(),
+    publicAssetId: row.public_asset_id,
+  };
+}
+
+function readyAssetFromRow(row: ReadyAssetRow): ReadyAsset {
+  const value = readyAssetRowSchema.parse(row);
+  return { ...assetMetadataFromRow(value), lifecycleState: "ready" };
+}
+
+function readyAssetLibraryEntry(asset: ReadyAsset): ReadyAssetLibraryEntry {
+  return {
+    ...asset,
+    failureCode: null,
+    references: { currentDrafts: 0, retainedPublications: 0 },
+  };
+}
+
+function libraryAssetFromRow(row: LibraryAssetRow): AssetLibraryEntry {
+  const value = libraryAssetRowSchema.parse(row);
+  const common = {
+    ...assetMetadataFromRow(value),
+    references: {
+      currentDrafts: value.current_draft_references,
+      retainedPublications: value.retained_publication_references,
+    },
+  };
+  return value.lifecycle_state === "ready"
+    ? {
+        ...common,
+        lifecycleState: "ready",
+        failureCode: null,
+      }
+    : {
+        ...common,
+        lifecycleState: "pending_deletion",
+        failureCode: value.failure_code,
+      };
 }
 
 function inspectPng(bytes: Uint8Array): VerifiedImage | null {
@@ -538,30 +606,178 @@ export async function uploadAsset(
   }
 
   const asset = await readAsset(database, id);
-  return asset ? { ok: true, asset } : { ok: false, reason: "storage-failed" };
+  return asset
+    ? { ok: true, asset: readyAssetLibraryEntry(asset) }
+    : { ok: false, reason: "storage-failed" };
 }
 
-export async function listAssets(database: D1Database): Promise<Asset[]> {
+export async function listAssets(
+  database: D1Database,
+): Promise<AssetLibraryEntry[]> {
   const { results } = await database
     .prepare(
-      `SELECT id, original_filename, mime_type, byte_size, width, height,
-              uploaded_at, lifecycle_state, public_asset_id
-       FROM asset
-       WHERE lifecycle_state = 'ready'
+      `${assetLibrarySelection}
+       WHERE lifecycle_state IN ('ready', 'pending_deletion')
        ORDER BY uploaded_at DESC, id ASC`,
     )
-    .all<ReadyAssetRow>();
-  return results.map(readyAssetFromRow);
+    .all<LibraryAssetRow>();
+  return results.map(libraryAssetFromRow);
+}
+
+export type CleanupAssetResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "referenced";
+      references: AssetReferences;
+    }
+  | { ok: false; reason: "storage-failed"; asset: AssetLibraryEntry };
+
+async function recordCleanupFailure(
+  database: D1Database,
+  assetId: string,
+  failureCode: AssetCleanupFailureCode,
+  fallback: AssetLibraryEntry,
+): Promise<AssetLibraryEntry> {
+  try {
+    await database
+      .prepare(
+        `UPDATE asset
+         SET failure_code = ?
+         WHERE id = ? AND lifecycle_state = 'pending_deletion'`,
+      )
+      .bind(failureCode, assetId)
+      .run();
+    const row = await database
+      .prepare(
+        `${assetLibrarySelection}
+         WHERE id = ? AND lifecycle_state = 'pending_deletion'
+         LIMIT 1`,
+      )
+      .bind(assetId)
+      .first<LibraryAssetRow>();
+    if (row) return libraryAssetFromRow(row);
+  } catch {}
+  return fallback;
+}
+
+export async function cleanupAsset(
+  database: D1Database,
+  bucket: R2Bucket,
+  assetId: string,
+): Promise<CleanupAssetResult> {
+  if (!z.string().uuid().safeParse(assetId).success) return { ok: true };
+  const statements = [
+    database
+      .prepare(
+        `UPDATE asset
+         SET lifecycle_state = 'pending_deletion', failure_code = NULL
+         WHERE id = ? AND lifecycle_state = 'ready'
+           AND ${assetHasNoReferencesCondition}
+         RETURNING object_key`,
+      )
+      .bind(assetId),
+    database
+      .prepare(
+        `${assetLibrarySelection}
+         WHERE id = ? AND lifecycle_state IN ('ready', 'pending_deletion')
+         LIMIT 1`,
+      )
+      .bind(assetId),
+  ];
+  const batch = await database.batch(statements);
+  const claimed = batch[0]?.results[0] as { object_key: string } | undefined;
+  const row = batch[1]?.results[0] as LibraryAssetRow | undefined;
+  if (!row) return { ok: true };
+
+  const asset = libraryAssetFromRow(row);
+  if (assetHasReferences(asset)) {
+    return {
+      ok: false,
+      reason: "referenced",
+      references: asset.references,
+    };
+  }
+  if (asset.lifecycleState === "ready" && !claimed) {
+    return { ok: false, reason: "storage-failed", asset };
+  }
+
+  try {
+    await bucket.delete(row.object_key);
+  } catch {
+    return {
+      ok: false,
+      reason: "storage-failed",
+      asset: await recordCleanupFailure(
+        database,
+        assetId,
+        "R2_DELETE_FAILED",
+        asset,
+      ),
+    };
+  }
+
+  try {
+    const deletion = await database
+      .prepare(
+        `DELETE FROM asset
+         WHERE id = ? AND lifecycle_state = 'pending_deletion'
+           AND ${assetHasNoReferencesCondition}`,
+      )
+      .bind(assetId)
+      .run();
+    if (deletion.meta.changes === 1) return { ok: true };
+  } catch {
+    return {
+      ok: false,
+      reason: "storage-failed",
+      asset: await recordCleanupFailure(
+        database,
+        assetId,
+        "D1_DELETE_FAILED",
+        asset,
+      ),
+    };
+  }
+
+  const remaining = await database
+    .prepare(
+      `${assetLibrarySelection}
+       WHERE id = ? AND lifecycle_state IN ('ready', 'pending_deletion')
+       LIMIT 1`,
+    )
+    .bind(assetId)
+    .first<LibraryAssetRow>();
+  if (!remaining) return { ok: true };
+
+  const remainingAsset = libraryAssetFromRow(remaining);
+  if (assetHasReferences(remainingAsset)) {
+    return {
+      ok: false,
+      reason: "referenced",
+      references: remainingAsset.references,
+    };
+  }
+  return {
+    ok: false,
+    reason: "storage-failed",
+    asset: await recordCleanupFailure(
+      database,
+      assetId,
+      "D1_DELETE_FAILED",
+      remainingAsset,
+    ),
+  };
 }
 
 async function readAsset(
   database: D1Database,
   assetId: string,
-): Promise<Asset | null> {
+): Promise<ReadyAsset | null> {
   const row = await database
     .prepare(
       `SELECT id, original_filename, mime_type, byte_size, width, height,
-              uploaded_at, lifecycle_state, public_asset_id
+              uploaded_at, lifecycle_state, failure_code, public_asset_id
        FROM asset
        WHERE id = ? AND lifecycle_state = 'ready'
        LIMIT 1`,
@@ -579,7 +795,8 @@ async function readReadyPrivateAssetRow(
   return database
     .prepare(
       `SELECT id, original_filename, mime_type, byte_size, width, height,
-              uploaded_at, lifecycle_state, public_asset_id, object_key
+              uploaded_at, lifecycle_state, failure_code, public_asset_id,
+              object_key
        FROM asset
        WHERE id = ? AND lifecycle_state = 'ready'
        LIMIT 1`,
@@ -592,7 +809,7 @@ export async function readPrivateAsset(
   database: D1Database,
   bucket: R2Bucket,
   assetId: string,
-): Promise<{ asset: Asset; object: R2ObjectBody } | null> {
+): Promise<{ asset: ReadyAsset; object: R2ObjectBody } | null> {
   const row = await readReadyPrivateAssetRow(database, assetId);
   if (!row) return null;
   const object = await bucket.get(row.object_key);
@@ -676,7 +893,8 @@ async function readPublicAssetRow(
   return database
     .prepare(
       `SELECT id, original_filename, mime_type, byte_size, width, height,
-              uploaded_at, lifecycle_state, public_asset_id, object_key
+              uploaded_at, lifecycle_state, failure_code, public_asset_id,
+              object_key
        FROM asset
        WHERE public_asset_id = ? AND lifecycle_state = 'ready'
        LIMIT 1`,
@@ -689,7 +907,7 @@ async function readPublicAssetObject<ObjectType extends R2Object>(
   database: D1Database,
   publicAssetId: string,
   readObject: (objectKey: string) => Promise<ObjectType | null>,
-): Promise<{ asset: Asset; object: ObjectType } | null> {
+): Promise<{ asset: ReadyAsset; object: ObjectType } | null> {
   const row = await readPublicAssetRow(database, publicAssetId);
   if (!row) return null;
   const object = await readObject(row.object_key);
@@ -701,7 +919,7 @@ export function readPublicAsset(
   database: D1Database,
   bucket: R2Bucket,
   publicAssetId: string,
-): Promise<{ asset: Asset; object: R2ObjectBody } | null> {
+): Promise<{ asset: ReadyAsset; object: R2ObjectBody } | null> {
   return readPublicAssetObject(database, publicAssetId, (objectKey) =>
     bucket.get(objectKey),
   );
@@ -711,7 +929,7 @@ export async function headPublicAsset(
   database: D1Database,
   bucket: R2Bucket,
   publicAssetId: string,
-): Promise<{ asset: Asset; object: R2Object } | null> {
+): Promise<{ asset: ReadyAsset; object: R2Object } | null> {
   return readPublicAssetObject(database, publicAssetId, (objectKey) =>
     bucket.head(objectKey),
   );

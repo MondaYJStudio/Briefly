@@ -14,7 +14,7 @@ import {
   type ArticleDocument,
 } from "../articles/articles";
 import type { VideoProviderFacts } from "../articles/video-embeds";
-import type { Asset } from "../assets/assets";
+import type { AssetLibraryEntry, ReadyAsset } from "../assets/assets";
 import { getApiClient } from "./api.$";
 
 export interface ArticleEditorProps {
@@ -489,7 +489,7 @@ function ArticleAssetAuthoring({
   cover: ArticleCoverUsage | null;
   onCoverChange: (cover: ArticleCoverUsage | null) => void;
 }) {
-  const [assets, setAssets] = useState<Asset[]>([]);
+  const [assets, setAssets] = useState<ReadyAsset[]>([]);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [state, setState] = useState<AssetAuthoringState>("loading");
   const [statusMessage, setStatusMessage] = useState("");
@@ -510,7 +510,16 @@ function ArticleAssetAuthoring({
         if (response.status !== 200 || !response.data)
           throw new Error("Assets unavailable");
         if (active) {
-          setAssets(response.data.assets);
+          setAssets(
+            response.data.assets.filter(
+              (
+                asset,
+              ): asset is Extract<
+                AssetLibraryEntry,
+                { lifecycleState: "ready" }
+              > => asset.lifecycleState === "ready",
+            ),
+          );
           setState("ready");
         }
       })
