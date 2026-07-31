@@ -20,6 +20,7 @@ import { getApiClient } from "./api.$";
 export interface ArticleEditorProps {
   document: ArticleDocument;
   cover: ArticleCoverUsage | null;
+  isDisabled: boolean;
   onChange: (document: ArticleDocument) => void;
   onCoverChange: (cover: ArticleCoverUsage | null) => void;
 }
@@ -27,6 +28,7 @@ export interface ArticleEditorProps {
 export function ArticleEditor({
   document,
   cover,
+  isDisabled,
   onChange,
   onCoverChange,
 }: ArticleEditorProps) {
@@ -36,6 +38,7 @@ export function ArticleEditor({
   const [editorRevision, setEditorRevision] = useState(0);
   const editor = useEditor({
     immediatelyRender: false,
+    editable: !isDisabled,
     extensions: createArticleEditorExtensions(),
     content: document.doc,
     editorProps: {
@@ -53,6 +56,10 @@ export function ArticleEditor({
     },
     onTransaction: () => setEditorRevision((current) => current + 1),
   });
+
+  useEffect(() => {
+    editor?.setEditable(!isDisabled);
+  }, [editor, isDisabled]);
 
   if (!editor) return <p role="status">Preparing the text-rich editor…</p>;
   const activeEditor = editor;

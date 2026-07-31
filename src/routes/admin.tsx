@@ -474,6 +474,7 @@ function ArticleDraftManager() {
   const revisionRef = useRef(0);
   const confirmedRevisionRef = useRef(0);
   const savingRef = useRef(false);
+  const restorePendingRef = useRef(false);
   const [preview, setPreview] = useState<RenderedArticleDraft | null>(null);
   const [previewIssues, setPreviewIssues] = useState<PublicationIssue[]>([]);
   const [previewState, setPreviewState] = useState<
@@ -607,7 +608,7 @@ function ArticleDraftManager() {
 
   const persistCurrentDraft = useCallback(async (version?: number) => {
     const snapshot = selectedRef.current;
-    if (!snapshot || savingRef.current) return;
+    if (!snapshot || savingRef.current || restorePendingRef.current) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       setState("offline");
       return;
@@ -718,7 +719,7 @@ function ArticleDraftManager() {
 
   function updateDraft(changes: Partial<Article["draft"]>) {
     const current = selectedRef.current;
-    if (!current) return;
+    if (!current || restorePendingRef.current) return;
     const next = { ...current, draft: { ...current.draft, ...changes } };
     const nextRevision = revisionRef.current + 1;
     selectedRef.current = next;
@@ -1018,8 +1019,14 @@ function ArticleDraftManager() {
     publication: ArticlePublicationHistoryEntry,
   ) {
     const snapshot = selectedRef.current;
-    const capturedRevision = revisionRef.current;
-    if (!snapshot || !serverConfirmed || lifecycleActionPending) return;
+    if (
+      !snapshot ||
+      !serverConfirmed ||
+      lifecycleActionPending ||
+      restorePendingRef.current
+    )
+      return;
+    restorePendingRef.current = true;
     setRestoreState("restoring");
     setRestoreIssues([]);
 
@@ -1034,25 +1041,12 @@ function ArticleDraftManager() {
       if (selectedRef.current?.id !== snapshot.id) return;
       if (response.status === 200 && response.data) {
         const serverArticle = response.data as Article;
-        const local = selectedRef.current;
-        const localChanged = revisionRef.current !== capturedRevision;
-        const next =
-          localChanged && local
-            ? preserveLocalDraft(serverArticle, local)
-            : serverArticle;
-        if (localChanged) {
-          selectedRef.current = next;
-          confirmedRevisionRef.current = capturedRevision;
-          setSelected(next);
-          setConfirmedRevision(capturedRevision);
-          setState("dirty");
-          resetPreview();
-        } else {
-          selectServerDraft(next, { preservePublicationHistory: true });
-          setState("saved");
-        }
+        selectServerDraft(serverArticle, { preservePublicationHistory: true });
+        setState("saved");
         setArticles((current) =>
-          current.map((article) => (article.id === next.id ? next : article)),
+          current.map((article) =>
+            article.id === serverArticle.id ? serverArticle : article,
+          ),
         );
         setHistoryHasUnpublishedChanges(true);
         setPublishState("ready");
@@ -1079,6 +1073,8 @@ function ArticleDraftManager() {
       }
     } catch {
       if (selectedRef.current?.id === snapshot.id) setRestoreState("error");
+    } finally {
+      restorePendingRef.current = false;
     }
   }
 
@@ -1382,140 +1378,156 @@ function ArticleDraftManager() {
             void persistCurrentDraft();
           }}
         >
-          <p className="text-sm text-default-500">
-            Draft Version {selected.draft.version}
-          </p>
-          <output className="text-sm" data-server-confirmed={serverConfirmed}>
-            {serverConfirmed
-              ? "Latest client state is server-confirmed."
-              : "Latest client state is not server-confirmed."}
-          </output>
-          <SettingsField label="Title" htmlFor="articleTitle">
-            <Input
-              fullWidth
-              id="articleTitle"
-              value={selected.draft.title}
-              onChange={(event) => updateDraft({ title: event.target.value })}
-            />
-          </SettingsField>
-          <SettingsField label="Unicode slug (optional)" htmlFor="articleSlug">
-            <Input
-              aria-describedby="articleSlugPolicy"
-              fullWidth
-              id="articleSlug"
-              value={selected.draft.slug ?? ""}
-              onChange={(event) =>
-                updateDraft({ slug: event.target.value || null })
-              }
-            />
-            <p className="text-sm text-default-500" id="articleSlugPolicy">
-              Saved as trimmed Unicode NFC with display casing preserved; global
-              uniqueness is case-insensitive. Control and path-reserved
-              characters, dot path segments, and malformed Unicode are rejected.
+          <fieldset
+            aria-busy={restoreState === "restoring"}
+            className="min-w-0 space-y-4 border-0 p-0"
+            disabled={restoreState === "restoring"}
+          >
+            <p className="text-sm text-default-500">
+              Draft Version {selected.draft.version}
             </p>
-          </SettingsField>
-          <SettingsField
-            label="Plain-text summary (optional)"
-            htmlFor="articleSummary"
-          >
-            <TextArea
-              fullWidth
-              id="articleSummary"
-              value={selected.draft.summary ?? ""}
-              onChange={(event) =>
-                updateDraft({ summary: event.target.value || null })
-              }
-            />
-          </SettingsField>
-          <SettingsField
-            label="Flat tags (comma separated)"
-            htmlFor="articleTags"
-          >
-            <Input
-              fullWidth
-              id="articleTags"
-              value={selected.draft.tags.join(", ")}
-              onChange={(event) =>
-                updateDraft({
-                  tags: event.target.value
-                    .split(",")
-                    .map((tag) => tag.trim())
-                    .filter(Boolean),
-                })
-              }
-            />
-          </SettingsField>
-          <SettingsField
-            label="Byline override name (optional)"
-            htmlFor="articleBylineName"
-          >
-            <Input
-              fullWidth
-              id="articleBylineName"
-              value={selected.draft.byline?.name ?? ""}
-              onChange={(event) =>
-                updateDraft({
-                  byline: event.target.value
-                    ? {
-                        name: event.target.value,
-                        url: selected.draft.byline?.url ?? null,
-                      }
-                    : null,
-                })
-              }
-            />
-          </SettingsField>
-          <SettingsField
-            label="Byline override URL (optional)"
-            htmlFor="articleBylineUrl"
-          >
-            <Input
-              fullWidth
-              id="articleBylineUrl"
-              type="url"
-              disabled={!selected.draft.byline}
-              value={selected.draft.byline?.url ?? ""}
-              onChange={(event) =>
-                selected.draft.byline &&
-                updateDraft({
-                  byline: {
-                    ...selected.draft.byline,
-                    url: event.target.value || null,
-                  },
-                })
-              }
-            />
-          </SettingsField>
-          <SettingsField
-            label="Language override (BCP 47, optional)"
-            htmlFor="articleLanguage"
-          >
-            <Input
-              fullWidth
-              id="articleLanguage"
-              value={selected.draft.language ?? ""}
-              onChange={(event) =>
-                updateDraft({ language: event.target.value || null })
-              }
-            />
-          </SettingsField>
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold">Text-rich Draft editor</h3>
-            <ClientOnly fallback={<ArticleEditorFallback />}>
-              <Suspense fallback={<ArticleEditorFallback />}>
-                <ArticleEditor
-                  key={`${selected.id}:${editorGeneration}`}
-                  document={selected.draft.document}
-                  cover={selected.draft.cover}
-                  onChange={(document) => updateDraft({ document })}
-                  onCoverChange={(cover) => updateDraft({ cover })}
-                />
-              </Suspense>
-            </ClientOnly>
-          </div>
-          <Button fullWidth type="submit" isPending={state === "saving"}>
-            Save complete Draft now
-          </Button>
+            <output className="text-sm" data-server-confirmed={serverConfirmed}>
+              {serverConfirmed
+                ? "Latest client state is server-confirmed."
+                : "Latest client state is not server-confirmed."}
+            </output>
+            {restoreState === "restoring" ? (
+              <p className="text-sm text-default-600" role="status">
+                Restoring Publication… Draft editing is temporarily paused.
+              </p>
+            ) : null}
+            <SettingsField label="Title" htmlFor="articleTitle">
+              <Input
+                fullWidth
+                id="articleTitle"
+                value={selected.draft.title}
+                onChange={(event) => updateDraft({ title: event.target.value })}
+              />
+            </SettingsField>
+            <SettingsField
+              label="Unicode slug (optional)"
+              htmlFor="articleSlug"
+            >
+              <Input
+                aria-describedby="articleSlugPolicy"
+                fullWidth
+                id="articleSlug"
+                value={selected.draft.slug ?? ""}
+                onChange={(event) =>
+                  updateDraft({ slug: event.target.value || null })
+                }
+              />
+              <p className="text-sm text-default-500" id="articleSlugPolicy">
+                Saved as trimmed Unicode NFC with display casing preserved;
+                global uniqueness is case-insensitive. Control and path-reserved
+                characters, dot path segments, and malformed Unicode are
+                rejected.
+              </p>
+            </SettingsField>
+            <SettingsField
+              label="Plain-text summary (optional)"
+              htmlFor="articleSummary"
+            >
+              <TextArea
+                fullWidth
+                id="articleSummary"
+                value={selected.draft.summary ?? ""}
+                onChange={(event) =>
+                  updateDraft({ summary: event.target.value || null })
+                }
+              />
+            </SettingsField>
+            <SettingsField
+              label="Flat tags (comma separated)"
+              htmlFor="articleTags"
+            >
+              <Input
+                fullWidth
+                id="articleTags"
+                value={selected.draft.tags.join(", ")}
+                onChange={(event) =>
+                  updateDraft({
+                    tags: event.target.value
+                      .split(",")
+                      .map((tag) => tag.trim())
+                      .filter(Boolean),
+                  })
+                }
+              />
+            </SettingsField>
+            <SettingsField
+              label="Byline override name (optional)"
+              htmlFor="articleBylineName"
+            >
+              <Input
+                fullWidth
+                id="articleBylineName"
+                value={selected.draft.byline?.name ?? ""}
+                onChange={(event) =>
+                  updateDraft({
+                    byline: event.target.value
+                      ? {
+                          name: event.target.value,
+                          url: selected.draft.byline?.url ?? null,
+                        }
+                      : null,
+                  })
+                }
+              />
+            </SettingsField>
+            <SettingsField
+              label="Byline override URL (optional)"
+              htmlFor="articleBylineUrl"
+            >
+              <Input
+                fullWidth
+                id="articleBylineUrl"
+                type="url"
+                disabled={!selected.draft.byline}
+                value={selected.draft.byline?.url ?? ""}
+                onChange={(event) =>
+                  selected.draft.byline &&
+                  updateDraft({
+                    byline: {
+                      ...selected.draft.byline,
+                      url: event.target.value || null,
+                    },
+                  })
+                }
+              />
+            </SettingsField>
+            <SettingsField
+              label="Language override (BCP 47, optional)"
+              htmlFor="articleLanguage"
+            >
+              <Input
+                fullWidth
+                id="articleLanguage"
+                value={selected.draft.language ?? ""}
+                onChange={(event) =>
+                  updateDraft({ language: event.target.value || null })
+                }
+              />
+            </SettingsField>
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold">Text-rich Draft editor</h3>
+              <ClientOnly fallback={<ArticleEditorFallback />}>
+                <Suspense fallback={<ArticleEditorFallback />}>
+                  <ArticleEditor
+                    key={`${selected.id}:${editorGeneration}`}
+                    document={selected.draft.document}
+                    cover={selected.draft.cover}
+                    isDisabled={restoreState === "restoring"}
+                    onChange={(document) => updateDraft({ document })}
+                    onCoverChange={(cover) => updateDraft({ cover })}
+                  />
+                </Suspense>
+              </ClientOnly>
+            </div>
+            <Button fullWidth type="submit" isPending={state === "saving"}>
+              Save complete Draft now
+            </Button>
+          </fieldset>
         </Form>
       ) : null}
       <section
