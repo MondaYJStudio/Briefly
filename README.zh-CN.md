@@ -123,11 +123,13 @@ Drizzle schema 文件是数据库结构的事实来源；Drizzle Kit 生成提�
 ## 公开内容 API
 
 - `GET` / `HEAD /api/articles` — 使用不透明游标仅列出当前发布版本；`limit` 默认为 20、上限为 100，并支持一个归一化后的 `tag` 过滤条件
-- `GET` / `HEAD /api/articles/:slug` — 根据规范 slug 获取当前发布版本
+- `GET` / `HEAD /api/articles/:slug` — 根据规范 slug 获取当前发布版本；Article 公开期间，曾经公开的 slug 会以 `308 Permanent Redirect` 跳转到当前规范 URL
 - `GET /api/openapi.json` — 查看机器可读的 OpenAPI 3.1 契约
 - `/media/...` — 交付受控的私有媒体与不可变公开媒体
 
 公开内容 API 允许匿名跨域读取，并且不受管理员 Cookie 影响。列表与详情响应使用确定性 ETag，并要求共享缓存重新验证，因此成功发布会立即可见。OpenAPI 源与应用一起提交，其 schema 会用真实 Worker 响应做契约测试。
+
+Article slug 采用唯一且明确的归一化策略：保存的显示 slug 会先移除首尾空白并归一化为 Unicode NFC，同时保留显示大小写；全局唯一键再使用与地区无关的 `und` locale 转为小写，并再次归一化为 NFC，避免大小写映射重新产生可绕过比较的分解等价形式。slug 必须是良构 Unicode，不能包含控制字符、URI 路径保留字符、百分号或反斜杠，也不能是点路径段 `.` 或 `..`。Publication 成功后，其归一化 slug claim 将永久保留；以后成功更改 slug 时，所有曾公开的 slug 都会直接重定向到当前规范 URL。Article 取消发布期间，这些定位符统一返回不披露内部状态的 404。
 
 ## 许可证
 

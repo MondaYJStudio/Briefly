@@ -614,6 +614,73 @@ describe("Article unpublish", () => {
     );
     expect(publicRead.status).toBe(200);
     expect(await publicRead.json()).toEqual(laterPublic);
+
+    const formerLocator = await SELF.fetch(
+      "http://briefly.test/api/articles/before-withdrawal",
+      { redirect: "manual" },
+    );
+    expect(formerLocator.status).toBe(308);
+    expect(formerLocator.headers.get("location")).toBe(
+      "/api/articles/after-withdrawal",
+    );
+
+    expect(
+      (
+        await SELF.fetch(
+          `http://briefly.test/api/admin/articles/${articleId}/current-publication`,
+          { method: "DELETE", headers: { cookie } },
+        )
+      ).status,
+    ).toBe(200);
+    for (const slug of ["before-withdrawal", "after-withdrawal"]) {
+      for (const method of ["GET", "HEAD"] as const) {
+        const unavailable = await SELF.fetch(
+          `http://briefly.test/api/articles/${slug}`,
+          { method, redirect: "manual" },
+        );
+        expect(unavailable.status).toBe(404);
+        expect(unavailable.headers.get("location")).toBeNull();
+        expect(unavailable.headers.get("etag")).toBeNull();
+        if (method === "GET") {
+          expect(await unavailable.json()).toEqual({
+            status: "error",
+            code: "ARTICLE_NOT_FOUND",
+          });
+        } else {
+          expect(await unavailable.text()).toBe("");
+        }
+      }
+
+      const claimant = await SELF.fetch(
+        "http://briefly.test/api/admin/articles",
+        { method: "POST", headers: { cookie } },
+      );
+      expect(claimant.status).toBe(201);
+      const { id: claimantId } = await claimant.json<{ id: string }>();
+      const conflictingClaim = await SELF.fetch(
+        `http://briefly.test/api/admin/articles/${claimantId}/draft`,
+        {
+          method: "PUT",
+          headers: { cookie, "content-type": "application/json" },
+          body: JSON.stringify({
+            version: 1,
+            title: "Must not inherit a public locator",
+            slug,
+            summary: null,
+            tags: [],
+            byline: null,
+            language: null,
+            cover: null,
+            document: textDocument("Conflicting claim"),
+          }),
+        },
+      );
+      expect(conflictingClaim.status).toBe(409);
+      expect(await conflictingClaim.json()).toEqual({
+        status: "error",
+        code: "ARTICLE_SLUG_CONFLICT",
+      });
+    }
   }, 30_000);
 
   it("presents a deliberate reversible action distinct from Trash and purge", async () => {

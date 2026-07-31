@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   ARTICLE_ASSET_ALT_MAXIMUM_LENGTH,
   ARTICLE_DOCUMENT_SCHEMA_VERSION,
-  ARTICLE_SLUG_MAXIMUM_LENGTH,
   ARTICLE_SUMMARY_MAXIMUM_LENGTH,
   ARTICLE_TAG_MAXIMUM_LENGTH,
   ARTICLE_TAGS_MAXIMUM_COUNT,
@@ -15,6 +14,7 @@ import {
   articleDocumentAssetReferences,
   validateArticleDocument,
 } from "./article-document";
+import { articleSlugKey, articleSlugSchema } from "./article-slug";
 
 const emptyDocument = {
   documentSchemaVersion: ARTICLE_DOCUMENT_SCHEMA_VERSION,
@@ -63,25 +63,6 @@ const coverUsage = z
   })
   .strict();
 
-const pathReservedCharacter = /[:/?#\[\]@!$&'()*+,;=%\\]/u;
-const controlCharacter = /\p{Cc}/u;
-
-function slugKeyFor(value: string | null): string | null {
-  return value?.toLocaleLowerCase("und") ?? null;
-}
-
-const slug = z
-  .string()
-  .max(ARTICLE_SLUG_MAXIMUM_LENGTH)
-  .transform((value) => value.normalize("NFC").trim())
-  .pipe(z.string().min(1, { message: "Enter a slug or leave it absent." }))
-  .refine((value) => !controlCharacter.test(value), {
-    message: "Slug cannot contain control characters.",
-  })
-  .refine((value) => !pathReservedCharacter.test(value), {
-    message: "Slug cannot contain path-reserved characters.",
-  });
-
 const tag = z
   .string()
   .transform((value) => value.normalize("NFC").trim().replace(/\s+/gu, " "))
@@ -97,7 +78,7 @@ const draftInput = z
   .object({
     version: z.number().int().positive(),
     title: z.string().trim().max(ARTICLE_TITLE_MAXIMUM_LENGTH),
-    slug: slug.nullable(),
+    slug: articleSlugSchema.nullable(),
     summary: z.string().max(ARTICLE_SUMMARY_MAXIMUM_LENGTH).nullable(),
     tags: z.array(tag).max(ARTICLE_TAGS_MAXIMUM_COUNT),
     byline: byline.nullable(),
@@ -442,7 +423,7 @@ export async function updateArticleDraft(
   }
 
   const value = parsed.data;
-  const slugKey = slugKeyFor(value.slug);
+  const slugKey = value.slug === null ? null : articleSlugKey(value.slug);
   const now = Date.now();
   const before = await readArticle(database, articleId);
   if (!before) return { ok: false, reason: "not-found" };
@@ -473,7 +454,8 @@ export async function updateArticleDraft(
   const assetIds = [...new Set(assetReferences.map(({ assetId }) => assetId))];
   const serializedCover = cover === null ? null : JSON.stringify(cover);
   const serializedDocument = JSON.stringify(documentResult.document);
-  const previousSlugKey = slugKeyFor(before.draft.slug);
+  const previousSlugKey =
+    before.draft.slug === null ? null : articleSlugKey(before.draft.slug);
   const statements: D1PreparedStatement[] = [];
   if (slugKey !== null) {
     statements.push(

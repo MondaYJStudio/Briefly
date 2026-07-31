@@ -1225,6 +1225,28 @@ describe("first immutable Publication", () => {
     expect(visibleRevision.status).toBe(200);
     expect(await visibleRevision.json()).toEqual(republishedArticle);
 
+    for (const method of ["GET", "HEAD"] as const) {
+      const formerLocator = await SELF.fetch(
+        "http://briefly.test/api/articles/original-publication",
+        {
+          method,
+          redirect: "manual",
+          headers: { origin: "https://reader.example" },
+        },
+      );
+      expect(formerLocator.status).toBe(308);
+      expect(formerLocator.headers.get("location")).toBe(
+        "/api/articles/revised-publication",
+      );
+      expect(formerLocator.headers.get("access-control-allow-origin")).toBe(
+        "*",
+      );
+      expect(formerLocator.headers.get("cache-control")).toBe(
+        "public, max-age=0, must-revalidate",
+      );
+      expect(await formerLocator.text()).toBe("");
+    }
+
     const list = await SELF.fetch("http://briefly.test/api/articles");
     expect(list.status).toBe(200);
     const expectedOrder = [
@@ -1245,5 +1267,69 @@ describe("first immutable Publication", () => {
         ({ id }) => id,
       ),
     ).toEqual(expectedOrder);
+  }, 20_000);
+
+  it("redirects normalization-equivalent former locators directly to the exact current canonical slug", async () => {
+    const cookie = await initializeAndSignIn();
+    const articleId = await createArticle(cookie);
+    expect(
+      (
+        await saveDraft(cookie, articleId, {
+          title: "First canonical spelling",
+          slug: "Café",
+          document: textDocument("First canonical body"),
+        })
+      ).status,
+    ).toBe(200);
+    expect((await publish(cookie, articleId)).status).toBe(201);
+
+    expect(
+      (
+        await saveDraft(cookie, articleId, {
+          version: 2,
+          title: "Current canonical spelling",
+          slug: "CAFÉ",
+          document: textDocument("Current canonical body"),
+        })
+      ).status,
+    ).toBe(200);
+    expect((await publish(cookie, articleId, 3)).status).toBe(201);
+
+    for (const formerPath of ["Caf%C3%A9", "CAFE%CC%81"]) {
+      const redirected = await SELF.fetch(
+        `http://briefly.test/api/articles/${formerPath}`,
+        {
+          redirect: "manual",
+          headers: { "if-none-match": "*" },
+        },
+      );
+      expect(redirected.status).toBe(308);
+      expect(redirected.headers.get("location")).toBe(
+        "/api/articles/CAF%C3%89",
+      );
+      expect(redirected.headers.get("etag")).toBeNull();
+    }
+
+    const canonical = await SELF.fetch(
+      "http://briefly.test/api/articles/CAF%C3%89",
+    );
+    expect(canonical.status).toBe(200);
+    expect(await canonical.json()).toMatchObject({
+      id: articleId,
+      slug: "CAFÉ",
+      title: "Current canonical spelling",
+      html: "<p>Current canonical body</p>",
+    });
+    expect(
+      await env.DB.prepare(
+        `SELECT slug_key, article_id, was_published
+         FROM article_slug
+         WHERE article_id = ?`,
+      )
+        .bind(articleId)
+        .all(),
+    ).toMatchObject({
+      results: [{ slug_key: "café", article_id: articleId, was_published: 1 }],
+    });
   }, 20_000);
 });

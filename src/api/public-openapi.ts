@@ -18,8 +18,17 @@ const publicResponseHeaders = {
   ETag: { $ref: "#/components/headers/ETag" },
 } satisfies Record<string, OpenAPIV3_1.ReferenceObject>;
 
+const canonicalRedirectHeaders = {
+  "Access-Control-Allow-Origin":
+    publicResponseHeaders["Access-Control-Allow-Origin"],
+  "Cache-Control": publicResponseHeaders["Cache-Control"],
+  Location: { $ref: "#/components/headers/CanonicalArticleLocation" },
+} satisfies Record<string, OpenAPIV3_1.ReferenceObject>;
+
 const articleUnavailableDescription =
   "The Article is unavailable; this response intentionally does not disclose why.";
+const canonicalRedirectDescription =
+  "The requested formerly public slug permanently redirects to the Current Publication's canonical detail URL.";
 
 const listParameters = [
   {
@@ -189,7 +198,8 @@ export const publicOpenApiDocument = {
           name: "slug",
           in: "path",
           required: true,
-          description: "Current canonical Unicode Article slug.",
+          description:
+            "Current canonical or formerly public Unicode Article slug. Claim lookup trims and NFC-normalizes the input, lowercases it with the locale-independent und locale, then NFC-normalizes the key again.",
           schema: {
             type: "string",
             minLength: 1,
@@ -200,9 +210,9 @@ export const publicOpenApiDocument = {
       get: {
         tags: ["Articles"],
         operationId: "getArticleBySlug",
-        summary: "Retrieve a Current Publication by canonical slug",
+        summary: "Retrieve or locate a Current Publication by slug",
         description:
-          "Returns the stored semantic HTML fragment. Media URLs in cover metadata and rendered HTML are absolute stable public references.",
+          "A canonical slug returns the stored semantic HTML fragment. A formerly public slug redirects permanently to the current canonical detail URL. Media URLs in cover metadata and rendered HTML are absolute stable public references.",
         responses: {
           200: {
             description: "The Current Publication.",
@@ -216,6 +226,10 @@ export const publicOpenApiDocument = {
           304: {
             description: "The Current Publication is unchanged.",
             headers: publicResponseHeaders,
+          },
+          308: {
+            description: canonicalRedirectDescription,
+            headers: canonicalRedirectHeaders,
           },
           404: {
             description: articleUnavailableDescription,
@@ -244,6 +258,10 @@ export const publicOpenApiDocument = {
           304: {
             description: "The Current Publication is unchanged.",
             headers: publicResponseHeaders,
+          },
+          308: {
+            description: canonicalRedirectDescription,
+            headers: canonicalRedirectHeaders,
           },
           404: {
             description: articleUnavailableDescription,
@@ -274,6 +292,15 @@ export const publicOpenApiDocument = {
       ETag: {
         description: "Deterministic strong entity tag for this representation.",
         schema: { type: "string" },
+      },
+      CanonicalArticleLocation: {
+        description:
+          "Origin-relative canonical Article detail URL. The normalized canonical slug is percent-encoded as exactly one path segment; no query or fragment is preserved.",
+        schema: {
+          type: "string",
+          format: "uri-reference",
+          pattern: "^/api/articles/(?:[A-Za-z0-9._~-]|%[0-9A-F]{2})+$",
+        },
       },
     },
     schemas: {

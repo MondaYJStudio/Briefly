@@ -13,6 +13,7 @@ import type {
   PublicArticleCover,
   PublicArticleListItem,
 } from "./articles";
+import { articleSlugKey } from "./article-slug";
 import {
   renderPublication,
   type PublicationIssue,
@@ -152,10 +153,6 @@ function publicArticleListItemFromRow(
   return item;
 }
 
-function slugKeyFor(value: string): string {
-  return value.normalize("NFC").trim().toLocaleLowerCase("und");
-}
-
 function publicationMetadataIssues(input: {
   title: string;
   slug: string | null;
@@ -288,7 +285,7 @@ export async function publishArticle(
   const publicationId = crypto.randomUUID();
   const slug = article.draft.slug;
   if (slug === null) throw new Error("Validated Publication slug is absent");
-  const slugKey = slugKeyFor(slug);
+  const slugKey = articleSlugKey(slug);
   const publishedAt = Date.now();
   const expectedCurrentPublicationId = article.currentPublicationId;
   const statements: D1PreparedStatement[] = [
@@ -642,21 +639,33 @@ export async function listPublicArticles(
   };
 }
 
-export async function readPublicArticle(
+export async function resolvePublicArticle(
   database: D1Database,
   slug: string,
-): Promise<{ article: PublicArticle; publicationId: string } | null> {
+): Promise<
+  | { kind: "article"; article: PublicArticle; publicationId: string }
+  | { kind: "redirect"; canonicalSlug: string }
+  | null
+> {
+  const requestedSlugKey = articleSlugKey(slug);
   const row = await database
     .prepare(
       `${publicArticleSelection}
-       WHERE article.trashed_at IS NULL AND publication.slug_key = ?
+       JOIN article_slug ON article_slug.article_id = article.id
+       WHERE article.trashed_at IS NULL
+         AND article_slug.slug_key = ?
+         AND article_slug.was_published = 1
        LIMIT 1`,
     )
-    .bind(slugKeyFor(slug))
+    .bind(requestedSlugKey)
     .first<PublicArticleRow>();
   if (!row) return null;
   const parsed = persistedPublicArticle.parse(row);
+  if (slug !== parsed.slug) {
+    return { kind: "redirect", canonicalSlug: parsed.slug };
+  }
   return {
+    kind: "article",
     article: publicArticleFromRow(row),
     publicationId: parsed.publication_id,
   };

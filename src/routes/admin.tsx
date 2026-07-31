@@ -1275,6 +1275,7 @@ function ArticleDraftManager() {
           </SettingsField>
           <SettingsField label="Unicode slug (optional)" htmlFor="articleSlug">
             <Input
+              aria-describedby="articleSlugPolicy"
               fullWidth
               id="articleSlug"
               value={selected.draft.slug ?? ""}
@@ -1282,6 +1283,11 @@ function ArticleDraftManager() {
                 updateDraft({ slug: event.target.value || null })
               }
             />
+            <p className="text-sm text-default-500" id="articleSlugPolicy">
+              Saved as trimmed Unicode NFC with display casing preserved; global
+              uniqueness is case-insensitive. Control and path-reserved
+              characters, dot path segments, and malformed Unicode are rejected.
+            </p>
           </SettingsField>
           <SettingsField
             label="Plain-text summary (optional)"

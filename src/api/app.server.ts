@@ -11,7 +11,7 @@ import { renderSavedArticleDraft } from "../articles/article-publication.server"
 import {
   listPublicArticles,
   publishArticle,
-  readPublicArticle,
+  resolvePublicArticle,
   unpublishArticle,
 } from "../articles/publications.server";
 import { recognizeVideoEmbed } from "../articles/video-embeds";
@@ -166,17 +166,25 @@ async function publicArticleResponse(
   slug: string,
   head = false,
 ): Promise<Response> {
-  const published = await readPublicArticle(database, slug);
-  if (!published) {
+  const resolution = await resolvePublicArticle(database, slug);
+  if (!resolution) {
     return publicJsonResponse(
       request,
       { status: "error", code: "ARTICLE_NOT_FOUND" },
       { status: 404, head },
     );
   }
-  return publicJsonResponse(request, published.article, {
+  if (resolution.kind === "redirect") {
+    const headers = publicContentHeaders();
+    headers.set(
+      "location",
+      `/api/articles/${encodeURIComponent(resolution.canonicalSlug)}`,
+    );
+    return new Response(null, { status: 308, headers });
+  }
+  return publicJsonResponse(request, resolution.article, {
     head,
-    etag: `"${published.publicationId}"`,
+    etag: `"${resolution.publicationId}"`,
   });
 }
 

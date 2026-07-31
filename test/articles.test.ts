@@ -661,7 +661,7 @@ describe("Article Draft administration", () => {
     ).toBeNull();
   }, 15_000);
 
-  it("rejects Unicode-equivalent slug collisions and preserves both Drafts", async () => {
+  it("deterministically resolves concurrent Unicode-equivalent slug claims without creating Publications", async () => {
     const cookie = await initializeAndSignIn();
     const create = () =>
       SELF.fetch("http://briefly.test/api/admin/articles", {
@@ -678,39 +678,74 @@ describe("Article Draft administration", () => {
       byline: null,
       language: null,
     };
-    expect(
-      (
-        await SELF.fetch(
-          `http://briefly.test/api/admin/articles/${first.id}/draft`,
+    const attempts = await Promise.all(
+      [
+        { id: first.id, slug: "J\u030C" },
+        { id: second.id, slug: "ǰ" },
+      ].map(async ({ id, slug }) => ({
+        id,
+        response: await SELF.fetch(
+          `http://briefly.test/api/admin/articles/${id}/draft`,
           {
             method: "PUT",
             headers: { cookie, "content-type": "application/json" },
-            body: JSON.stringify({ ...metadata, slug: "café" }),
+            body: JSON.stringify({ ...metadata, slug }),
           },
-        )
-      ).status,
-    ).toBe(200);
-
-    const collision = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${second.id}/draft`,
-      {
-        method: "PUT",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ ...metadata, slug: "CAFE\u0301" }),
-      },
+        ),
+      })),
     );
 
-    expect(collision.status).toBe(409);
-    expect(await collision.json()).toEqual({
+    expect(attempts.map(({ response }) => response.status).sort()).toEqual([
+      200, 409,
+    ]);
+    const collision = attempts.find(({ response }) => response.status === 409);
+    if (!collision) throw new Error("Expected one conflicting slug claim");
+    expect(await collision.response.json()).toEqual({
       status: "error",
       code: "ARTICLE_SLUG_CONFLICT",
     });
-    const secondDraft = await (
-      await SELF.fetch(`http://briefly.test/api/admin/articles/${second.id}`, {
-        headers: { cookie },
-      })
-    ).json<{ draft: { version: number; slug: string | null } }>();
-    expect(secondDraft.draft).toMatchObject({ version: 1, slug: null });
+    const drafts = await Promise.all(
+      [first.id, second.id].map(async (id) =>
+        (
+          await SELF.fetch(`http://briefly.test/api/admin/articles/${id}`, {
+            headers: { cookie },
+          })
+        ).json<{ draft: { version: number; slug: string | null } }>(),
+      ),
+    );
+    expect(
+      drafts
+        .map(({ draft }) => ({ version: draft.version, slug: draft.slug }))
+        .sort((left, right) => left.version - right.version),
+    ).toEqual([
+      { version: 1, slug: null },
+      {
+        version: 2,
+        slug: expect.stringMatching(/^(?:J\u030C|ǰ)$/u),
+      },
+    ]);
+    expect(
+      await env.DB.prepare(
+        "SELECT article_id, was_published FROM article_slug WHERE slug_key = ?",
+      )
+        .bind("ǰ")
+        .all(),
+    ).toMatchObject({
+      results: [
+        {
+          article_id: attempts.find(({ response }) => response.status === 200)
+            ?.id,
+          was_published: 0,
+        },
+      ],
+    });
+    expect(
+      await env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM publication WHERE article_id IN (?, ?)",
+      )
+        .bind(first.id, second.id)
+        .first(),
+    ).toEqual({ count: 0 });
   }, 15_000);
 
   it("reserves the Current Publication locator and constrains its Article reference", async () => {
@@ -853,6 +888,9 @@ describe("Article Draft administration", () => {
     "fragment#value",
     "percent%2F",
     "control\u0000value",
+    ".",
+    "..",
+    "unpaired-\ud800-surrogate",
   ])(
     "rejects the unsafe slug %j with a private validation issue",
     async (slug) => {

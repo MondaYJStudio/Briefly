@@ -123,11 +123,13 @@ The baseline contains no product telemetry, phone-home behavior, third-party ana
 ## Public content API
 
 - `GET` / `HEAD /api/articles` — list only current Publications using opaque cursor pagination; `limit` defaults to 20 and is capped at 100, and one normalized `tag` filter is supported
-- `GET` / `HEAD /api/articles/:slug` — retrieve the current Publication by canonical slug
+- `GET` / `HEAD /api/articles/:slug` — retrieve the Current Publication by canonical slug; while the Article is public, a formerly public slug returns `308 Permanent Redirect` to the current canonical URL
 - `GET /api/openapi.json` — inspect the machine-readable OpenAPI 3.1 contract
 - `/media/...` — serve controlled private media and immutable public media
 
 The public content API is anonymous, cross-origin readable, and independent of administrator cookies. List and detail responses use deterministic ETags and require shared caches to revalidate so a successful publish is visible immediately. The OpenAPI source is committed with the application and its schemas are tested against real Worker responses.
+
+Article slugs use one normalization policy. The saved display slug is trimmed and normalized to Unicode NFC while preserving its casing. The global uniqueness key lowercases that value with the locale-independent `und` locale, then normalizes the result to NFC again so case mapping cannot reintroduce a decomposed equivalent. Slugs must be well-formed Unicode and cannot contain control characters, URI path-reserved characters, percent signs, backslashes, or be the dot path segments `.` or `..`. A successful Publication makes its normalized slug claim permanent. Later successful slug changes redirect every former public slug directly to the current canonical URL; while the Article is unpublished, all of those locators return the same non-disclosing 404.
 
 ## License
 

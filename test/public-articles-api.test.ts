@@ -704,4 +704,92 @@ describe("public Article API", () => {
     expect(unavailableHead.headers.get("etag")).toBeNull();
     expect(await unavailableHead.text()).toBe("");
   }, 30_000);
+
+  it("documents and serves safely encoded permanent redirects from former public slugs", async () => {
+    const cookie = await initializeAndSignIn();
+    const published = await createArticle(cookie, {
+      slug: "former-locator",
+      title: "Former locator",
+    });
+    const canonicalSlug = "规范 slug";
+    const revised = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${published.id}/draft`,
+      {
+        method: "PUT",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          version: 2,
+          title: "Canonical locator",
+          slug: canonicalSlug,
+          summary: null,
+          tags: [],
+          byline: { name: "Public Writer", url: null },
+          language: "en",
+          cover: null,
+          document: textDocument("Canonical public source"),
+        }),
+      },
+    );
+    expect(revised.status).toBe(200);
+    const republished = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${published.id}/publications`,
+      {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ draftVersion: 3 }),
+      },
+    );
+    expect(republished.status).toBe(201);
+
+    const contract = await (
+      await SELF.fetch("http://briefly.test/api/openapi.json")
+    ).json<OpenAPIV3_1.Document>();
+    for (const method of ["get", "head"] as const) {
+      const redirectResponse =
+        contract.paths?.["/api/articles/{slug}"]?.[method]?.responses?.[308];
+      if (!redirectResponse || "$ref" in redirectResponse) {
+        throw new Error(`Missing inline 308 response for ${method}`);
+      }
+      expect(redirectResponse.description).toBe(
+        "The requested formerly public slug permanently redirects to the Current Publication's canonical detail URL.",
+      );
+      expect(redirectResponse.headers?.Location).toEqual({
+        $ref: "#/components/headers/CanonicalArticleLocation",
+      });
+
+      const response = await SELF.fetch(
+        "http://briefly.test/api/articles/former-locator?next=https://attacker.example/path#fragment",
+        {
+          method: method.toUpperCase(),
+          redirect: "manual",
+          headers: {
+            origin: "https://reader.example",
+            "if-none-match": "*",
+          },
+        },
+      );
+      expect(response.status).toBe(308);
+      expect(response.headers.get("location")).toBe(
+        "/api/articles/%E8%A7%84%E8%8C%83%20slug",
+      );
+      expect(response.headers.get("location")).not.toContain("attacker");
+      expect(response.headers.get("access-control-allow-origin")).toBe("*");
+      expect(response.headers.get("cache-control")).toBe(
+        "public, max-age=0, must-revalidate",
+      );
+      expect(response.headers.get("etag")).toBeNull();
+      expect(await response.text()).toBe("");
+    }
+    expect(
+      contract.components?.headers?.CanonicalArticleLocation,
+    ).toMatchObject({
+      description:
+        "Origin-relative canonical Article detail URL. The normalized canonical slug is percent-encoded as exactly one path segment; no query or fragment is preserved.",
+      schema: {
+        type: "string",
+        format: "uri-reference",
+        pattern: "^/api/articles/(?:[A-Za-z0-9._~-]|%[0-9A-F]{2})+$",
+      },
+    });
+  }, 30_000);
 });
