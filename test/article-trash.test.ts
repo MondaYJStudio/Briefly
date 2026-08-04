@@ -669,23 +669,20 @@ describe("Article Trash and restore", () => {
     ).toBe(404);
   }, 30_000);
 
-  it("presents accessible reversible Trash and restore controls distinct from unpublish and purge", async () => {
+  it("serves recoverable Articles from the dedicated Trash route", async () => {
     const cookie = await initializeAndSignIn();
 
-    const response = await SELF.fetch("http://briefly.test/admin", {
+    const response = await SELF.fetch("http://briefly.test/admin/trash", {
       headers: { cookie },
     });
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain("Articles and Trash");
-    expect(html).toContain("Move Article to Trash");
-    expect(html).toContain("Move this Article to Trash?");
-    expect(html).toContain("Restore Article");
-    expect(html).toContain("Restore this Article from Trash?");
-    expect(html).toContain("Article restored as unpublished");
-    expect(html).toContain("explicitly publish it again");
-    expect(html).toContain("Permanent purge is separate and irreversible");
-    expect(html).toContain("Unpublish Article");
+    expect(html).toContain('<main class="page" id="admin-main">');
+    expect(html).toContain('<h1 class="page-title">Trash</h1>');
+    expect(html).toContain(
+      "Trashed articles keep their Draft, all Publications, slug records",
+    );
+    expect(html).toContain("Nothing here is public.");
   }, 30_000);
 });

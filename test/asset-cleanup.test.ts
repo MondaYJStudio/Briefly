@@ -211,7 +211,7 @@ describe("Asset reference protection and cleanup", () => {
     ]);
   });
 
-  it("requires an Administrator and exposes explicit accessible cleanup guidance", async () => {
+  it("requires an Administrator and exposes the dedicated Media route", async () => {
     const cookie = await initializeAndSignIn();
     const asset = await uploadOnePixelPngAsset(cookie, "protected-action.png");
 
@@ -224,14 +224,14 @@ describe("Asset reference protection and cleanup", () => {
     });
     expect((await listAssets(cookie)).map(({ id }) => id)).toContain(asset.id);
 
-    const admin = await SELF.fetch("http://briefly.test/admin", {
+    const admin = await SELF.fetch("http://briefly.test/admin/media", {
       headers: { cookie },
     });
     const html = await admin.text();
     expect(admin.status).toBe(200);
-    expect(html).toContain("Asset cleanup is always explicit");
-    expect(html).toContain("zero current Draft");
-    expect(html).toContain("no folders, bulk cleanup, or automatic age rules");
+    expect(html).toContain('<main class="page" id="admin-main">');
+    expect(html).toContain('<h1 class="page-title">Media</h1>');
+    expect(html).toContain("Images referenced by Drafts and Publications.");
   }, 30_000);
 
   it("reports Draft and retained Publication references and blocks both cleanup paths", async () => {

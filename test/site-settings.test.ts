@@ -224,20 +224,17 @@ describe("site identity and Byline defaults", () => {
     expect(preserved?.count).toBe(1);
   }, 15_000);
 
-  it("presents route-local loading and editing status for Site Settings", async () => {
+  it("presents the Site Settings entry in the authenticated administration shell", async () => {
     const cookie = await initializeAndSignIn();
 
-    const response = await SELF.fetch("http://briefly.test/admin", {
+    const response = await SELF.fetch("http://briefly.test/admin/articles", {
       headers: { cookie },
     });
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain("Site identity and defaults");
-    expect(html).toContain("Loading Site Settings");
-    expect(html).toContain(
-      "These public values are independent of the Administrator account.",
-    );
+    expect(html).toContain("Administrator session");
+    expect(html).toContain("Settings and account menu — Administrator");
     expect(html).not.toContain(administrator.email);
   }, 15_000);
 });

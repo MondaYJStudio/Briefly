@@ -811,15 +811,25 @@ describe("sole Administrator authentication", () => {
 
     expect((await initialize()).status).toBe(201);
     const cookie = cookieFrom(await signIn());
-    const authenticatedResponse = await SELF.fetch(
+    const authenticatedRedirect = await SELF.fetch(
       "http://briefly.test/admin",
+      { headers: { cookie }, redirect: "manual" },
+    );
+    expect(authenticatedRedirect.status).toBe(307);
+    expect(authenticatedRedirect.headers.get("location")).toBe(
+      "/admin/articles",
+    );
+
+    const authenticatedDestination = await SELF.fetch(
+      "http://briefly.test/admin/articles",
       { headers: { cookie } },
     );
-    expect(authenticatedResponse.status).toBe(200);
-    const authenticatedHtml = await authenticatedResponse.text();
+    expect(authenticatedDestination.status).toBe(200);
+    const authenticatedHtml = await authenticatedDestination.text();
     expect(authenticatedHtml).toContain("Administrator session");
-    expect(authenticatedHtml).toContain("Change password");
-    expect(authenticatedHtml).toContain("revokes every Administrator session");
+    expect(authenticatedHtml).toContain(
+      "Settings and account menu — Administrator",
+    );
 
     const recoveryResponse = await SELF.fetch("http://briefly.test/recover");
     const recoveryHtml = await recoveryResponse.text();

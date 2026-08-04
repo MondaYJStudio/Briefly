@@ -699,22 +699,23 @@ describe("Article unpublish", () => {
     }
   }, 30_000);
 
-  it("presents a deliberate reversible action distinct from Trash and purge", async () => {
+  it("serves the Article editor route while client-side unpublish controls load", async () => {
     const cookie = await initializeAndSignIn();
+    const article = await (
+      await SELF.fetch("http://briefly.test/api/admin/articles", {
+        method: "POST",
+        headers: { cookie },
+      })
+    ).json<{ id: string }>();
 
-    const response = await SELF.fetch("http://briefly.test/admin", {
-      headers: { cookie },
-    });
+    const response = await SELF.fetch(
+      `http://briefly.test/admin/articles/${article.id}`,
+      { headers: { cookie } },
+    );
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain("Unpublish Article");
-    expect(html).toContain("Unpublish this Article?");
-    expect(html).toContain("Unpublish is reversible");
-    expect(html).toContain("This is not Trash or permanent purge");
-    expect(html).toContain("Draft and Publication history remain intact");
-    expect(html).toContain("previously published media remains public");
-    expect(html).toContain("requires deliberate confirmation");
-    expect(html).not.toContain("first immutable Publication");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(html).toContain("Loading Article editor");
   }, 30_000);
 });

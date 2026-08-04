@@ -702,18 +702,23 @@ describe("private saved Draft preview", () => {
     }
   }, 15_000);
 
-  it("presents a route-local control for previewing only a saved Draft Version", async () => {
+  it("serves the Article editor route while client-side preview controls load", async () => {
     const cookie = await initializeAndSignIn();
+    const article = await (
+      await SELF.fetch("http://briefly.test/api/admin/articles", {
+        method: "POST",
+        headers: { cookie },
+      })
+    ).json<{ id: string }>();
 
-    const response = await SELF.fetch("http://briefly.test/admin", {
-      headers: { cookie },
-    });
+    const response = await SELF.fetch(
+      `http://briefly.test/admin/articles/${article.id}`,
+      { headers: { cookie } },
+    );
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain("Saved Draft Preview");
-    expect(html).toContain(
-      "Select an Article to preview an exact server-confirmed Draft Version.",
-    );
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(html).toContain("Loading Article editor");
   }, 15_000);
 });

@@ -1,10 +1,12 @@
 @import "tailwindcss";
 @import "@heroui/react/styles";
+@import "./admin-ui.css";
 
 @source "../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}";
 
 :root {
   color-scheme: light dark;
+  font-size: 16px;
   font-family:
     Inter,
     ui-sans-serif,
@@ -15,37 +17,12 @@
     sans-serif;
 }
 
+html[data-theme] {
+  font-size: 16px;
+}
+
 body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-}
-
-.article-editor__content > * + * {
-  margin-top: 0.75rem;
-}
-
-.article-editor__content ul,
-.article-editor__content ol {
-  padding-inline-start: 1.5rem;
-}
-
-.article-editor__content ul {
-  list-style: disc;
-}
-
-.article-editor__content ol {
-  list-style: decimal;
-}
-
-.article-editor__content blockquote {
-  border-inline-start: 0.25rem solid var(--border);
-  padding-inline-start: 1rem;
-}
-
-.article-editor__content pre {
-  overflow-x: auto;
-  border-radius: 0.5rem;
-  background: var(--surface-secondary);
-  padding: 0.75rem;
 }

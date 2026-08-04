@@ -776,21 +776,23 @@ describe("Article Draft Asset usages", () => {
     ]);
   }, 15_000);
 
-  it("presents an accessible route-local figure and cover authoring shell", async () => {
+  it("serves the Article editor route while client-side authoring controls load", async () => {
     const cookie = await initializeAndSignIn();
+    const article = await (
+      await SELF.fetch("http://briefly.test/api/admin/articles", {
+        method: "POST",
+        headers: { cookie },
+      })
+    ).json<{ id: string }>();
 
-    const response = await SELF.fetch("http://briefly.test/admin", {
-      headers: { cookie },
-    });
+    const response = await SELF.fetch(
+      `http://briefly.test/admin/articles/${article.id}`,
+      { headers: { cookie } },
+    );
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain("Figures and cover");
-    expect(html).toContain(
-      "Select or upload verified Assets, then describe each Article usage.",
-    );
-    expect(html).toContain(
-      "Decorative figures expose that state and save an empty alternative value.",
-    );
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(html).toContain("Loading Article editor");
   }, 15_000);
 });

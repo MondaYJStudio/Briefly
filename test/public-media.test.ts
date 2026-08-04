@@ -387,17 +387,18 @@ describe("stable public Asset delivery", () => {
     );
   }, 20_000);
 
-  it("warns that distributed public media cannot become private again", async () => {
+  it("serves public-media administration from the dedicated Media route", async () => {
     const cookie = await initializeAndSignIn();
 
-    const response = await SELF.fetch("http://briefly.test/admin", {
+    const response = await SELF.fetch("http://briefly.test/admin/media", {
       headers: { cookie },
     });
+    const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(await response.text()).toContain(
-      "Published media URLs remain public permanently, including after the Article is unpublished.",
-    );
+    expect(html).toContain('<main class="page" id="admin-main">');
+    expect(html).toContain('<h1 class="page-title">Media</h1>');
+    expect(html).toContain("Images referenced by Drafts and Publications.");
   }, 20_000);
 
   it("keeps the previous Current Publication when a republish Asset becomes unavailable", async () => {

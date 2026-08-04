@@ -999,24 +999,19 @@ describe("first immutable Publication", () => {
     }
   }, 20_000);
 
-  it("presents a deliberate publish action for a server-confirmed Draft", async () => {
+  it("serves the Article editor route while client-side publish controls load", async () => {
     const cookie = await initializeAndSignIn();
+    const articleId = await createArticle(cookie);
 
-    const response = await SELF.fetch("http://briefly.test/admin", {
-      headers: { cookie },
-    });
+    const response = await SELF.fetch(
+      `http://briefly.test/admin/articles/${articleId}`,
+      { headers: { cookie } },
+    );
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain("Publish saved Draft");
-    expect(html).toContain("Republish saved Draft");
-    expect(html).toContain(
-      "Publishing is available only for a server-confirmed Draft Version",
-    );
-    expect(html).toContain("requires deliberate confirmation");
-    expect(html).toContain(
-      "Republishing creates a new immutable Publication while preserving earlier history",
-    );
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(html).toContain("Loading Article editor");
   }, 20_000);
 
   it("requires an Administrator session for the publish command", async () => {

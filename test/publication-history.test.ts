@@ -633,20 +633,18 @@ describe("Publication history and restore", () => {
     }
   });
 
-  it("presents a route-local destructive warning and explicit restore confirmation", async () => {
+  it("serves the Article editor route while client-side history controls load", async () => {
     const cookie = await initializeAndSignIn();
+    const articleId = await createArticle(cookie);
 
-    const response = await SELF.fetch("http://briefly.test/admin", {
-      headers: { cookie },
-    });
+    const response = await SELF.fetch(
+      `http://briefly.test/admin/articles/${articleId}`,
+      { headers: { cookie } },
+    );
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain("Publication History");
-    expect(html).toContain("Load retained Publications");
-    expect(html).toContain("unpublished Draft changes");
-    expect(html).toContain("permanently replaces the current Draft");
-    expect(html).toContain("Confirm and restore Publication");
-    expect(html).toContain("preview the restored Draft before publishing");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(html).toContain("Loading Article editor");
   }, 20_000);
 });

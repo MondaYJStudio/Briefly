@@ -14,8 +14,14 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as RecoverRouteImport } from './routes/recover'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminArticlesRouteImport } from './routes/admin/articles'
+import { Route as AdminMediaRouteImport } from './routes/admin/media'
+import { Route as AdminTrashRouteImport } from './routes/admin/trash'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
 import { Route as MediaPublicAssetIdRouteImport } from './routes/media.$publicAssetId'
+import { Route as AdminArticlesIndexRouteImport } from './routes/admin/articles/index'
+import { Route as AdminArticlesArticleIdRouteImport } from './routes/admin/articles/$articleId'
 import { Route as MediaPrivateAssetIdRouteImport } from './routes/media.private.$assetId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -43,6 +49,26 @@ const SignInRoute = SignInRouteImport.update({
   path: '/sign-in',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminArticlesRoute = AdminArticlesRouteImport.update({
+  id: '/articles',
+  path: '/articles',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMediaRoute = AdminMediaRouteImport.update({
+  id: '/media',
+  path: '/media',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTrashRoute = AdminTrashRouteImport.update({
+  id: '/trash',
+  path: '/trash',
+  getParentRoute: () => AdminRoute,
+} as any)
 const ApiSplatRoute = ApiSplatRouteImport.update({
   id: '/api/$',
   path: '/api/$',
@@ -53,6 +79,16 @@ const MediaPublicAssetIdRoute = MediaPublicAssetIdRouteImport.update({
   path: '/media/$publicAssetId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminArticlesIndexRoute = AdminArticlesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminArticlesRoute,
+} as any)
+const AdminArticlesArticleIdRoute = AdminArticlesArticleIdRouteImport.update({
+  id: '/$articleId',
+  path: '/$articleId',
+  getParentRoute: () => AdminArticlesRoute,
+} as any)
 const MediaPrivateAssetIdRoute = MediaPrivateAssetIdRouteImport.update({
   id: '/media/private/$assetId',
   path: '/media/private/$assetId',
@@ -61,34 +97,50 @@ const MediaPrivateAssetIdRoute = MediaPrivateAssetIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/recover': typeof RecoverRoute
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
+  '/admin/articles': typeof AdminArticlesRouteWithChildren
+  '/admin/media': typeof AdminMediaRoute
+  '/admin/trash': typeof AdminTrashRoute
   '/api/$': typeof ApiSplatRoute
   '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/articles/$articleId': typeof AdminArticlesArticleIdRoute
   '/media/private/$assetId': typeof MediaPrivateAssetIdRoute
+  '/admin/articles/': typeof AdminArticlesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
   '/recover': typeof RecoverRoute
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
+  '/admin/media': typeof AdminMediaRoute
+  '/admin/trash': typeof AdminTrashRoute
   '/api/$': typeof ApiSplatRoute
   '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
+  '/admin': typeof AdminIndexRoute
+  '/admin/articles/$articleId': typeof AdminArticlesArticleIdRoute
   '/media/private/$assetId': typeof MediaPrivateAssetIdRoute
+  '/admin/articles': typeof AdminArticlesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/recover': typeof RecoverRoute
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
+  '/admin/articles': typeof AdminArticlesRouteWithChildren
+  '/admin/media': typeof AdminMediaRoute
+  '/admin/trash': typeof AdminTrashRoute
   '/api/$': typeof ApiSplatRoute
   '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/articles/$articleId': typeof AdminArticlesArticleIdRoute
   '/media/private/$assetId': typeof MediaPrivateAssetIdRoute
+  '/admin/articles/': typeof AdminArticlesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -98,19 +150,29 @@ export interface FileRouteTypes {
     | '/recover'
     | '/setup'
     | '/sign-in'
+    | '/admin/articles'
+    | '/admin/media'
+    | '/admin/trash'
     | '/api/$'
     | '/media/$publicAssetId'
+    | '/admin/'
+    | '/admin/articles/$articleId'
     | '/media/private/$assetId'
+    | '/admin/articles/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/admin'
     | '/recover'
     | '/setup'
     | '/sign-in'
+    | '/admin/media'
+    | '/admin/trash'
     | '/api/$'
     | '/media/$publicAssetId'
+    | '/admin'
+    | '/admin/articles/$articleId'
     | '/media/private/$assetId'
+    | '/admin/articles'
   id:
     | '__root__'
     | '/'
@@ -118,14 +180,20 @@ export interface FileRouteTypes {
     | '/recover'
     | '/setup'
     | '/sign-in'
+    | '/admin/articles'
+    | '/admin/media'
+    | '/admin/trash'
     | '/api/$'
     | '/media/$publicAssetId'
+    | '/admin/'
+    | '/admin/articles/$articleId'
     | '/media/private/$assetId'
+    | '/admin/articles/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRoute
+  AdminRoute: typeof AdminRouteWithChildren
   RecoverRoute: typeof RecoverRoute
   SetupRoute: typeof SetupRoute
   SignInRoute: typeof SignInRoute
@@ -171,6 +239,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignInRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/articles': {
+      id: '/admin/articles'
+      path: '/articles'
+      fullPath: '/admin/articles'
+      preLoaderRoute: typeof AdminArticlesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/media': {
+      id: '/admin/media'
+      path: '/media'
+      fullPath: '/admin/media'
+      preLoaderRoute: typeof AdminMediaRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/trash': {
+      id: '/admin/trash'
+      path: '/trash'
+      fullPath: '/admin/trash'
+      preLoaderRoute: typeof AdminTrashRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/api/$': {
       id: '/api/$'
       path: '/api/$'
@@ -185,6 +281,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MediaPublicAssetIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/articles/': {
+      id: '/admin/articles/'
+      path: '/'
+      fullPath: '/admin/articles/'
+      preLoaderRoute: typeof AdminArticlesIndexRouteImport
+      parentRoute: typeof AdminArticlesRoute
+    }
+    '/admin/articles/$articleId': {
+      id: '/admin/articles/$articleId'
+      path: '/$articleId'
+      fullPath: '/admin/articles/$articleId'
+      preLoaderRoute: typeof AdminArticlesArticleIdRouteImport
+      parentRoute: typeof AdminArticlesRoute
+    }
     '/media/private/$assetId': {
       id: '/media/private/$assetId'
       path: '/media/private/$assetId'
@@ -195,9 +305,39 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminArticlesRouteChildren {
+  AdminArticlesArticleIdRoute: typeof AdminArticlesArticleIdRoute
+  AdminArticlesIndexRoute: typeof AdminArticlesIndexRoute
+}
+
+const AdminArticlesRouteChildren: AdminArticlesRouteChildren = {
+  AdminArticlesArticleIdRoute: AdminArticlesArticleIdRoute,
+  AdminArticlesIndexRoute: AdminArticlesIndexRoute,
+}
+
+const AdminArticlesRouteWithChildren = AdminArticlesRoute._addFileChildren(
+  AdminArticlesRouteChildren,
+)
+
+interface AdminRouteChildren {
+  AdminArticlesRoute: typeof AdminArticlesRouteWithChildren
+  AdminMediaRoute: typeof AdminMediaRoute
+  AdminTrashRoute: typeof AdminTrashRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminArticlesRoute: AdminArticlesRouteWithChildren,
+  AdminMediaRoute: AdminMediaRoute,
+  AdminTrashRoute: AdminTrashRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRoute,
+  AdminRoute: AdminRouteWithChildren,
   RecoverRoute: RecoverRoute,
   SetupRoute: SetupRoute,
   SignInRoute: SignInRoute,

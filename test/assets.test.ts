@@ -783,18 +783,17 @@ describe("private Asset media library", () => {
     }
   }, 15_000);
 
-  it("presents an accessible upload, inspection, and selection surface", async () => {
+  it("serves Asset administration from the dedicated Media route", async () => {
     const cookie = await initializeAndSignIn();
 
-    const response = await SELF.fetch("http://briefly.test/admin", {
+    const response = await SELF.fetch("http://briefly.test/admin/media", {
       headers: { cookie },
     });
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain("Media library");
-    expect(html).toContain("Upload verified image");
-    expect(html).toContain("JPEG, PNG, WebP, or AVIF up to 8 MiB");
-    expect(html).toContain("Loading Assets");
+    expect(html).toContain('<main class="page" id="admin-main">');
+    expect(html).toContain('<h1 class="page-title">Media</h1>');
+    expect(html).toContain("Images referenced by Drafts and Publications.");
   }, 15_000);
 });

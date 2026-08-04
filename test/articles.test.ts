@@ -952,22 +952,22 @@ describe("Article Draft administration", () => {
     }
   });
 
-  it("presents the route-local Article Draft creation and loading surface", async () => {
+  it("serves the authenticated Article index creation and loading surface", async () => {
     const cookie = await initializeAndSignIn();
 
-    const response = await SELF.fetch("http://briefly.test/admin", {
+    const response = await SELF.fetch("http://briefly.test/admin/articles", {
       headers: { cookie },
     });
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain("Article Drafts");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(html).toContain("Articles");
     expect(html).toContain("Create Article Draft");
     expect(html).toContain("Loading Article Drafts");
     expect(html).toContain(
-      "Create incomplete Articles and autosave complete versioned Drafts.",
+      "Each article has one living Draft. Publishing freezes an immutable Publication",
     );
-    expect(html).toContain("The text-rich editor loads after hydration");
   }, 15_000);
 
   it("rejects a malformed persisted Draft envelope instead of trusting stored JSON", async () => {
