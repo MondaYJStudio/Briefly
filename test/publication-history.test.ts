@@ -190,7 +190,8 @@ describe("Publication history and restore", () => {
       ),
       env.DB.prepare(
         `UPDATE site_settings
-         SET site_name = 'Briefly', site_description = NULL,
+         SET site_name = 'Briefly',
+             site_description = 'A modern, self-hosted content engine with editable drafts and an immutable version history.',
              default_byline_name = 'Briefly', default_byline_url = NULL,
              default_language = 'en'
          WHERE id = 1`,

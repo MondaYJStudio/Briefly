@@ -7,4 +7,8 @@ CREATE TABLE `site_settings` (
 	`default_language` text DEFAULT 'en' NOT NULL
 );
 --> statement-breakpoint
-INSERT INTO `site_settings` (`id`) VALUES (1);
+INSERT INTO `site_settings` (`id`, `site_description`)
+VALUES (
+	1,
+	'A modern, self-hosted content engine with editable drafts and an immutable version history.'
+);

@@ -194,6 +194,15 @@ async function publicOpenApiResponse(request: Request): Promise<Response> {
   return publicJsonResponse(request, publicOpenApiDocument, { etag: true });
 }
 
+async function publicSiteSettingsResponse(
+  database: D1Database,
+  request: Request,
+  head = false,
+): Promise<Response> {
+  const settings = await readSiteSettings(database);
+  return publicJsonResponse(request, settings, { head, etag: true });
+}
+
 async function publicArticleResponse(
   database: D1Database,
   request: Request,
@@ -885,6 +894,12 @@ function createApi(getBindings: () => RuntimeBindings) {
       { params: t.Object({ articleId: t.String({ format: "uuid" }) }) },
     )
     .get("/openapi.json", ({ request }) => publicOpenApiResponse(request))
+    .get("/site", ({ request }) =>
+      publicSiteSettingsResponse(getBindings().DB, request),
+    )
+    .head("/site", ({ request }) =>
+      publicSiteSettingsResponse(getBindings().DB, request, true),
+    )
     .get("/articles", ({ query, request }) =>
       publicArticleListResponse(getBindings().DB, request, query),
     )

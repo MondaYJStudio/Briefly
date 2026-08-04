@@ -388,7 +388,7 @@ html[data-theme="dark"],
 }
 
 /* ============ Page scaffolding ============ */
-.page {
+.briefly-theme .page {
   flex: 1;
   padding: var(--space-8) var(--space-10) var(--space-16);
   max-width: 72rem;

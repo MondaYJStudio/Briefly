@@ -14,11 +14,13 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as RecoverRouteImport } from './routes/recover'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as ZhCNRouteImport } from './routes/zh-CN'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminArticlesRouteImport } from './routes/admin/articles'
 import { Route as AdminMediaRouteImport } from './routes/admin/media'
 import { Route as AdminTrashRouteImport } from './routes/admin/trash'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
+import { Route as ArticlesSlugRouteImport } from './routes/articles/$slug'
 import { Route as MediaPublicAssetIdRouteImport } from './routes/media.$publicAssetId'
 import { Route as AdminArticlesIndexRouteImport } from './routes/admin/articles/index'
 import { Route as AdminArticlesArticleIdRouteImport } from './routes/admin/articles/$articleId'
@@ -49,6 +51,11 @@ const SignInRoute = SignInRouteImport.update({
   path: '/sign-in',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ZhCNRoute = ZhCNRouteImport.update({
+  id: '/zh-CN',
+  path: '/zh-CN',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -72,6 +79,11 @@ const AdminTrashRoute = AdminTrashRouteImport.update({
 const ApiSplatRoute = ApiSplatRouteImport.update({
   id: '/api/$',
   path: '/api/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArticlesSlugRoute = ArticlesSlugRouteImport.update({
+  id: '/articles/$slug',
+  path: '/articles/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MediaPublicAssetIdRoute = MediaPublicAssetIdRouteImport.update({
@@ -101,10 +113,12 @@ export interface FileRoutesByFullPath {
   '/recover': typeof RecoverRoute
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
+  '/zh-CN': typeof ZhCNRoute
   '/admin/articles': typeof AdminArticlesRouteWithChildren
   '/admin/media': typeof AdminMediaRoute
   '/admin/trash': typeof AdminTrashRoute
   '/api/$': typeof ApiSplatRoute
+  '/articles/$slug': typeof ArticlesSlugRoute
   '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/articles/$articleId': typeof AdminArticlesArticleIdRoute
@@ -116,9 +130,11 @@ export interface FileRoutesByTo {
   '/recover': typeof RecoverRoute
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
+  '/zh-CN': typeof ZhCNRoute
   '/admin/media': typeof AdminMediaRoute
   '/admin/trash': typeof AdminTrashRoute
   '/api/$': typeof ApiSplatRoute
+  '/articles/$slug': typeof ArticlesSlugRoute
   '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
   '/admin': typeof AdminIndexRoute
   '/admin/articles/$articleId': typeof AdminArticlesArticleIdRoute
@@ -132,10 +148,12 @@ export interface FileRoutesById {
   '/recover': typeof RecoverRoute
   '/setup': typeof SetupRoute
   '/sign-in': typeof SignInRoute
+  '/zh-CN': typeof ZhCNRoute
   '/admin/articles': typeof AdminArticlesRouteWithChildren
   '/admin/media': typeof AdminMediaRoute
   '/admin/trash': typeof AdminTrashRoute
   '/api/$': typeof ApiSplatRoute
+  '/articles/$slug': typeof ArticlesSlugRoute
   '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/articles/$articleId': typeof AdminArticlesArticleIdRoute
@@ -150,10 +168,12 @@ export interface FileRouteTypes {
     | '/recover'
     | '/setup'
     | '/sign-in'
+    | '/zh-CN'
     | '/admin/articles'
     | '/admin/media'
     | '/admin/trash'
     | '/api/$'
+    | '/articles/$slug'
     | '/media/$publicAssetId'
     | '/admin/'
     | '/admin/articles/$articleId'
@@ -165,9 +185,11 @@ export interface FileRouteTypes {
     | '/recover'
     | '/setup'
     | '/sign-in'
+    | '/zh-CN'
     | '/admin/media'
     | '/admin/trash'
     | '/api/$'
+    | '/articles/$slug'
     | '/media/$publicAssetId'
     | '/admin'
     | '/admin/articles/$articleId'
@@ -180,10 +202,12 @@ export interface FileRouteTypes {
     | '/recover'
     | '/setup'
     | '/sign-in'
+    | '/zh-CN'
     | '/admin/articles'
     | '/admin/media'
     | '/admin/trash'
     | '/api/$'
+    | '/articles/$slug'
     | '/media/$publicAssetId'
     | '/admin/'
     | '/admin/articles/$articleId'
@@ -197,7 +221,9 @@ export interface RootRouteChildren {
   RecoverRoute: typeof RecoverRoute
   SetupRoute: typeof SetupRoute
   SignInRoute: typeof SignInRoute
+  ZhCNRoute: typeof ZhCNRoute
   ApiSplatRoute: typeof ApiSplatRoute
+  ArticlesSlugRoute: typeof ArticlesSlugRoute
   MediaPublicAssetIdRoute: typeof MediaPublicAssetIdRoute
   MediaPrivateAssetIdRoute: typeof MediaPrivateAssetIdRoute
 }
@@ -239,6 +265,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignInRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/zh-CN': {
+      id: '/zh-CN'
+      path: '/zh-CN'
+      fullPath: '/zh-CN'
+      preLoaderRoute: typeof ZhCNRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/': {
       id: '/admin/'
       path: '/'
@@ -272,6 +305,13 @@ declare module '@tanstack/react-router' {
       path: '/api/$'
       fullPath: '/api/$'
       preLoaderRoute: typeof ApiSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/articles/$slug': {
+      id: '/articles/$slug'
+      path: '/articles/$slug'
+      fullPath: '/articles/$slug'
+      preLoaderRoute: typeof ArticlesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/media/$publicAssetId': {
@@ -341,7 +381,9 @@ const rootRouteChildren: RootRouteChildren = {
   RecoverRoute: RecoverRoute,
   SetupRoute: SetupRoute,
   SignInRoute: SignInRoute,
+  ZhCNRoute: ZhCNRoute,
   ApiSplatRoute: ApiSplatRoute,
+  ArticlesSlugRoute: ArticlesSlugRoute,
   MediaPublicAssetIdRoute: MediaPublicAssetIdRoute,
   MediaPrivateAssetIdRoute: MediaPrivateAssetIdRoute,
 }

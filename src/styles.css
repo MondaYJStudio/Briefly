@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "@heroui/react/styles";
 @import "./admin-ui.css";
+@import "./public-site.css";
 
 @source "../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}";
 

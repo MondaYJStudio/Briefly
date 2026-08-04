@@ -128,8 +128,48 @@ export const publicOpenApiDocument = {
   },
   servers: [{ url: "/", description: "Current Briefly origin" }],
   security: [],
-  tags: [{ name: "Articles" }],
+  tags: [{ name: "Articles" }, { name: "Site" }],
   paths: {
+    "/api/site": {
+      get: {
+        tags: ["Site"],
+        operationId: "getSiteSettings",
+        summary: "Read public Site Settings",
+        description:
+          "Returns the site's public identity: name, description, default Byline, and default language. Draft-only or administrative settings are never part of this contract.",
+        responses: {
+          200: {
+            description: "The public Site Settings.",
+            headers: publicResponseHeaders,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SiteSettings" },
+              },
+            },
+          },
+          304: {
+            description:
+              "The Site Settings are unchanged for the supplied If-None-Match value.",
+            headers: publicResponseHeaders,
+          },
+        },
+      },
+      head: {
+        tags: ["Site"],
+        operationId: "headSiteSettings",
+        summary: "Read Site Settings metadata without a response body",
+        responses: {
+          200: {
+            description: "The Site Settings exist; the body is omitted.",
+            headers: publicResponseHeaders,
+          },
+          304: {
+            description: "The Site Settings are unchanged.",
+            headers: publicResponseHeaders,
+          },
+        },
+      },
+    },
     "/api/articles": {
       get: {
         tags: ["Articles"],
@@ -327,6 +367,27 @@ export const publicOpenApiDocument = {
       },
     },
     schemas: {
+      SiteSettings: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "siteName",
+          "siteDescription",
+          "defaultByline",
+          "defaultLanguage",
+        ],
+        properties: {
+          siteName: { type: "string", minLength: 1 },
+          siteDescription: {
+            oneOf: [{ type: "string" }, { type: "null" }],
+          },
+          defaultByline: { $ref: "#/components/schemas/Byline" },
+          defaultLanguage: {
+            type: "string",
+            description: "Default BCP 47 language tag for Publications.",
+          },
+        },
+      },
       Byline: {
         type: "object",
         additionalProperties: false,

@@ -6,7 +6,7 @@ import type { PublicArticleListItem } from "../articles/articles";
 import { PublicSiteShell } from "../components/public/public-site-shell";
 import type { SiteSettings } from "../site-settings/site-settings";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/zh-CN")({
   loader: async () => {
     const client = getApiClient();
     const [site, articles] = await Promise.all([
@@ -33,7 +33,7 @@ export const Route = createFileRoute("/")({
         name: "description",
         content:
           loaderData?.site.siteDescription ??
-          "A compact, self-hosted publishing system.",
+          "A compact, self-hosted publication system.",
       },
     ],
   }),
@@ -51,16 +51,17 @@ function publicationDate(iso: string): string {
 }
 
 function currentSeason(): string {
-  const month = new Date().getMonth() + 1;
-  if (month >= 3 && month <= 5) return "Spring";
-  if (month >= 6 && month <= 8) return "Summer";
-  if (month >= 9 && month <= 11) return "Autumn";
-  return "Winter";
+  const month = new Date().getMonth() + 1; // 1-12
+  if (month >= 3 && month <= 5) return "春";
+  if (month >= 6 && month <= 8) return "夏";
+  if (month >= 9 && month <= 11) return "秋";
+  return "冬";
 }
 
 function issueLine(articleCount: number): string {
   const year = new Date().getFullYear();
-  return `Vol. ${articleCount} · ${currentSeason()} ${year}`;
+  const season = currentSeason();
+  return `Vol. ${articleCount} · ${year} 年${season}`;
 }
 
 function Home() {
@@ -70,7 +71,7 @@ function Home() {
     <PublicSiteShell
       siteName={site.siteName}
       issueLine={issueLine(articles.length)}
-      locale="en"
+      locale="zh-CN"
       variant="home"
     >
       <main>
@@ -78,7 +79,7 @@ function Home() {
           <section
             className="intro reveal"
             style={revealStyle(1)}
-            aria-label="About this site"
+            aria-label="站点说明"
           >
             <p>{site.siteDescription}</p>
           </section>
@@ -91,10 +92,10 @@ function Home() {
           aria-labelledby="index-h"
         >
           <div className="section-head">
-            <h2 id="index-h">Articles</h2>
+            <h2 id="index-h">文章</h2>
           </div>
           {articles.length === 0 ? (
-            <p className="index__empty">No articles have been published yet.</p>
+            <p className="index__empty">还没有发布的文章。</p>
           ) : (
             <ol className="article-list" reversed>
               {articles.map((article) => (
@@ -104,10 +105,7 @@ function Home() {
                     to="/articles/$slug"
                     params={{ slug: article.slug }}
                   >
-                    <span
-                      className="article-row__date"
-                      aria-label="Publication date"
-                    >
+                    <span className="article-row__date" aria-label="发布日期">
                       {publicationDate(article.publishedAt)}
                     </span>
                     <span className="article-row__body">
@@ -140,38 +138,37 @@ function Home() {
           aria-labelledby="how-h"
         >
           <div className="section-head">
-            <h2 id="how-h">How it works</h2>
+            <h2 id="how-h">核心机制</h2>
           </div>
           <p className="how__note">
-            Each article lives as an editable draft alongside a history of
-            immutable publications.
+            每篇文章对应一份可变草稿和一系列不可变版本。
           </p>
           <table className="spec">
             <tbody>
               <tr>
-                <th scope="row">Draft</th>
-                <td>A working copy you can revise at any time</td>
-                <td className="spec__foot">Private until published</td>
+                <th scope="row">草稿</th>
+                <td>持续可编辑的工作副本</td>
+                <td className="spec__foot">对外不可见</td>
               </tr>
               <tr>
-                <th scope="row">Publication</th>
-                <td>A validated, immutable snapshot</td>
-                <td className="spec__foot">Promoted atomically</td>
+                <th scope="row">版本</th>
+                <td>验证后生成的不可变记录</td>
+                <td className="spec__foot">原子性切换为当前版本</td>
               </tr>
               <tr>
-                <th scope="row">History</th>
-                <td>Every published version is preserved</td>
-                <td className="spec__foot">Review any version</td>
+                <th scope="row">历史</th>
+                <td>完整保留每次修订</td>
+                <td className="spec__foot">可回溯至任意版本</td>
               </tr>
               <tr>
-                <th scope="row">Media</th>
-                <td>Private assets with stable URLs</td>
-                <td className="spec__foot">Delivered with access control</td>
+                <th scope="row">媒体</th>
+                <td>私有资源，永久 URL</td>
+                <td className="spec__foot">受控交付</td>
               </tr>
               <tr>
-                <th scope="row">Deployment</th>
-                <td>One Cloudflare Worker</td>
-                <td className="spec__foot">Serverless at the edge</td>
+                <th scope="row">部署</th>
+                <td>单一 Cloudflare Worker</td>
+                <td className="spec__foot">边缘分发，无服务器</td>
               </tr>
             </tbody>
           </table>
@@ -184,11 +181,11 @@ function Home() {
           aria-labelledby="console-h"
         >
           <div className="section-head">
-            <h2 id="console-h">Publishing console</h2>
+            <h2 id="console-h">管理界面</h2>
           </div>
-          <p>Write, publish, and manage media in one focused workspace.</p>
+          <p>富文本编辑、版本管理与媒体资源。</p>
           <a className="console-link" href="/admin">
-            Enter the console
+            进入控制台
             <svg
               className="arrow"
               viewBox="0 0 16 16"

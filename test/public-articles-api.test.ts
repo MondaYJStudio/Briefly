@@ -462,6 +462,7 @@ describe("public Article API", () => {
     expect(Object.keys(contract.paths ?? {}).sort()).toEqual([
       "/api/articles",
       "/api/articles/{slug}",
+      "/api/site",
     ]);
     const unavailableDescription =
       "The Article is unavailable; this response intentionally does not disclose why.";
