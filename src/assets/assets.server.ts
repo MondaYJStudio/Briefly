@@ -106,6 +106,15 @@ export interface PublicationAssetResolution {
   delivery: "public";
 }
 
+interface UnsafePublicationAssetResolution {
+  assetId: string;
+  rejection: "unsafe";
+}
+
+type AssetRenderingVerification =
+  | { ok: true; row: PrivateAssetRow }
+  | { ok: false; reason: "unavailable" | "unsafe" };
+
 export type UploadAssetResult =
   | { ok: true; asset: ReadyAssetLibraryEntry }
   | { ok: false; reason: "invalid"; issues: AssetValidationIssue[] }
@@ -822,14 +831,19 @@ export async function resolvePrivateAssetForRendering(
   applicationOrigin: string,
   assetId: string,
 ) {
-  const row = await readReadyPrivateAssetRow(database, assetId);
-  if (!row || !(await bucket.head(row.object_key))) return null;
+  const verified = await verifyAssetForRendering(database, bucket, assetId);
+  if (!verified.ok) {
+    return verified.reason === "unsafe"
+      ? ({ assetId, rejection: "unsafe" } as const)
+      : null;
+  }
 
   return {
-    assetId: row.id,
-    publicUrl: new URL(`/media/private/${row.id}`, applicationOrigin).href,
-    width: row.width,
-    height: row.height,
+    assetId: verified.row.id,
+    publicUrl: new URL(`/media/private/${verified.row.id}`, applicationOrigin)
+      .href,
+    width: verified.row.width,
+    height: verified.row.height,
     delivery: "private" as const,
   };
 }
@@ -856,22 +870,51 @@ function objectMatchesAsset(row: PrivateAssetRow, object: R2Object): boolean {
   );
 }
 
+function assetFactsAreSafe(row: PrivateAssetRow): boolean {
+  try {
+    readyAssetFromRow(row);
+  } catch {
+    return false;
+  }
+  return (
+    row.byte_size <= ASSET_MAXIMUM_BYTE_SIZE &&
+    row.width <= ASSET_MAXIMUM_DIMENSION &&
+    row.height <= ASSET_MAXIMUM_DIMENSION &&
+    row.width * row.height <= ASSET_MAXIMUM_PIXEL_COUNT
+  );
+}
+
+async function verifyAssetForRendering(
+  database: D1Database,
+  bucket: R2Bucket,
+  assetId: string,
+): Promise<AssetRenderingVerification> {
+  const row = await readReadyPrivateAssetRow(database, assetId);
+  if (!row) return { ok: false, reason: "unavailable" };
+  const object = await bucket.head(row.object_key);
+  if (!object || !objectMatchesAsset(row, object)) {
+    return { ok: false, reason: "unavailable" };
+  }
+  return assetFactsAreSafe(row)
+    ? { ok: true, row }
+    : { ok: false, reason: "unsafe" };
+}
+
 export async function resolveAssetForPublication(
   database: D1Database,
   bucket: R2Bucket,
   applicationOrigin: string,
   assetId: string,
-): Promise<PublicationAssetResolution | null> {
-  const row = await readReadyPrivateAssetRow(database, assetId);
-  if (!row) return null;
-
-  try {
-    readyAssetFromRow(row);
-  } catch {
-    return null;
+): Promise<
+  PublicationAssetResolution | UnsafePublicationAssetResolution | null
+> {
+  const verified = await verifyAssetForRendering(database, bucket, assetId);
+  if (!verified.ok) {
+    return verified.reason === "unsafe"
+      ? { assetId, rejection: "unsafe" }
+      : null;
   }
-  const object = await bucket.head(row.object_key);
-  if (!object || !objectMatchesAsset(row, object)) return null;
+  const { row } = verified;
 
   const publicAssetId =
     row.public_asset_id ?? (await derivedPublicAssetId(row.id));

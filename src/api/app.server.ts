@@ -13,29 +13,29 @@ import {
   restoreTrashedArticle,
   trashArticle,
 } from "../articles/article-trash.server";
-import { renderSavedArticleDraft } from "../articles/article-publication.server";
 import {
   listArticlePublicationHistory,
   restoreArticlePublication,
 } from "../articles/publication-history.server";
 import {
+  isPublicationWorkflowError,
+  previewSavedDraft,
+  publishSavedDraft,
+} from "../articles/publication-workflow.server";
+import {
   listPublicArticles,
-  publishArticle,
   resolvePublicArticle,
   unpublishArticle,
 } from "../articles/publications.server";
 import { recognizeVideoEmbed } from "../articles/video-embeds";
-import {
-  cleanupAsset,
-  listAssets,
-  resolvePrivateAssetForRendering,
-  uploadAsset,
-} from "../assets/assets.server";
+import { cleanupAsset, listAssets, uploadAsset } from "../assets/assets.server";
 import {
   initializeAdministrator,
   installationIsInitialized,
 } from "../auth/initialization.server";
 import { secretsMatch } from "../auth/secret.server";
+import { logPublicationWorkflowFailure } from "../env/logger.server";
+import { requestIdFor } from "../env/request-id.server";
 import {
   validateRuntimeBindings,
   type RuntimeBindings,
@@ -69,6 +69,29 @@ const siteSettingsInvalidContract = t.Object({
     }),
   ),
 });
+// Dynamic Elysia cannot execute a TypeBox nullable union without TypeCompiler.
+// The handler performs the closed runtime check while this transform preserves
+// the required string-or-null command field in the inferred Eden contract.
+const publicationBaselineContract = t
+  .Transform(t.Any())
+  .Decode((value): string | null => value as string | null)
+  .Encode((value) => value);
+
+function logPublicationFailure(
+  operation: "preview" | "publish",
+  error: unknown,
+  request: Request,
+): void {
+  const code = isPublicationWorkflowError(error)
+    ? error.code
+    : ("INTERNAL_ERROR" as const);
+  logPublicationWorkflowFailure({
+    requestId: requestIdFor(request),
+    operation,
+    status: code === "PUBLICATION_NOT_COMPLETED" ? 503 : 500,
+    code,
+  });
+}
 
 function getValidatedWorkerBindings() {
   const configuration = validateRuntimeBindings(env);
@@ -211,6 +234,20 @@ function createApi(getBindings: () => RuntimeBindings) {
     prefix: "/api",
     aot: false,
   })
+    .onError(({ code, request, status }) => {
+      const pathname = new URL(request.url).pathname;
+      if (
+        (code === "VALIDATION" || code === "PARSE") &&
+        /^\/api\/admin\/articles\/[^/]+\/(?:preview|publications)$/u.test(
+          pathname,
+        )
+      ) {
+        return status(400, {
+          status: "error" as const,
+          code: "REQUEST_INVALID" as const,
+        });
+      }
+    })
     .get("/", () => ({
       service: "briefly" as const,
       transport: "elysia" as const,
@@ -595,40 +632,60 @@ function createApi(getBindings: () => RuntimeBindings) {
             code: "AUTHENTICATION_REQUIRED" as const,
           });
 
-        const result = await renderSavedArticleDraft(
-          bindings.DB,
-          params.articleId,
-          (body as { version?: unknown })?.version,
-          {
-            resolveAsset: (assetId) =>
-              resolvePrivateAssetForRendering(
-                bindings.DB,
-                bindings.MEDIA_BUCKET,
-                bindings.APP_ORIGIN,
-                assetId,
-              ),
-          },
-        );
-        if (result.ok) return result.renderedDraft;
+        if (!Number.isInteger(body.draftVersion) || body.draftVersion < 1) {
+          return status(400, {
+            status: "error" as const,
+            code: "REQUEST_INVALID" as const,
+          });
+        }
+
+        let result: Awaited<ReturnType<typeof previewSavedDraft>>;
+        try {
+          result = await previewSavedDraft(
+            bindings.DB,
+            bindings.MEDIA_BUCKET,
+            bindings.APP_ORIGIN,
+            {
+              articleId: params.articleId,
+              draftVersion: body.draftVersion,
+            },
+          );
+        } catch (error) {
+          logPublicationFailure("preview", error, request);
+          if (isPublicationWorkflowError(error)) {
+            return status(
+              error.code === "PUBLICATION_NOT_COMPLETED" ? 503 : 500,
+              { status: "error" as const, code: error.code },
+            );
+          }
+          return status(500, {
+            status: "error" as const,
+            code: "INTERNAL_ERROR" as const,
+          });
+        }
+        if (result.ok) return result.value;
         if (result.reason === "not-found")
           return status(404, {
             status: "error" as const,
             code: "ARTICLE_NOT_FOUND" as const,
           });
-        if (result.reason === "version-conflict")
+        if (result.reason === "conflict")
           return status(409, {
             status: "error" as const,
-            code: "ARTICLE_DRAFT_VERSION_CONFLICT" as const,
+            code: "PUBLICATION_CONFLICT" as const,
           });
-        return status(400, {
-          status: "error" as const,
-          code: "ARTICLE_PREVIEW_INVALID" as const,
-          issues: result.issues ?? [],
-        });
+        if (result.reason === "invalid") {
+          return status(400, {
+            status: "error" as const,
+            code: "PUBLICATION_INVALID" as const,
+            issues: result.issues,
+          });
+        }
+        throw new Error("Unhandled Publication Workflow result");
       },
       {
         params: t.Object({ articleId: t.String({ format: "uuid" }) }),
-        body: t.Any(),
+        body: t.Object({ draftVersion: t.Number({ minimum: 1 }) }),
       },
     )
     .get(
@@ -666,22 +723,49 @@ function createApi(getBindings: () => RuntimeBindings) {
             code: "AUTHENTICATION_REQUIRED" as const,
           });
 
-        let result: Awaited<ReturnType<typeof publishArticle>>;
+        if (
+          !Number.isInteger(body.draftVersion) ||
+          body.draftVersion < 1 ||
+          !(
+            body.expectedCurrentPublicationId === null ||
+            (typeof body.expectedCurrentPublicationId === "string" &&
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+                body.expectedCurrentPublicationId,
+              ))
+          )
+        ) {
+          return status(400, {
+            status: "error" as const,
+            code: "REQUEST_INVALID" as const,
+          });
+        }
+
+        let result: Awaited<ReturnType<typeof publishSavedDraft>>;
         try {
-          result = await publishArticle(
+          result = await publishSavedDraft(
             bindings.DB,
             bindings.MEDIA_BUCKET,
             bindings.APP_ORIGIN,
-            params.articleId,
-            body.draftVersion,
+            {
+              articleId: params.articleId,
+              draftVersion: body.draftVersion,
+              expectedCurrentPublicationId: body.expectedCurrentPublicationId,
+            },
           );
-        } catch {
+        } catch (error) {
+          logPublicationFailure("publish", error, request);
+          if (isPublicationWorkflowError(error)) {
+            return status(
+              error.code === "PUBLICATION_NOT_COMPLETED" ? 503 : 500,
+              { status: "error" as const, code: error.code },
+            );
+          }
           return status(500, {
             status: "error" as const,
             code: "INTERNAL_ERROR" as const,
           });
         }
-        if (result.ok) return status(201, result.article);
+        if (result.ok) return status(201, result.value);
         if (result.reason === "invalid")
           return status(400, {
             status: "error" as const,
@@ -695,12 +779,15 @@ function createApi(getBindings: () => RuntimeBindings) {
           });
         return status(409, {
           status: "error" as const,
-          code: "ARTICLE_DRAFT_VERSION_CONFLICT" as const,
+          code: "PUBLICATION_CONFLICT" as const,
         });
       },
       {
         params: t.Object({ articleId: t.String({ format: "uuid" }) }),
-        body: t.Object({ draftVersion: t.Number({ minimum: 1 }) }),
+        body: t.Object({
+          draftVersion: t.Number({ minimum: 1 }),
+          expectedCurrentPublicationId: publicationBaselineContract,
+        }),
       },
     )
     .post(

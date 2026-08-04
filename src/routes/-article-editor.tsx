@@ -21,15 +21,18 @@ import {
   type ArticleCoverUsage,
   type ArticleDocument,
 } from "../articles/articles";
+import type { PublicationIssue } from "../articles/publication-workflow";
 import type { VideoProviderFacts } from "../articles/video-embeds";
 import type { AssetLibraryEntry, ReadyAsset } from "../assets/assets";
 import { AdminIcon } from "../components/admin/icons";
+import { publicationIssuesForSurface } from "../components/admin/publication-issues";
 import { getApiClient } from "./api.$";
 
 export interface ArticleEditorProps {
   title: string;
   document: ArticleDocument;
   cover: ArticleCoverUsage | null;
+  publicationIssues: PublicationIssue[];
   isDisabled: boolean;
   onTitleChange: (title: string) => void;
   onChange: (document: ArticleDocument) => void;
@@ -40,6 +43,7 @@ export function ArticleEditor({
   title,
   document,
   cover,
+  publicationIssues,
   isDisabled,
   onTitleChange,
   onChange,
@@ -53,6 +57,22 @@ export function ArticleEditor({
   const [activePanel, setActivePanel] = useState<
     "link" | "code" | "video" | "media" | null
   >(null);
+  const titlePublicationIssues = publicationIssuesForSurface(
+    publicationIssues,
+    "title",
+  );
+  const bodyPublicationIssues = publicationIssuesForSurface(
+    publicationIssues,
+    "body",
+  );
+  const coverPublicationIssues = publicationIssuesForSurface(
+    publicationIssues,
+    "cover",
+  );
+  const assetPublicationIssues = publicationIssuesForSurface(
+    publicationIssues,
+    "asset",
+  );
   const editor = useEditor({
     immediatelyRender: false,
     editable: !isDisabled,
@@ -378,7 +398,9 @@ export function ArticleEditor({
           value={title}
           onChange={(event) => onTitleChange(event.target.value)}
         />
+        <PublicationGuidance issues={titlePublicationIssues} />
         <EditorContent editor={editor} />
+        <PublicationGuidance issues={bodyPublicationIssues} />
       </article>
 
       <EditorToolModal
@@ -510,10 +532,29 @@ export function ArticleEditor({
           editor={activeEditor}
           editorRevision={editorRevision}
           cover={cover}
+          coverPublicationIssues={coverPublicationIssues}
+          assetPublicationIssues={assetPublicationIssues}
           onCoverChange={onCoverChange}
         />
       </EditorToolModal>
     </div>
+  );
+}
+
+function PublicationGuidance({
+  issues,
+}: Readonly<{ issues: PublicationIssue[] }>) {
+  if (issues.length === 0) return null;
+  return (
+    <ul
+      className="list-disc pl-5 text-sm"
+      role="alert"
+      style={{ color: "var(--danger-strong)" }}
+    >
+      {issues.map((issue) => (
+        <li key={`${issue.code}:${issue.path}`}>{issue.message}</li>
+      ))}
+    </ul>
   );
 }
 
@@ -824,11 +865,15 @@ function ArticleAssetAuthoring({
   editor,
   editorRevision,
   cover,
+  coverPublicationIssues,
+  assetPublicationIssues,
   onCoverChange,
 }: {
   editor: Editor;
   editorRevision: number;
   cover: ArticleCoverUsage | null;
+  coverPublicationIssues: PublicationIssue[];
+  assetPublicationIssues: PublicationIssue[];
   onCoverChange: (cover: ArticleCoverUsage | null) => void;
 }) {
   const [assets, setAssets] = useState<ReadyAsset[]>([]);
@@ -961,6 +1006,26 @@ function ArticleAssetAuthoring({
 
   return (
     <div className="editor-tool-panel space-y-4">
+      {coverPublicationIssues.length > 0 ? (
+        <Alert status="danger" role="alert">
+          <Alert.Content>
+            <Alert.Title>Cover needs attention</Alert.Title>
+            <Alert.Description>
+              <PublicationGuidance issues={coverPublicationIssues} />
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : null}
+      {assetPublicationIssues.length > 0 ? (
+        <Alert status="danger" role="alert">
+          <Alert.Content>
+            <Alert.Title>Referenced Asset needs attention</Alert.Title>
+            <Alert.Description>
+              <PublicationGuidance issues={assetPublicationIssues} />
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : null}
       <div className="space-y-1">
         <p className="text-sm text-default-500">
           Select or upload verified Assets from the library, then describe each

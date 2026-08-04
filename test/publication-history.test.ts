@@ -88,13 +88,14 @@ function publish(
   cookie: string,
   articleId: string,
   draftVersion: number,
+  expectedCurrentPublicationId: string | null,
 ): Promise<Response> {
   return SELF.fetch(
     `http://briefly.test/api/admin/articles/${articleId}/publications`,
     {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },
-      body: JSON.stringify({ draftVersion }),
+      body: JSON.stringify({ draftVersion, expectedCurrentPublicationId }),
     },
   );
 }
@@ -213,7 +214,9 @@ describe("Publication history and restore", () => {
       document: textDocument("First retained body"),
     });
     expect(firstSave.status).toBe(200);
-    expect((await publish(cookie, articleId, 2)).status).toBe(201);
+    const firstPublish = await publish(cookie, articleId, 2, null);
+    expect(firstPublish.status).toBe(201);
+    const firstReceipt = await firstPublish.json<{ publicationId: string }>();
 
     const autosave = await saveDraft(cookie, articleId, {
       version: 2,
@@ -239,7 +242,9 @@ describe("Publication history and restore", () => {
       document: textDocument("Second retained body"),
     });
     expect(secondSave.status).toBe(200);
-    expect((await publish(cookie, articleId, 4)).status).toBe(201);
+    expect(
+      (await publish(cookie, articleId, 4, firstReceipt.publicationId)).status,
+    ).toBe(201);
 
     const response = await listHistory(cookie, articleId);
 
@@ -308,12 +313,16 @@ describe("Publication history and restore", () => {
         })
       ).status,
     ).toBe(200);
-    const firstPublish = await publish(cookie, articleId, 2);
+    const firstPublish = await publish(cookie, articleId, 2, null);
     expect(firstPublish.status).toBe(201);
-    const firstPublic = await firstPublish.json<{
-      publishedAt: string;
-      updatedAt: string;
+    const firstReceipt = await firstPublish.json<{
+      publicationId: string;
+      article: {
+        publishedAt: string;
+        updatedAt: string;
+      };
     }>();
+    const firstPublic = firstReceipt.article;
 
     expect(
       (
@@ -336,7 +345,16 @@ describe("Publication history and restore", () => {
         })
       ).status,
     ).toBe(200);
-    expect((await publish(cookie, articleId, 3)).status).toBe(201);
+    const secondPublish = await publish(
+      cookie,
+      articleId,
+      3,
+      firstReceipt.publicationId,
+    );
+    expect(secondPublish.status).toBe(201);
+    const secondReceipt = await secondPublish.json<{
+      publicationId: string;
+    }>();
 
     const historyResponse = await listHistory(cookie, articleId);
     expect(historyResponse.status).toBe(200);
@@ -479,7 +497,7 @@ describe("Publication history and restore", () => {
       {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ version: 5 }),
+        body: JSON.stringify({ draftVersion: 5 }),
       },
     );
     expect(preview.status).toBe(200);
@@ -496,9 +514,16 @@ describe("Publication history and restore", () => {
     );
     expect(historyAfterRestore.hasUnpublishedChanges).toBe(true);
 
-    const republished = await publish(cookie, articleId, 5);
+    const republished = await publish(
+      cookie,
+      articleId,
+      5,
+      secondReceipt.publicationId,
+    );
     expect(republished.status).toBe(201);
-    expect(await republished.json()).toMatchObject({
+    expect(
+      (await republished.json<{ article: unknown }>()).article,
+    ).toMatchObject({
       title: "Historical title",
       slug: "historical-slug",
       summary: null,
@@ -546,7 +571,7 @@ describe("Publication history and restore", () => {
         })
       ).status,
     ).toBe(200);
-    expect((await publish(cookie, articleId, 2)).status).toBe(201);
+    expect((await publish(cookie, articleId, 2, null)).status).toBe(201);
     const history = await (
       await listHistory(cookie, articleId)
     ).json<ArticlePublicationHistory>();

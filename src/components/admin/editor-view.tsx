@@ -17,6 +17,10 @@ import type { ArticlePublicationHistoryEntry } from "../../articles/articles";
 import type { SiteSettings } from "../../site-settings/site-settings";
 import { SettingsField } from "./fields";
 import { AdminIcon } from "./icons";
+import {
+  publicationIssuesForSurface,
+  type PublicationIssueSurface,
+} from "./publication-issues";
 import { StatusChip } from "./status-chip";
 import type { ArticleWorkspace } from "./use-article-workspace";
 import { WorkspaceAlerts } from "./workspace-alerts";
@@ -266,6 +270,7 @@ export function EditorView({
                       title={selected.draft.title}
                       document={selected.draft.document}
                       cover={selected.draft.cover}
+                      publicationIssues={workspace.publicationIssues}
                       isDisabled={editorLocked}
                       onTitleChange={(title) =>
                         workspace.updateDraft({ title })
@@ -531,6 +536,10 @@ function EditorRail({
     hasCurrentPublication &&
     (workspace.hasUnsavedChanges || historyHasUnpublishedChanges);
   const cover = selected.draft.cover;
+  const issueMessages = (surface: PublicationIssueSurface) =>
+    publicationIssuesForSurface(workspace.publicationIssues, surface).map(
+      (issue) => issue.message,
+    );
 
   return (
     <aside
@@ -669,7 +678,11 @@ function EditorRail({
           <section className="rail-section">
             <h3>Basics</h3>
             <div className="field-stack">
-              <SettingsField label="Title" htmlFor="articleTitleRail">
+              <SettingsField
+                label="Title"
+                htmlFor="articleTitleRail"
+                issues={issueMessages("title")}
+              >
                 <Input
                   fullWidth
                   id="articleTitleRail"
@@ -683,6 +696,7 @@ function EditorRail({
                 label="Unicode slug (optional)"
                 htmlFor="articleSlug"
                 description="Saved as trimmed Unicode NFC; global uniqueness is case-insensitive."
+                issues={issueMessages("slug")}
               >
                 <Input
                   fullWidth
@@ -738,6 +752,7 @@ function EditorRail({
               <SettingsField
                 label="Byline override name (optional)"
                 htmlFor="articleBylineName"
+                issues={issueMessages("byline")}
               >
                 <Input
                   fullWidth
@@ -785,6 +800,7 @@ function EditorRail({
               <SettingsField
                 label="Language override (BCP 47, optional)"
                 htmlFor="articleLanguage"
+                issues={issueMessages("language")}
               >
                 <Input
                   fullWidth
@@ -812,6 +828,17 @@ function EditorRail({
           {/* ---- Cover ---- */}
           <section className="rail-section">
             <h3>Cover</h3>
+            {issueMessages("cover").length > 0 ? (
+              <ul
+                className="list-disc pl-5 small"
+                role="alert"
+                style={{ color: "var(--danger-strong)" }}
+              >
+                {issueMessages("cover").map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+            ) : null}
             {cover ? (
               <div className="cover-box">
                 <img src={`/media/private/${cover.assetId}`} alt={cover.alt} />

@@ -7,12 +7,14 @@ export function SettingsField({
   htmlFor,
   optional,
   description,
+  issues = [],
   children,
 }: Readonly<{
   label: string;
   htmlFor: string;
   optional?: string;
   description?: ReactNode;
+  issues?: readonly string[];
   children: ReactNode;
 }>) {
   return (
@@ -48,6 +50,21 @@ export function SettingsField({
         ) : null}
       </Label>
       {children}
+      {issues.length > 0 ? (
+        <ul
+          className="list-disc pl-5"
+          role="alert"
+          style={{
+            color: "var(--danger)",
+            fontSize: "var(--text-tiny)",
+            margin: 0,
+          }}
+        >
+          {issues.map((issue) => (
+            <li key={issue}>{issue}</li>
+          ))}
+        </ul>
+      ) : null}
       {description ? (
         <p
           style={{

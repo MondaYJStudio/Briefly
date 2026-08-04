@@ -265,7 +265,10 @@ describe("Asset reference protection and cleanup", () => {
       {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ draftVersion: 2 }),
+        body: JSON.stringify({
+          draftVersion: 2,
+          expectedCurrentPublicationId: null,
+        }),
       },
     );
     expect(published.status).toBe(201);
@@ -401,7 +404,10 @@ describe("Asset reference protection and cleanup", () => {
       {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ draftVersion: 2 }),
+        body: JSON.stringify({
+          draftVersion: 2,
+          expectedCurrentPublicationId: null,
+        }),
       },
     );
     expect(publication.status).toBe(201);
@@ -574,14 +580,17 @@ describe("Asset reference protection and cleanup", () => {
       {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ draftVersion: 2 }),
+        body: JSON.stringify({
+          draftVersion: 2,
+          expectedCurrentPublicationId: null,
+        }),
       },
       coordinatingHeadBucket,
     );
     expect(racedPublication.status).toBe(409);
     expect(await racedPublication.json()).toMatchObject({
       status: "error",
-      code: "ARTICLE_DRAFT_VERSION_CONFLICT",
+      code: "PUBLICATION_CONFLICT",
     });
     expect(publishRace.cleanup?.status).toBe(204);
     expect((await listAssets(cookie)).map(({ id }) => id)).not.toContain(

@@ -572,6 +572,36 @@ describe("Publication renderer", () => {
     });
   });
 
+  it("propagates Asset resolver exceptions to the Publication Workflow", async () => {
+    const resolverFailure = new Error("Asset resolver failed");
+
+    await expect(
+      renderPublication(
+        {
+          documentSchemaVersion: 1,
+          doc: {
+            type: "doc",
+            content: [
+              {
+                type: "figure",
+                attrs: {
+                  assetId: "asset-throw",
+                  alt: "Resolver failure",
+                  decorative: false,
+                },
+              },
+            ],
+          },
+        },
+        {
+          resolveAsset: async () => {
+            throw resolverFailure;
+          },
+        },
+      ),
+    ).rejects.toBe(resolverFailure);
+  });
+
   it.each([
     {
       label: "unknown node",

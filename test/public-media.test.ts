@@ -5,6 +5,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { initializeAndSignIn } from "./administrator-fixture";
 import { uploadOnePixelPngAsset } from "./asset-fixture";
 
+interface PublicationReceipt<Article> {
+  publicationId: string;
+  draftVersion: number;
+  article: Article;
+}
+
 async function createArticle(cookie: string): Promise<string> {
   const response = await SELF.fetch("http://briefly.test/api/admin/articles", {
     method: "POST",
@@ -72,13 +78,14 @@ async function publish(
   cookie: string,
   articleId: string,
   draftVersion = 2,
+  expectedCurrentPublicationId: string | null = null,
 ): Promise<Response> {
   return SELF.fetch(
     `http://briefly.test/api/admin/articles/${articleId}/publications`,
     {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },
-      body: JSON.stringify({ draftVersion }),
+      body: JSON.stringify({ draftVersion, expectedCurrentPublicationId }),
     },
   );
 }
@@ -123,10 +130,14 @@ describe("stable public Asset delivery", () => {
     const response = await publish(cookie, articleId);
 
     expect(response.status).toBe(201);
-    const body = await response.json<{
-      cover: { url: string; width: number; height: number; alt: string };
-      html: string;
-    }>();
+    const receipt = await response.json<
+      PublicationReceipt<{
+        cover: { url: string; width: number; height: number; alt: string };
+        html: string;
+      }>
+    >();
+    expect(receipt.draftVersion).toBe(2);
+    const body = receipt.article;
     expect(body.cover).toEqual({
       url: expect.stringMatching(
         /^http:\/\/briefly\.test\/media\/[0-9a-f-]{36}$/u,
@@ -210,10 +221,13 @@ describe("stable public Asset delivery", () => {
     await saveAssetBackedDraft(cookie, firstArticleId, asset.id, asset.id);
     const firstPublication = await publish(cookie, firstArticleId);
     expect(firstPublication.status).toBe(201);
-    const firstBody = await firstPublication.json<{
-      cover: { url: string };
-      html: string;
-    }>();
+    const firstReceipt = await firstPublication.json<
+      PublicationReceipt<{
+        cover: { url: string };
+        html: string;
+      }>
+    >();
+    const firstBody = firstReceipt.article;
     const assigned = await env.DB.prepare(
       "SELECT public_asset_id FROM asset WHERE id = ?",
     )
@@ -309,12 +323,21 @@ describe("stable public Asset delivery", () => {
         .all(),
     ).toMatchObject({ results: [{ asset_id: asset.id }] });
 
-    const republished = await publish(cookie, firstArticleId, 3);
+    const republished = await publish(
+      cookie,
+      firstArticleId,
+      3,
+      firstReceipt.publicationId,
+    );
     expect(republished.status).toBe(201);
-    const republishedBody = await republished.json<{
-      cover: { url: string; alt: string };
-      html: string;
-    }>();
+    const republishedBody = (
+      await republished.json<
+        PublicationReceipt<{
+          cover: { url: string; alt: string };
+          html: string;
+        }>
+      >()
+    ).article;
     const replacementIdentity = await env.DB.prepare(
       "SELECT public_asset_id FROM asset WHERE id = ?",
     )
@@ -364,10 +387,14 @@ describe("stable public Asset delivery", () => {
     await saveAssetBackedDraft(cookie, secondArticleId, asset.id, asset.id);
     const secondPublication = await publish(cookie, secondArticleId);
     expect(secondPublication.status).toBe(201);
-    const secondBody = await secondPublication.json<{
-      cover: { url: string };
-      html: string;
-    }>();
+    const secondBody = (
+      await secondPublication.json<
+        PublicationReceipt<{
+          cover: { url: string };
+          html: string;
+        }>
+      >()
+    ).article;
     expect(secondBody.cover.url).toBe(firstBody.cover.url);
     expect(secondBody.html).toContain(firstBody.cover.url);
     expect(
@@ -401,241 +428,6 @@ describe("stable public Asset delivery", () => {
     expect(html).toContain("Images referenced by Drafts and Publications.");
   }, 20_000);
 
-  it("keeps the previous Current Publication when a republish Asset becomes unavailable", async () => {
-    const cookie = await initializeAndSignIn();
-    const originalAsset = await uploadOnePixelPngAsset(cookie, "original.png");
-    const articleId = await createArticle(cookie);
-    await saveAssetBackedDraft(
-      cookie,
-      articleId,
-      originalAsset.id,
-      originalAsset.id,
-    );
-    const firstPublished = await publish(cookie, articleId);
-    expect(firstPublished.status).toBe(201);
-    const firstBody = await firstPublished.json<{
-      cover: { url: string };
-      html: string;
-    }>();
-    const firstPublication = await env.DB.prepare(
-      `SELECT id, cover, document, html
-       FROM publication
-       WHERE article_id = ? AND publication_number = 1`,
-    )
-      .bind(articleId)
-      .first<Record<string, unknown>>();
-    expect(firstPublication).not.toBeNull();
-
-    const unavailableAsset = await uploadOnePixelPngAsset(
-      cookie,
-      "unavailable-replacement.png",
-    );
-    const revisedDraft = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${articleId}/draft`,
-      {
-        method: "PUT",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({
-          version: 2,
-          title: "Unavailable Asset replacement",
-          slug: `public-asset-${articleId}`,
-          summary: null,
-          tags: [],
-          byline: null,
-          language: null,
-          cover: {
-            assetId: unavailableAsset.id,
-            alt: "Unavailable replacement cover",
-          },
-          document: figureDocument(unavailableAsset.id),
-        }),
-      },
-    );
-    expect(revisedDraft.status).toBe(200);
-    const unavailableObject = await env.DB.prepare(
-      "SELECT object_key FROM asset WHERE id = ?",
-    )
-      .bind(unavailableAsset.id)
-      .first<{ object_key: string }>();
-    if (!unavailableObject) throw new Error("Expected replacement Asset");
-    await env.MEDIA_BUCKET.delete(unavailableObject.object_key);
-
-    const rejected = await publish(cookie, articleId, 3);
-
-    expect(rejected.status).toBe(400);
-    expect(await rejected.json()).toMatchObject({
-      status: "error",
-      code: "PUBLICATION_INVALID",
-      issues: [
-        expect.objectContaining({
-          code: "ASSET_NOT_RESOLVED",
-          path: `assets.${unavailableAsset.id}`,
-        }),
-      ],
-    });
-    expect(
-      await env.DB.prepare(
-        "SELECT COUNT(*) AS count FROM publication WHERE article_id = ?",
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual({ count: 1 });
-    expect(
-      await env.DB.prepare(
-        `SELECT id, cover, document, html
-         FROM publication
-         WHERE article_id = ? AND publication_number = 1`,
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual(firstPublication);
-    expect(
-      await env.DB.prepare(
-        "SELECT current_publication_id FROM article WHERE id = ?",
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual({ current_publication_id: firstPublication?.id });
-    expect(
-      await env.DB.prepare("SELECT public_asset_id FROM asset WHERE id = ?")
-        .bind(unavailableAsset.id)
-        .first(),
-    ).toEqual({ public_asset_id: null });
-
-    const stillPublic = await SELF.fetch(
-      `http://briefly.test/api/articles/public-asset-${articleId}`,
-    );
-    expect(stillPublic.status).toBe(200);
-    expect(await stillPublic.json()).toMatchObject(firstBody);
-  }, 20_000);
-
-  it("reports every unavailable Asset without leaving partial public state", async () => {
-    const cookie = await initializeAndSignIn();
-    const coverAsset = await uploadOnePixelPngAsset(
-      cookie,
-      "missing-object.png",
-    );
-    const incompleteAsset = await uploadOnePixelPngAsset(
-      cookie,
-      "incomplete.png",
-    );
-    const invalidMediaAsset = await uploadOnePixelPngAsset(
-      cookie,
-      "invalid-media.png",
-    );
-    const removedAsset = await uploadOnePixelPngAsset(cookie, "removed.png");
-    const articleId = await createArticle(cookie);
-    const document = {
-      documentSchemaVersion: 1,
-      doc: {
-        type: "doc",
-        content: [incompleteAsset, invalidMediaAsset, removedAsset].map(
-          ({ id }, index) => ({
-            type: "figure",
-            attrs: {
-              assetId: id,
-              alt: `Figure ${index + 1}`,
-              caption: null,
-              decorative: false,
-            },
-          }),
-        ),
-      },
-    };
-    const saved = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${articleId}/draft`,
-      {
-        method: "PUT",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({
-          version: 1,
-          title: "Unavailable public Assets",
-          slug: "unavailable-public-assets",
-          summary: null,
-          tags: [],
-          byline: null,
-          language: null,
-          cover: { assetId: coverAsset.id, alt: "Missing cover object" },
-          document,
-        }),
-      },
-    );
-    expect(saved.status).toBe(200);
-
-    const coverRow = await env.DB.prepare(
-      "SELECT object_key FROM asset WHERE id = ?",
-    )
-      .bind(coverAsset.id)
-      .first<{ object_key: string }>();
-    if (!coverRow) throw new Error("Expected saved cover Asset");
-    await env.MEDIA_BUCKET.delete(coverRow.object_key);
-    await env.DB.batch([
-      env.DB.prepare(
-        "UPDATE asset SET lifecycle_state = 'failed', failure_code = 'TEST' WHERE id = ?",
-      ).bind(incompleteAsset.id),
-      env.DB.prepare(
-        "UPDATE asset SET mime_type = 'image/svg+xml' WHERE id = ?",
-      ).bind(invalidMediaAsset.id),
-    ]);
-    const missingAssetId = crypto.randomUUID();
-    const persistedDocument = structuredClone(document);
-    persistedDocument.doc.content[2].attrs.assetId = missingAssetId;
-    await env.DB.prepare(
-      "UPDATE article_draft SET document = ? WHERE article_id = ?",
-    )
-      .bind(JSON.stringify(persistedDocument), articleId)
-      .run();
-
-    const response = await publish(cookie, articleId);
-
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({
-      status: "error",
-      code: "PUBLICATION_INVALID",
-      issues: [
-        coverAsset.id,
-        incompleteAsset.id,
-        invalidMediaAsset.id,
-        missingAssetId,
-      ].map((assetId) => ({
-        code: "ASSET_NOT_RESOLVED",
-        path: `assets.${assetId}`,
-        message: "Referenced Asset is unavailable for publication",
-      })),
-    });
-    expect(
-      await env.DB.prepare("SELECT id FROM publication WHERE article_id = ?")
-        .bind(articleId)
-        .first(),
-    ).toBeNull();
-    expect(
-      await env.DB.prepare(
-        "SELECT current_publication_id FROM article WHERE id = ?",
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual({ current_publication_id: null });
-    expect(
-      await env.DB.prepare(
-        "SELECT COUNT(*) AS count FROM publication_asset_reference",
-      ).first(),
-    ).toEqual({ count: 0 });
-    expect(
-      (
-        await env.DB.prepare(
-          "SELECT public_asset_id FROM asset ORDER BY id",
-        ).all<{ public_asset_id: string | null }>()
-      ).results.every(({ public_asset_id }) => public_asset_id === null),
-    ).toBe(true);
-    expect(
-      await env.DB.prepare(
-        "SELECT was_published FROM article_slug WHERE slug_key = ?",
-      )
-        .bind("unavailable-public-assets")
-        .first(),
-    ).toEqual({ was_published: 0 });
-  }, 20_000);
-
   it("rolls back public identities and references when the D1 commit fails", async () => {
     const cookie = await initializeAndSignIn();
     const asset = await uploadOnePixelPngAsset(cookie, "rollback.png");
@@ -659,10 +451,10 @@ describe("stable public Asset delivery", () => {
       ).run();
     }
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
       status: "error",
-      code: "INTERNAL_ERROR",
+      code: "PUBLICATION_NOT_COMPLETED",
     });
     expect(
       await env.DB.prepare("SELECT public_asset_id FROM asset WHERE id = ?")

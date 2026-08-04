@@ -94,7 +94,10 @@ async function createPublishedArticle(
     {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },
-      body: JSON.stringify({ draftVersion: 2 }),
+      body: JSON.stringify({
+        draftVersion: 2,
+        expectedCurrentPublicationId: null,
+      }),
     },
   );
   expect(published.status).toBe(201);
@@ -385,8 +388,8 @@ describe("Article unpublish", () => {
         document: figureDocument(asset.id),
       },
     );
-    const publicArticle = await publication.json<{
-      cover: { url: string };
+    const { article: publicArticle } = await publication.json<{
+      article: { cover: { url: string } };
     }>();
     const publicMediaBefore = await SELF.fetch(publicArticle.cover.url);
     expect(publicMediaBefore.status).toBe(200);
@@ -568,17 +571,22 @@ describe("Article unpublish", () => {
       {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ draftVersion: 3 }),
+        body: JSON.stringify({
+          draftVersion: 3,
+          expectedCurrentPublicationId: null,
+        }),
       },
     );
 
     expect(publishedAgain.status).toBe(201);
-    const laterPublic = await publishedAgain.json<{
-      slug: string;
-      title: string;
-      publishedAt: string;
-      updatedAt: string;
-      html: string;
+    const { article: laterPublic } = await publishedAgain.json<{
+      article: {
+        slug: string;
+        title: string;
+        publishedAt: string;
+        updatedAt: string;
+        html: string;
+      };
     }>();
     expect(laterPublic).toMatchObject({
       slug: "after-withdrawal",

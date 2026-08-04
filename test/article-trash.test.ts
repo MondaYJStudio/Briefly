@@ -79,13 +79,14 @@ async function publish(
   cookie: string,
   articleId: string,
   draftVersion: number,
+  expectedCurrentPublicationId: string | null,
 ): Promise<Response> {
   return SELF.fetch(
     `http://briefly.test/api/admin/articles/${articleId}/publications`,
     {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },
-      body: JSON.stringify({ draftVersion }),
+      body: JSON.stringify({ draftVersion, expectedCurrentPublicationId }),
     },
   );
 }
@@ -146,7 +147,8 @@ describe("Article Trash and restore", () => {
       slug: "formerly-public-article",
     });
     expect(
-      (await publish(cookie, published.id, published.draftVersion)).status,
+      (await publish(cookie, published.id, published.draftVersion, null))
+        .status,
     ).toBe(201);
     const draftOnly = await createSavedArticle(cookie, {
       title: "Draft-only Article",
@@ -271,10 +273,11 @@ describe("Article Trash and restore", () => {
       cookie,
       original.id,
       original.draftVersion,
+      null,
     );
     expect(firstPublication.status).toBe(201);
-    const firstPublic = await firstPublication.json<{
-      cover: { url: string };
+    const { article: firstPublic } = await firstPublication.json<{
+      article: { cover: { url: string } };
     }>();
 
     const revisedDraft = await SELF.fetch(
@@ -399,9 +402,11 @@ describe("Article Trash and restore", () => {
       ).toBe(404);
     }
 
-    const publishedAgain = await publish(cookie, original.id, 3);
+    const publishedAgain = await publish(cookie, original.id, 3, null);
     expect(publishedAgain.status).toBe(201);
-    expect(await publishedAgain.json()).toMatchObject({
+    expect(
+      (await publishedAgain.json<{ article: unknown }>()).article,
+    ).toMatchObject({
       slug: "restored-and-published-again",
       title: "Recoverable unpublished changes",
       html: expect.stringContaining("Recovered Draft body"),
@@ -432,7 +437,7 @@ describe("Article Trash and restore", () => {
       slug: "atomic-trash-restore",
     });
     expect(
-      (await publish(cookie, article.id, article.draftVersion)).status,
+      (await publish(cookie, article.id, article.draftVersion, null)).status,
     ).toBe(201);
     await env.DB.prepare(
       `CREATE TRIGGER reject_article_trash
@@ -546,7 +551,7 @@ describe("Article Trash and restore", () => {
       slug: "unavailable-while-trashed",
     });
     expect(
-      (await publish(cookie, article.id, article.draftVersion)).status,
+      (await publish(cookie, article.id, article.draftVersion, null)).status,
     ).toBe(201);
     const historyBefore = await (
       await SELF.fetch(
@@ -589,10 +594,10 @@ describe("Article Trash and restore", () => {
         {
           method: "POST",
           headers: { cookie, "content-type": "application/json" },
-          body: JSON.stringify({ version: 2 }),
+          body: JSON.stringify({ draftVersion: 2 }),
         },
       ),
-      await publish(cookie, article.id, 2),
+      await publish(cookie, article.id, 2, null),
       await SELF.fetch(
         `http://briefly.test/api/admin/articles/${article.id}/publications`,
         { headers: { cookie } },

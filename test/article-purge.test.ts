@@ -58,16 +58,18 @@ async function publish(
   cookie: string,
   articleId: string,
   draftVersion: number,
+  expectedCurrentPublicationId: string | null,
 ) {
   const published = await SELF.fetch(
     `http://briefly.test/api/admin/articles/${articleId}/publications`,
     {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },
-      body: JSON.stringify({ draftVersion }),
+      body: JSON.stringify({ draftVersion, expectedCurrentPublicationId }),
     },
   );
   expect(published.status).toBe(201);
+  return (await published.json<{ publicationId: string }>()).publicationId;
 }
 
 async function trashArticle(cookie: string, articleId: string) {
@@ -124,9 +126,9 @@ describe("Article purge", () => {
     const cookie = await initializeAndSignIn();
     const article = await createArticle(cookie);
     await saveDraft(cookie, article.id, 1, "First-Caf\u00e9", "First title");
-    await publish(cookie, article.id, 2);
+    const firstPublicationId = await publish(cookie, article.id, 2, null);
     await saveDraft(cookie, article.id, 2, "second-slug", "Second title");
-    await publish(cookie, article.id, 3);
+    await publish(cookie, article.id, 3, firstPublicationId);
     await saveDraft(cookie, article.id, 3, "never-public", "Private revision");
     await trashArticle(cookie, article.id);
 
@@ -300,9 +302,9 @@ describe("Article purge", () => {
       expect(saved.status).toBe(200);
     };
     await saveWithAsset(1, "retained-one", "Secret title one");
-    await publish(cookie, article.id, 2);
+    const firstPublicationId = await publish(cookie, article.id, 2, null);
     await saveWithAsset(2, "retained-two", "Secret title two");
-    await publish(cookie, article.id, 3);
+    await publish(cookie, article.id, 3, firstPublicationId);
     await trashArticle(cookie, article.id);
 
     const purged = await purgeArticle(cookie, article.id);
@@ -354,7 +356,7 @@ describe("Article purge", () => {
     const cookie = await initializeAndSignIn();
     const article = await createArticle(cookie);
     await saveDraft(cookie, article.id, 1, "atomic-purge", "Atomic title");
-    await publish(cookie, article.id, 2);
+    await publish(cookie, article.id, 2, null);
     await trashArticle(cookie, article.id);
     await env.DB.prepare(
       `CREATE TRIGGER reject_article_purge
@@ -405,7 +407,7 @@ describe("Article purge", () => {
     const cookie = await initializeAndSignIn();
     const original = await createArticle(cookie);
     await saveDraft(cookie, original.id, 1, "Caf\u00e9", "Original");
-    await publish(cookie, original.id, 2);
+    await publish(cookie, original.id, 2, null);
     await trashArticle(cookie, original.id);
 
     const concurrent = await createArticle(cookie);

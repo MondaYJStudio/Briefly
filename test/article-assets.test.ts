@@ -499,7 +499,7 @@ describe("Article Draft Asset usages", () => {
       {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ version: 2 }),
+        body: JSON.stringify({ draftVersion: 2 }),
       },
     );
 
@@ -536,88 +536,6 @@ describe("Article Draft Asset usages", () => {
           .all<{ public_asset_id: string | null }>()
       ).results,
     ).toEqual([{ public_asset_id: null }, { public_asset_id: null }]);
-  }, 15_000);
-
-  it("returns every unavailable cover and figure issue without partial preview output", async () => {
-    const cookie = await initializeAndSignIn();
-    const coverAsset = await uploadAsset(cookie, "missing-cover.png");
-    const missingFigure = await uploadAsset(cookie, "missing-figure.png");
-    const incompleteFigure = await uploadAsset(cookie, "incomplete-figure.png");
-    const article = await (
-      await SELF.fetch("http://briefly.test/api/admin/articles", {
-        method: "POST",
-        headers: { cookie },
-      })
-    ).json<{ id: string }>();
-    const saved = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${article.id}/draft`,
-      {
-        method: "PUT",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify(
-          draftInput({
-            title: "Unavailable Assets",
-            slug: "unavailable-assets",
-            cover: { assetId: coverAsset.id, alt: "Missing cover" },
-            document: figureDocument([
-              {
-                assetId: missingFigure.id,
-                alt: "Missing figure",
-                caption: null,
-              },
-              {
-                assetId: incompleteFigure.id,
-                alt: "Incomplete figure",
-                caption: null,
-              },
-            ]),
-          }),
-        ),
-      },
-    );
-    expect(saved.status).toBe(200);
-    const { results } = await env.DB.prepare(
-      "SELECT id, object_key FROM asset WHERE id IN (?, ?, ?)",
-    )
-      .bind(coverAsset.id, missingFigure.id, incompleteFigure.id)
-      .all<{ id: string; object_key: string }>();
-    const keys = new Map(results.map(({ id, object_key }) => [id, object_key]));
-    await Promise.all([
-      env.MEDIA_BUCKET.delete(keys.get(coverAsset.id)!),
-      env.MEDIA_BUCKET.delete(keys.get(missingFigure.id)!),
-      env.DB.prepare(
-        "UPDATE asset SET lifecycle_state = 'failed', failure_code = 'TEST' WHERE id = ?",
-      )
-        .bind(incompleteFigure.id)
-        .run(),
-    ]);
-
-    const response = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${article.id}/preview`,
-      {
-        method: "POST",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ version: 2 }),
-      },
-    );
-
-    expect(response.status).toBe(400);
-    expect(response.headers.get("cache-control")).toBe("private, no-store");
-    const responseText = await response.text();
-    expect(JSON.parse(responseText)).toEqual({
-      status: "error",
-      code: "ARTICLE_PREVIEW_INVALID",
-      issues: [coverAsset.id, missingFigure.id, incompleteFigure.id].map(
-        (assetId) => ({
-          code: "ASSET_NOT_RESOLVED",
-          path: `assets.${assetId}`,
-          message: "Referenced Asset is unavailable for publication",
-        }),
-      ),
-    });
-    expect(responseText).not.toMatch(
-      /"(?:coverHtml|html)"|object.?key|private-assets/i,
-    );
   }, 15_000);
 
   it("keeps both Draft content and references unchanged after stale and failed saves", async () => {

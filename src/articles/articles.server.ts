@@ -167,19 +167,6 @@ const persistedArticle = persistedArticleBase.extend({
   }),
 });
 
-const articleDocumentEnvelope = z
-  .object({
-    documentSchemaVersion: z.number(),
-    doc: z.unknown(),
-  })
-  .passthrough();
-
-const persistedArticleForRendering = persistedArticleBase.extend({
-  document: persistedArticleDocument((input) =>
-    articleDocumentEnvelope.parse(input),
-  ),
-});
-
 type ArticleRow = z.input<typeof persistedArticle>;
 
 type ArticleDraftMetadata = Pick<
@@ -194,7 +181,7 @@ type ArticleDraftMetadata = Pick<
   | "cover"
 >;
 
-export class NonCanonicalArticleDraftMetadataError extends Error {
+class NonCanonicalArticleDraftMetadataError extends Error {
   constructor() {
     super("Article Draft metadata is not canonically persisted");
     this.name = "NonCanonicalArticleDraftMetadataError";
@@ -588,40 +575,6 @@ export async function readArticle(
     .bind(articleId)
     .first<ArticleRow>();
   return row ? articleFromRow(row) : null;
-}
-
-export interface ArticleDraftRenderingSource {
-  id: string;
-  draft: ArticleDraftMetadata & {
-    document: {
-      documentSchemaVersion: number;
-      doc: unknown;
-    };
-  };
-}
-
-export async function readArticleDraftForRendering(
-  database: D1Database,
-  articleId: string,
-): Promise<ArticleDraftRenderingSource | null> {
-  const row = await database
-    .prepare(
-      `${articleSelection}
-       WHERE article.id = ? AND article.trashed_at IS NULL
-       LIMIT 1`,
-    )
-    .bind(articleId)
-    .first<ArticleRow>();
-  if (!row) return null;
-
-  const persisted = persistedArticleForRendering.parse(row);
-  return {
-    id: persisted.id,
-    draft: {
-      ...articleDraftMetadataFromRow(persisted),
-      document: persisted.document,
-    },
-  };
 }
 
 export async function updateArticleDraft(

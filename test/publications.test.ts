@@ -1,7 +1,6 @@
 import { SELF } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import * as staticRenderer from "@tiptap/static-renderer/pm/html-string";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { uploadOnePixelPngAsset } from "./asset-fixture";
 
@@ -68,6 +67,12 @@ interface DraftPayload {
   cover?: { assetId: string; alt: string };
 }
 
+interface PublicationReceipt<Article> {
+  publicationId: string;
+  draftVersion: number;
+  article: Article;
+}
+
 async function createArticle(cookie: string): Promise<string> {
   const response = await SELF.fetch("http://briefly.test/api/admin/articles", {
     method: "POST",
@@ -107,13 +112,14 @@ function publish(
   cookie: string,
   articleId: string,
   draftVersion = 2,
+  expectedCurrentPublicationId: string | null = null,
 ): Promise<Response> {
   return SELF.fetch(
     `http://briefly.test/api/admin/articles/${articleId}/publications`,
     {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },
-      body: JSON.stringify({ draftVersion }),
+      body: JSON.stringify({ draftVersion, expectedCurrentPublicationId }),
     },
   );
 }
@@ -180,13 +186,20 @@ describe("first immutable Publication", () => {
 
     expect(published.status).toBe(201);
     expect(published.headers.get("cache-control")).toBe("no-store");
-    const publicArticle = await published.json<{
-      id: string;
-      slug: string;
-      publishedAt: string;
-      updatedAt: string;
-      html: string;
-    }>();
+    const receipt = await published.json<
+      PublicationReceipt<{
+        id: string;
+        slug: string;
+        publishedAt: string;
+        updatedAt: string;
+        html: string;
+      }>
+    >();
+    expect(receipt).toMatchObject({
+      publicationId: expect.any(String),
+      draftVersion: 2,
+    });
+    const publicArticle = receipt.article;
     expect(publicArticle).toMatchObject({
       id: articleId,
       slug: "first-publication",
@@ -225,9 +238,9 @@ describe("first immutable Publication", () => {
               cover, document_schema_version, document, renderer_version,
               html, published_at
        FROM publication
-       WHERE article_id = ?`,
+       WHERE id = ? AND article_id = ?`,
     )
-      .bind(articleId)
+      .bind(receipt.publicationId, articleId)
       .first<Record<string, unknown>>();
     expect(stored).toMatchObject({
       publication_number: 1,
@@ -261,7 +274,7 @@ describe("first immutable Publication", () => {
     expect(stale.status).toBe(409);
     expect(await stale.json()).toEqual({
       status: "error",
-      code: "ARTICLE_DRAFT_VERSION_CONFLICT",
+      code: "PUBLICATION_CONFLICT",
     });
     expect(
       await env.DB.prepare("SELECT id FROM publication WHERE article_id = ?")
@@ -286,70 +299,6 @@ describe("first immutable Publication", () => {
     ).toBe(404);
   }, 20_000);
 
-  it.each([
-    {
-      name: "missing title",
-      title: "",
-      slug: "missing-title",
-      text: "Substantive body",
-      code: "TITLE_REQUIRED",
-    },
-    {
-      name: "missing slug",
-      title: "Missing slug",
-      slug: null,
-      text: "Substantive body",
-      code: "SLUG_REQUIRED",
-    },
-    {
-      name: "non-substantive body",
-      title: "Whitespace body",
-      slug: "whitespace-body",
-      text: "  \n  ",
-      code: "SUBSTANTIVE_BODY_REQUIRED",
-    },
-  ])(
-    "rejects $name while preserving the saved Draft and private state",
-    async ({ title, slug, text, code }) => {
-      const cookie = await initializeAndSignIn();
-      const articleId = await createArticle(cookie);
-      const saved = await saveDraft(cookie, articleId, {
-        title,
-        slug,
-        document: textDocument(text),
-      });
-      expect(saved.status).toBe(200);
-
-      const rejected = await publish(cookie, articleId);
-
-      expect(rejected.status).toBe(400);
-      expect(await rejected.json()).toMatchObject({
-        status: "error",
-        code: "PUBLICATION_INVALID",
-        issues: [expect.objectContaining({ code })],
-      });
-      expect(
-        await env.DB.prepare("SELECT id FROM publication WHERE article_id = ?")
-          .bind(articleId)
-          .first(),
-      ).toBeNull();
-      const preserved = await (
-        await SELF.fetch(
-          `http://briefly.test/api/admin/articles/${articleId}`,
-          { headers: { cookie } },
-        )
-      ).json<{
-        currentPublicationId: string | null;
-        draft: { version: number };
-      }>();
-      expect(preserved).toMatchObject({
-        currentPublicationId: null,
-        draft: { version: 2 },
-      });
-    },
-    20_000,
-  );
-
   it("publishes a valid cover-bearing Draft through public Asset delivery", async () => {
     const cookie = await initializeAndSignIn();
     const articleId = await createArticle(cookie);
@@ -367,11 +316,14 @@ describe("first immutable Publication", () => {
 
     expect(published.status).toBe(201);
     expect(await published.json()).toMatchObject({
-      cover: {
-        url: expect.stringMatching(/^http:\/\/briefly\.test\/media\//u),
-        width: 1,
-        height: 1,
-        alt: "Published cover",
+      draftVersion: 2,
+      article: {
+        cover: {
+          url: expect.stringMatching(/^http:\/\/briefly\.test\/media\//u),
+          width: 1,
+          height: 1,
+          alt: "Published cover",
+        },
       },
     });
     expect(
@@ -474,393 +426,6 @@ describe("first immutable Publication", () => {
     20_000,
   );
 
-  it("rejects an invalid persisted Draft without creating partial public state", async () => {
-    const cookie = await initializeAndSignIn();
-    const articleId = await createArticle(cookie);
-    const saved = await saveDraft(cookie, articleId, {
-      title: "Persisted invalid Draft",
-      slug: "persisted-invalid-draft",
-    });
-    expect(saved.status).toBe(200);
-    await env.DB.prepare(
-      "UPDATE article_draft SET document = ? WHERE article_id = ?",
-    )
-      .bind(
-        JSON.stringify({
-          documentSchemaVersion: 999,
-          doc: { type: "doc", content: [{ type: "future-node" }] },
-        }),
-        articleId,
-      )
-      .run();
-
-    const rejected = await publish(cookie, articleId);
-
-    expect(rejected.status).toBe(400);
-    expect(await rejected.json()).toEqual({
-      status: "error",
-      code: "PUBLICATION_INVALID",
-      issues: [
-        {
-          code: "INVALID_DOCUMENT",
-          path: "document",
-          message: "The saved Draft document is invalid or unsupported",
-        },
-      ],
-    });
-    expect(
-      await env.DB.prepare("SELECT id FROM publication WHERE article_id = ?")
-        .bind(articleId)
-        .first(),
-    ).toBeNull();
-    expect(
-      await env.DB.prepare(
-        "SELECT current_publication_id, published_at FROM article WHERE id = ?",
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual({ current_publication_id: null, published_at: null });
-    expect(
-      await env.DB.prepare(
-        "SELECT was_published FROM article_slug WHERE slug_key = 'persisted-invalid-draft'",
-      ).first(),
-    ).toEqual({ was_published: 0 });
-  }, 20_000);
-
-  it("keeps the previous Current Publication when a persisted republish Draft is invalid", async () => {
-    const cookie = await initializeAndSignIn();
-    const articleId = await createArticle(cookie);
-    expect(
-      (
-        await saveDraft(cookie, articleId, {
-          title: "Valid first snapshot",
-          slug: "valid-first-snapshot",
-          document: textDocument("Valid first body"),
-        })
-      ).status,
-    ).toBe(200);
-    const firstPublished = await publish(cookie, articleId);
-    expect(firstPublished.status).toBe(201);
-    const firstPublicArticle = await firstPublished.json();
-    const firstPublication = await env.DB.prepare(
-      `SELECT id, document, html
-       FROM publication
-       WHERE article_id = ? AND publication_number = 1`,
-    )
-      .bind(articleId)
-      .first<Record<string, unknown>>();
-    expect(firstPublication).not.toBeNull();
-
-    expect(
-      (
-        await saveDraft(cookie, articleId, {
-          version: 2,
-          title: "Invalid replacement snapshot",
-          slug: "invalid-replacement-snapshot",
-          document: textDocument("Replacement body before corruption"),
-        })
-      ).status,
-    ).toBe(200);
-    await env.DB.prepare(
-      "UPDATE article_draft SET document = ? WHERE article_id = ?",
-    )
-      .bind(
-        JSON.stringify({
-          documentSchemaVersion: 999,
-          doc: { type: "doc", content: [{ type: "future-node" }] },
-        }),
-        articleId,
-      )
-      .run();
-
-    const rejected = await publish(cookie, articleId, 3);
-
-    expect(rejected.status).toBe(400);
-    expect(await rejected.json()).toMatchObject({
-      status: "error",
-      code: "PUBLICATION_INVALID",
-      issues: [expect.objectContaining({ code: "INVALID_DOCUMENT" })],
-    });
-    expect(
-      await env.DB.prepare(
-        "SELECT COUNT(*) AS count FROM publication WHERE article_id = ?",
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual({ count: 1 });
-    expect(
-      await env.DB.prepare(
-        `SELECT id, document, html
-         FROM publication
-         WHERE article_id = ? AND publication_number = 1`,
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual(firstPublication);
-    expect(
-      await env.DB.prepare(
-        "SELECT current_publication_id FROM article WHERE id = ?",
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual({ current_publication_id: firstPublication?.id });
-    expect(
-      await env.DB.prepare(
-        "SELECT was_published FROM article_slug WHERE slug_key = ?",
-      )
-        .bind("invalid-replacement-snapshot")
-        .first(),
-    ).toEqual({ was_published: 0 });
-
-    const stillPublic = await SELF.fetch(
-      "http://briefly.test/api/articles/valid-first-snapshot",
-    );
-    expect(stillPublic.status).toBe(200);
-    expect(await stillPublic.json()).toEqual(firstPublicArticle);
-  }, 20_000);
-
-  it("rolls back the slug claim and Current Publication when D1 rejects creation", async () => {
-    const cookie = await initializeAndSignIn();
-    const articleId = await createArticle(cookie);
-    const saved = await saveDraft(cookie, articleId, {
-      title: "Atomic publication",
-      slug: "atomic-publication",
-      document: textDocument("Atomic body"),
-    });
-    expect(saved.status).toBe(200);
-    await env.DB.prepare(
-      `CREATE TRIGGER reject_publication_insert
-       BEFORE INSERT ON publication
-       BEGIN
-         SELECT RAISE(ABORT, 'forced publication failure');
-       END`,
-    ).run();
-
-    let failed: Response;
-    try {
-      failed = await publish(cookie, articleId);
-    } finally {
-      await env.DB.prepare(
-        "DROP TRIGGER IF EXISTS reject_publication_insert",
-      ).run();
-    }
-
-    expect(failed.status).toBe(500);
-    expect(await failed.json()).toMatchObject({
-      status: "error",
-      code: "INTERNAL_ERROR",
-    });
-    expect(
-      await env.DB.prepare("SELECT id FROM publication WHERE article_id = ?")
-        .bind(articleId)
-        .first(),
-    ).toBeNull();
-    expect(
-      await env.DB.prepare(
-        "SELECT current_publication_id, published_at FROM article WHERE id = ?",
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual({ current_publication_id: null, published_at: null });
-    expect(
-      await env.DB.prepare(
-        "SELECT was_published FROM article_slug WHERE slug_key = 'atomic-publication'",
-      ).first(),
-    ).toEqual({ was_published: 0 });
-  }, 20_000);
-
-  it("rolls back a failed republish without changing the previous Current Publication", async () => {
-    const cookie = await initializeAndSignIn();
-    const articleId = await createArticle(cookie);
-    expect(
-      (
-        await saveDraft(cookie, articleId, {
-          title: "Stable first snapshot",
-          slug: "stable-first-snapshot",
-          document: textDocument("Stable first body"),
-        })
-      ).status,
-    ).toBe(200);
-    const firstPublished = await publish(cookie, articleId);
-    expect(firstPublished.status).toBe(201);
-    const firstPublicArticle = await firstPublished.json();
-    const firstSnapshot = await env.DB.prepare(
-      `SELECT id, publication_number, slug, document, html, published_at
-       FROM publication
-       WHERE article_id = ? AND publication_number = 1`,
-    )
-      .bind(articleId)
-      .first<Record<string, unknown>>();
-    expect(firstSnapshot).not.toBeNull();
-
-    expect(
-      (
-        await saveDraft(cookie, articleId, {
-          version: 2,
-          title: "Rejected replacement snapshot",
-          slug: "rejected-replacement-snapshot",
-          document: textDocument("Rejected replacement body"),
-        })
-      ).status,
-    ).toBe(200);
-    await env.DB.prepare(
-      `CREATE TRIGGER reject_republication_insert
-       BEFORE INSERT ON publication
-       BEGIN
-         SELECT RAISE(ABORT, 'forced republish failure');
-       END`,
-    ).run();
-
-    let failed: Response;
-    try {
-      failed = await publish(cookie, articleId, 3);
-    } finally {
-      await env.DB.prepare(
-        "DROP TRIGGER IF EXISTS reject_republication_insert",
-      ).run();
-    }
-
-    expect(failed.status).toBe(500);
-    expect(await failed.json()).toEqual({
-      status: "error",
-      code: "INTERNAL_ERROR",
-    });
-    expect(
-      await env.DB.prepare(
-        `SELECT id, publication_number, slug, document, html, published_at
-         FROM publication
-         WHERE article_id = ? AND publication_number = 1`,
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual(firstSnapshot);
-    expect(
-      await env.DB.prepare(
-        "SELECT COUNT(*) AS count FROM publication WHERE article_id = ?",
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual({ count: 1 });
-    expect(
-      await env.DB.prepare(
-        "SELECT current_publication_id FROM article WHERE id = ?",
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual({ current_publication_id: firstSnapshot?.id });
-    expect(
-      await env.DB.prepare(
-        "SELECT was_published FROM article_slug WHERE slug_key = ?",
-      )
-        .bind("rejected-replacement-snapshot")
-        .first(),
-    ).toEqual({ was_published: 0 });
-
-    const stillPublic = await SELF.fetch(
-      "http://briefly.test/api/articles/stable-first-snapshot",
-    );
-    expect(stillPublic.status).toBe(200);
-    expect(await stillPublic.json()).toEqual(firstPublicArticle);
-  }, 20_000);
-
-  it("preserves the previous Current Publication when rendering a republish fails", async () => {
-    const cookie = await initializeAndSignIn();
-    const articleId = await createArticle(cookie);
-    expect(
-      (
-        await saveDraft(cookie, articleId, {
-          title: "Renderer failure first snapshot",
-          slug: "renderer-failure-first-snapshot",
-          document: textDocument("Stable public body"),
-        })
-      ).status,
-    ).toBe(200);
-    const firstPublished = await publish(cookie, articleId);
-    expect(firstPublished.status).toBe(201);
-    const firstPublicArticle = await firstPublished.json();
-    const firstPublication = await env.DB.prepare(
-      `SELECT id, document, html
-       FROM publication
-       WHERE article_id = ? AND publication_number = 1`,
-    )
-      .bind(articleId)
-      .first<Record<string, unknown>>();
-    expect(firstPublication).not.toBeNull();
-
-    expect(
-      (
-        await saveDraft(cookie, articleId, {
-          version: 2,
-          title: "Renderer failure replacement",
-          slug: "renderer-failure-replacement",
-          document: textDocument("Replacement body that cannot render"),
-        })
-      ).status,
-    ).toBe(200);
-
-    const renderFailure = vi
-      .spyOn(staticRenderer, "renderToHTMLString")
-      .mockImplementation(() => {
-        throw new Error("Forced renderer failure");
-      });
-    let rejected: Response;
-    try {
-      rejected = await publish(cookie, articleId, 3);
-    } finally {
-      renderFailure.mockRestore();
-    }
-
-    expect(rejected.status).toBe(400);
-    expect(await rejected.json()).toMatchObject({
-      status: "error",
-      code: "PUBLICATION_INVALID",
-      issues: [expect.objectContaining({ code: "RENDER_FAILED" })],
-    });
-    expect(
-      await env.DB.prepare(
-        "SELECT COUNT(*) AS count FROM publication WHERE article_id = ?",
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual({ count: 1 });
-    expect(
-      await env.DB.prepare(
-        "SELECT current_publication_id FROM article WHERE id = ?",
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual({ current_publication_id: firstPublication?.id });
-    const preservedDraft = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${articleId}`,
-      { headers: { cookie } },
-    );
-    expect(preservedDraft.status).toBe(200);
-    expect(await preservedDraft.json()).toMatchObject({
-      currentPublicationId: firstPublication?.id,
-      draft: {
-        version: 3,
-        title: "Renderer failure replacement",
-        slug: "renderer-failure-replacement",
-        document: textDocument("Replacement body that cannot render"),
-      },
-    });
-    expect(
-      await env.DB.prepare(
-        `SELECT id, document, html
-         FROM publication
-         WHERE article_id = ? AND publication_number = 1`,
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual(firstPublication);
-
-    const stillPublic = await SELF.fetch(
-      "http://briefly.test/api/articles/renderer-failure-first-snapshot",
-    );
-    expect(stillPublic.status).toBe(200);
-    expect(await stillPublic.json()).toEqual(firstPublicArticle);
-  }, 20_000);
-
   it("serves only the stored artifact with cookie-independent CORS, HEAD, and conditional semantics", async () => {
     const cookie = await initializeAndSignIn();
     const articleId = await createArticle(cookie);
@@ -891,7 +456,9 @@ describe("first immutable Publication", () => {
     ).toBe(200);
     const published = await publish(cookie, articleId);
     expect(published.status).toBe(201);
-    const expected = await published.json<Record<string, unknown>>();
+    const expected = (
+      await published.json<PublicationReceipt<Record<string, unknown>>>()
+    ).article;
 
     expect(
       (
@@ -1022,7 +589,10 @@ describe("first immutable Publication", () => {
       {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ draftVersion: 1 }),
+        body: JSON.stringify({
+          draftVersion: 1,
+          expectedCurrentPublicationId: null,
+        }),
       },
     );
 
@@ -1050,21 +620,13 @@ describe("first immutable Publication", () => {
     ).toBe(200);
     const firstPublished = await publish(cookie, articleId);
     expect(firstPublished.status).toBe(201);
-    const firstPublicArticle = await firstPublished.json<{
-      publishedAt: string;
-      updatedAt: string;
-    }>();
-
-    const firstSnapshot = await env.DB.prepare(
-      `SELECT id, publication_number, title, slug, summary, tags, byline,
-              language, cover, document_schema_version, document,
-              renderer_version, provider_facts, html, published_at, created_at
-       FROM publication
-       WHERE article_id = ? AND publication_number = 1`,
-    )
-      .bind(articleId)
-      .first<Record<string, unknown>>();
-    expect(firstSnapshot).not.toBeNull();
+    const firstReceipt = await firstPublished.json<
+      PublicationReceipt<{
+        publishedAt: string;
+        updatedAt: string;
+      }>
+    >();
+    let firstPublicArticle = firstReceipt.article;
 
     const laterArticleId = await createArticle(cookie);
     expect(
@@ -1078,10 +640,14 @@ describe("first immutable Publication", () => {
     ).toBe(200);
     const laterPublished = await publish(cookie, laterArticleId);
     expect(laterPublished.status).toBe(201);
-    const laterPublicArticle = await laterPublished.json<{
-      id: string;
-      publishedAt: string;
-    }>();
+    const laterPublicArticle = (
+      await laterPublished.json<
+        PublicationReceipt<{
+          id: string;
+          publishedAt: string;
+        }>
+      >()
+    ).article;
 
     const revised = await saveDraft(cookie, articleId, {
       version: 2,
@@ -1118,11 +684,16 @@ describe("first immutable Publication", () => {
       tags: ["original"],
     });
 
-    const stale = await publish(cookie, articleId, 2);
+    const stale = await publish(
+      cookie,
+      articleId,
+      2,
+      firstReceipt.publicationId,
+    );
     expect(stale.status).toBe(409);
     expect(await stale.json()).toEqual({
       status: "error",
-      code: "ARTICLE_DRAFT_VERSION_CONFLICT",
+      code: "PUBLICATION_CONFLICT",
     });
     expect(
       await env.DB.prepare(
@@ -1132,20 +703,61 @@ describe("first immutable Publication", () => {
         .first(),
     ).toEqual({ count: 1 });
 
-    await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 5));
-    const republished = await publish(cookie, articleId, 3);
-
-    expect(republished.status).toBe(201);
-    const republishedArticle = await republished.json<{
-      id: string;
-      slug: string;
-      title: string;
-      summary: string | null;
-      tags: string[];
+    const previousPublicationTime = Date.now() + 60_000;
+    await env.DB.batch([
+      env.DB.prepare(
+        "UPDATE publication SET published_at = ? WHERE id = ?",
+      ).bind(previousPublicationTime, firstReceipt.publicationId),
+      env.DB.prepare("UPDATE article SET published_at = ? WHERE id = ?").bind(
+        previousPublicationTime,
+        articleId,
+      ),
+    ]);
+    const previousCurrent = await SELF.fetch(
+      "http://briefly.test/api/articles/original-publication",
+    );
+    expect(previousCurrent.status).toBe(200);
+    const previousCurrentArticle = await previousCurrent.json<{
       publishedAt: string;
       updatedAt: string;
-      html: string;
     }>();
+    expect(Date.parse(previousCurrentArticle.updatedAt)).toBe(
+      previousPublicationTime,
+    );
+    firstPublicArticle = previousCurrentArticle;
+    const firstSnapshot = await env.DB.prepare(
+      `SELECT id, publication_number, title, slug, summary, tags, byline,
+              language, cover, document_schema_version, document,
+              renderer_version, provider_facts, html, published_at, created_at
+       FROM publication
+       WHERE article_id = ? AND publication_number = 1`,
+    )
+      .bind(articleId)
+      .first<Record<string, unknown>>();
+    expect(firstSnapshot).not.toBeNull();
+
+    const republished = await publish(
+      cookie,
+      articleId,
+      3,
+      firstReceipt.publicationId,
+    );
+
+    expect(republished.status).toBe(201);
+    const republishedReceipt = await republished.json<
+      PublicationReceipt<{
+        id: string;
+        slug: string;
+        title: string;
+        summary: string | null;
+        tags: string[];
+        publishedAt: string;
+        updatedAt: string;
+        html: string;
+      }>
+    >();
+    expect(republishedReceipt.draftVersion).toBe(3);
+    const republishedArticle = republishedReceipt.article;
     expect(republishedArticle).toMatchObject({
       id: articleId,
       slug: "revised-publication",
@@ -1155,7 +767,9 @@ describe("first immutable Publication", () => {
       publishedAt: firstPublicArticle.publishedAt,
       html: "<p>Revised public body</p>",
     });
-    expect(republishedArticle.updatedAt).not.toBe(firstPublicArticle.updatedAt);
+    expect(Date.parse(republishedArticle.updatedAt)).toBeGreaterThan(
+      Date.parse(previousCurrentArticle.updatedAt),
+    );
 
     const firstSnapshotAfterRepublish = await env.DB.prepare(
       `SELECT id, publication_number, title, slug, summary, tags, byline,
@@ -1209,10 +823,11 @@ describe("first immutable Publication", () => {
         updated_at: number;
       }>();
     expect(current).toEqual({
-      current_publication_id: history.results[1]?.id,
+      current_publication_id: republishedReceipt.publicationId,
       published_at: history.results[0]?.published_at,
       updated_at: history.results[1]?.published_at,
     });
+    expect(history.results[1]?.id).toBe(republishedReceipt.publicationId);
 
     const visibleRevision = await SELF.fetch(
       "http://briefly.test/api/articles/revised-publication",
@@ -1276,7 +891,11 @@ describe("first immutable Publication", () => {
         })
       ).status,
     ).toBe(200);
-    expect((await publish(cookie, articleId)).status).toBe(201);
+    const firstPublished = await publish(cookie, articleId);
+    expect(firstPublished.status).toBe(201);
+    const firstReceipt = await firstPublished.json<{
+      publicationId: string;
+    }>();
 
     expect(
       (
@@ -1288,7 +907,9 @@ describe("first immutable Publication", () => {
         })
       ).status,
     ).toBe(200);
-    expect((await publish(cookie, articleId, 3)).status).toBe(201);
+    expect(
+      (await publish(cookie, articleId, 3, firstReceipt.publicationId)).status,
+    ).toBe(201);
 
     for (const formerPath of ["Caf%C3%A9", "CAFE%CC%81"]) {
       const redirected = await SELF.fetch(

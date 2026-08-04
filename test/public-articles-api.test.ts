@@ -68,16 +68,14 @@ async function createArticle(
     {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },
-      body: JSON.stringify({ draftVersion: 2 }),
+      body: JSON.stringify({
+        draftVersion: 2,
+        expectedCurrentPublicationId: null,
+      }),
     },
   );
   expect(published.status).toBe(201);
-  const publicationId = await env.DB.prepare(
-    "SELECT current_publication_id FROM article WHERE id = ?",
-  )
-    .bind(id)
-    .first<string>("current_publication_id");
-  if (!publicationId) throw new Error("Expected a Current Publication");
+  const { publicationId } = await published.json<{ publicationId: string }>();
   return { id, publicationId };
 }
 
@@ -624,7 +622,10 @@ describe("public Article API", () => {
       {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ draftVersion: 3 }),
+        body: JSON.stringify({
+          draftVersion: 3,
+          expectedCurrentPublicationId: published.publicationId,
+        }),
       },
     );
     expect(republished.status).toBe(201);

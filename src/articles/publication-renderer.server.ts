@@ -9,13 +9,33 @@ import {
 } from "@tiptap/static-renderer/pm/html-string";
 import { z } from "zod";
 
-import type { ArticleCoverUsage, PublicationIssue } from "./articles";
+import type { ArticleCoverUsage } from "./articles";
 import { VIDEO_PROVIDER_IDENTIFIERS, type VideoProvider } from "./video-embeds";
-
-export type { PublicationIssue } from "./articles";
 
 const DOCUMENT_SCHEMA_VERSION = 1;
 export const PUBLICATION_RENDERER_VERSION = 3;
+
+export type PublicationRendererDiagnosticCode =
+  | "ASSET_NOT_RESOLVED"
+  | "FIGURE_ALT_REQUIRED"
+  | "INVALID_ASSET_IDENTITY"
+  | "INVALID_ASSET_RESOLUTION"
+  | "INVALID_COVER"
+  | "INVALID_DOCUMENT"
+  | "INVALID_DOCUMENT_STRUCTURE"
+  | "INVALID_HEADING_LEVEL"
+  | "INVALID_NODE_ATTRIBUTES"
+  | "INVALID_PROVIDER_IDENTIFIER"
+  | "UNSAFE_LINK"
+  | "UNSUPPORTED_DOCUMENT_SCHEMA_VERSION"
+  | "UNSUPPORTED_MARK"
+  | "UNSUPPORTED_NODE";
+
+export interface PublicationRendererDiagnostic {
+  code: PublicationRendererDiagnosticCode;
+  path: string;
+  message: string;
+}
 const VIDEO_PROVIDER_POLICIES = {
   youtube: {
     idPattern: VIDEO_PROVIDER_IDENTIFIERS.youtube,
@@ -390,8 +410,17 @@ export interface ResolvedPublicationAsset {
   delivery?: "private" | "public";
 }
 
+export interface UnsafePublicationAssetResolution {
+  assetId: string;
+  rejection: "unsafe";
+}
+
 export interface PublicationRendererDependencies {
-  resolveAsset: (assetId: string) => Promise<ResolvedPublicationAsset | null>;
+  resolveAsset: (
+    assetId: string,
+  ) => Promise<
+    ResolvedPublicationAsset | UnsafePublicationAssetResolution | null
+  >;
 }
 
 export type PublicationRenderResult =
@@ -405,7 +434,7 @@ export type PublicationRenderResult =
         referencedProviders: Array<{ provider: VideoProvider; id: string }>;
       };
     }
-  | { ok: false; issues: PublicationIssue[] };
+  | { ok: false; issues: PublicationRendererDiagnostic[] };
 
 export function renderPublication(
   document: VersionedPublicationDocument,
@@ -503,31 +532,16 @@ export async function renderPublication(
   const assetsById = new Map(
     resolvedAssets.assets.map((asset) => [asset.assetId, asset]),
   );
-  let html: string;
-
-  try {
-    html = renderToHTMLString({
-      content: node,
-      extensions,
-      options: {
-        nodeMapping: {
-          figure: ({ node: figure }) => renderFigure(figure.attrs, assetsById),
-          videoEmbed: ({ node: video }) => renderVideo(video.attrs),
-        },
+  const html = renderToHTMLString({
+    content: node,
+    extensions,
+    options: {
+      nodeMapping: {
+        figure: ({ node: figure }) => renderFigure(figure.attrs, assetsById),
+        videoEmbed: ({ node: video }) => renderVideo(video.attrs),
       },
-    });
-  } catch {
-    return {
-      ok: false,
-      issues: [
-        {
-          code: "RENDER_FAILED",
-          path: "doc",
-          message: "Publication HTML could not be rendered",
-        },
-      ],
-    };
-  }
+    },
+  });
 
   const value: Extract<PublicationRenderResult, { ok: true }>["value"] = {
     rendererVersion: PUBLICATION_RENDERER_VERSION,
@@ -694,18 +708,15 @@ async function resolveAssets(
   resolveAsset: PublicationRendererDependencies["resolveAsset"],
 ): Promise<
   | { ok: true; assets: ResolvedPublicationAsset[] }
-  | { ok: false; issues: PublicationIssue[] }
+  | { ok: false; issues: PublicationRendererDiagnostic[] }
 > {
   const resolutions = await Promise.all(
-    assetIds.map(async (assetId) => {
-      try {
-        return { assetId, asset: await resolveAsset(assetId) };
-      } catch {
-        return { assetId, asset: null };
-      }
-    }),
+    assetIds.map(async (assetId) => ({
+      assetId,
+      asset: await resolveAsset(assetId),
+    })),
   );
-  const issues: PublicationIssue[] = [];
+  const issues: PublicationRendererDiagnostic[] = [];
   const assets: ResolvedPublicationAsset[] = [];
 
   for (const resolution of resolutions) {
@@ -714,6 +725,14 @@ async function resolveAssets(
         code: "ASSET_NOT_RESOLVED",
         path: `assets.${resolution.assetId}`,
         message: "Referenced Asset is unavailable for publication",
+      });
+      continue;
+    }
+    if ("rejection" in resolution.asset) {
+      issues.push({
+        code: "INVALID_ASSET_RESOLUTION",
+        path: `assets.${resolution.assetId}`,
+        message: "Resolved Asset facts are not safe for publication",
       });
       continue;
     }

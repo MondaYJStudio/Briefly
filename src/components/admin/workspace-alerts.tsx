@@ -1,5 +1,6 @@
 import { Alert, Button, TextArea } from "@heroui/react";
 
+import { publicationIssueGuidance } from "./publication-issues";
 import type { ArticleWorkspace } from "./use-article-workspace";
 
 /**
@@ -18,12 +19,16 @@ export function WorkspaceAlerts({
     publishState,
     publicationAction,
     publicationIssues,
+    publicationReceipt,
+    publicationReconciliationState,
     unpublishState,
     trashActionState,
     lifecycleActionPending,
     persistCurrentDraft,
     reloadDraft,
     retryConflict,
+    retryPublishDraft,
+    acknowledgePublicationReconciliation,
     clearSelectedArticle,
   } = workspace;
 
@@ -209,6 +214,13 @@ export function WorkspaceAlerts({
               {publicationAction === "republished"
                 ? "The new immutable Publication is public now; earlier Publications remain unchanged."
                 : "A new immutable Publication is public now."}
+              {publicationReceipt ? (
+                <span className="block mt-2">
+                  Current Publication {publicationReceipt.publicationId} was
+                  confirmed from saved Draft Version{" "}
+                  {publicationReceipt.draftVersion}.
+                </span>
+              ) : null}
             </Alert.Description>
           </Alert.Content>
         </Alert>
@@ -219,7 +231,9 @@ export function WorkspaceAlerts({
             <Alert.Description>
               <ul className="list-disc pl-5">
                 {publicationIssues.map((issue) => (
-                  <li key={issue}>{issue}</li>
+                  <li key={`${issue.code}:${issue.path}`}>
+                    {publicationIssueGuidance(issue)}
+                  </li>
                 ))}
               </ul>
             </Alert.Description>
@@ -230,8 +244,92 @@ export function WorkspaceAlerts({
           <Alert.Content>
             <Alert.Title>Publication conflict</Alert.Title>
             <Alert.Description>
-              Reload the latest server-confirmed Draft Version before
-              publishing.
+              The saved Draft Version or observed Current Publication changed.
+              Briefly did not retry the command.
+              {publicationReconciliationState === "reconciled"
+                ? " Briefly reread the authoritative Article and public state. Review the refreshed state before publishing again."
+                : " Briefly could not fully reread the authoritative Article and public state. Reload it before publishing again."}
+              {publicationReconciliationState === "reconciled" ? (
+                <Button
+                  className="mt-2"
+                  type="button"
+                  variant="secondary"
+                  onPress={acknowledgePublicationReconciliation}
+                >
+                  Continue with refreshed state
+                </Button>
+              ) : (
+                <Button
+                  className="mt-2"
+                  type="button"
+                  variant="secondary"
+                  onPress={reloadDraft}
+                >
+                  Reload Article state
+                </Button>
+              )}
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : publishState === "not-completed" ? (
+        <Alert status="warning" role="alert">
+          <Alert.Content>
+            <Alert.Title>Publication was not completed</Alert.Title>
+            <Alert.Description>
+              The server confirmed that this Publish command made no public
+              change. Briefly will not retry it automatically.
+              <Button
+                className="mt-2"
+                type="button"
+                onPress={() => void retryPublishDraft()}
+              >
+                Retry this Publish command
+              </Button>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : publishState === "reconciling" ? (
+        <Alert status="warning" role="status">
+          <Alert.Content>
+            <Alert.Title>Checking publication state</Alert.Title>
+            <Alert.Description>
+              The Publish command is not being repeated. Briefly is rereading
+              the Article and its public state.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : publishState === "state-unconfirmed" ||
+        publishState === "transport-error" ? (
+        <Alert status="warning" role="alert">
+          <Alert.Content>
+            <Alert.Title>
+              {publishState === "state-unconfirmed"
+                ? "Publication outcome needs review"
+                : "Publish connection was interrupted"}
+            </Alert.Title>
+            <Alert.Description>
+              {publicationReconciliationState === "reconciled"
+                ? "Briefly reread the Article and its public endpoint. Review the refreshed Current Publication before issuing another Publish command."
+                : "Briefly could not fully reread the Article and public endpoint. Reload the authoritative Article state before issuing another Publish command."}
+              {publicationReconciliationState === "reconciled" ? (
+                <Button
+                  className="mt-2"
+                  type="button"
+                  variant="secondary"
+                  onPress={acknowledgePublicationReconciliation}
+                >
+                  Continue with refreshed state
+                </Button>
+              ) : (
+                <Button
+                  className="mt-2"
+                  type="button"
+                  variant="secondary"
+                  onPress={reloadDraft}
+                >
+                  Reload Article state
+                </Button>
+              )}
             </Alert.Description>
           </Alert.Content>
         </Alert>
@@ -239,7 +337,18 @@ export function WorkspaceAlerts({
         <Alert status="danger" role="alert">
           <Alert.Content>
             <Alert.Title>Unable to publish Article</Alert.Title>
-            <Alert.Description>Please try again.</Alert.Description>
+            <Alert.Description>
+              Briefly could not classify this failure safely. Reload the Article
+              state before trying another command.
+              <Button
+                className="mt-2"
+                type="button"
+                variant="secondary"
+                onPress={reloadDraft}
+              >
+                Reload Article state
+              </Button>
+            </Alert.Description>
           </Alert.Content>
         </Alert>
       ) : null}

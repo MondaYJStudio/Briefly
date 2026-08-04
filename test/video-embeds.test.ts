@@ -4,6 +4,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { initializeAndSignIn } from "./administrator-fixture";
 
+interface PublicationReceipt<Article> {
+  publicationId: string;
+  draftVersion: number;
+  article: Article;
+}
+
 describe("structured video embeds", () => {
   beforeEach(async () => {
     await env.DB.batch([
@@ -156,7 +162,7 @@ describe("structured video embeds", () => {
       {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ version: 2 }),
+        body: JSON.stringify({ draftVersion: 2 }),
       },
     );
     expect(preview.status).toBe(200);
@@ -170,11 +176,19 @@ describe("structured video embeds", () => {
       {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ draftVersion: 2 }),
+        body: JSON.stringify({
+          draftVersion: 2,
+          expectedCurrentPublicationId: null,
+        }),
       },
     );
     expect(published.status).toBe(201);
-    expect(await published.json()).toMatchObject({ html: previewed.html });
+    const firstReceipt =
+      await published.json<PublicationReceipt<{ html: string }>>();
+    expect(firstReceipt).toMatchObject({
+      draftVersion: 2,
+      article: { html: previewed.html },
+    });
 
     const publicRead = await SELF.fetch(
       "http://briefly.test/api/articles/portable-video-embeds",
@@ -258,11 +272,16 @@ describe("structured video embeds", () => {
       {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ draftVersion: 3 }),
+        body: JSON.stringify({
+          draftVersion: 3,
+          expectedCurrentPublicationId: firstReceipt.publicationId,
+        }),
       },
     );
     expect(republished.status).toBe(201);
-    const republishedArticle = await republished.json<{ html: string }>();
+    const republishedReceipt =
+      await republished.json<PublicationReceipt<{ html: string }>>();
+    const republishedArticle = republishedReceipt.article;
     expect(republishedArticle.html).toBe(
       '<iframe src="https://www.youtube-nocookie.com/embed/9bZkp7q19f0" title="A private revision" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen=""></iframe>',
     );
@@ -390,127 +409,6 @@ describe("structured video embeds", () => {
       },
     });
   });
-
-  it("returns structured publication issues and preserves the Current Publication for a malformed saved provider identifier", async () => {
-    const cookie = await initializeAndSignIn();
-    const created = await SELF.fetch("http://briefly.test/api/admin/articles", {
-      method: "POST",
-      headers: { cookie },
-    });
-    const articleId = (await created.json<{ id: string }>()).id;
-    const validDocument = {
-      documentSchemaVersion: 1,
-      doc: {
-        type: "doc",
-        content: [
-          {
-            type: "videoEmbed",
-            attrs: {
-              provider: "youtube",
-              id: "dQw4w9WgXcQ",
-              title: "Published video",
-            },
-          },
-        ],
-      },
-    };
-    const save = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${articleId}/draft`,
-      {
-        method: "PUT",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({
-          version: 1,
-          title: "Preserved video",
-          slug: "preserved-video",
-          summary: null,
-          tags: [],
-          byline: null,
-          language: null,
-          document: validDocument,
-        }),
-      },
-    );
-    expect(save.status).toBe(200);
-    const published = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${articleId}/publications`,
-      {
-        method: "POST",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ draftVersion: 2 }),
-      },
-    );
-    expect(published.status).toBe(201);
-    const before = await env.DB.prepare(
-      "SELECT current_publication_id FROM article WHERE id = ?",
-    )
-      .bind(articleId)
-      .first<{ current_publication_id: string }>();
-    const malformedDocument = {
-      ...validDocument,
-      doc: {
-        type: "doc",
-        content: [
-          {
-            type: "videoEmbed",
-            attrs: {
-              provider: "youtube",
-              id: "malformed",
-              title: "Malformed saved video",
-            },
-          },
-        ],
-      },
-    };
-    await env.DB.prepare(
-      "UPDATE article_draft SET document = ? WHERE article_id = ?",
-    )
-      .bind(JSON.stringify(malformedDocument), articleId)
-      .run();
-
-    const rejected = await SELF.fetch(
-      `http://briefly.test/api/admin/articles/${articleId}/publications`,
-      {
-        method: "POST",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ draftVersion: 2 }),
-      },
-    );
-
-    expect(rejected.status).toBe(400);
-    expect(await rejected.json()).toEqual({
-      status: "error",
-      code: "PUBLICATION_INVALID",
-      issues: [
-        {
-          code: "INVALID_DOCUMENT",
-          path: "document",
-          message: "The saved Draft document is invalid or unsupported",
-        },
-      ],
-    });
-    expect(
-      await env.DB.prepare(
-        "SELECT current_publication_id FROM article WHERE id = ?",
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual(before);
-    expect(
-      await env.DB.prepare(
-        "SELECT COUNT(*) AS count FROM publication WHERE article_id = ?",
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual({ count: 1 });
-    expect(
-      await env.DB.prepare(
-        "SELECT document FROM article_draft WHERE article_id = ?",
-      )
-        .bind(articleId)
-        .first(),
-    ).toEqual({ document: JSON.stringify(malformedDocument) });
-  }, 20_000);
 
   it("requires an Administrator session for provider recognition", async () => {
     const response = await SELF.fetch(

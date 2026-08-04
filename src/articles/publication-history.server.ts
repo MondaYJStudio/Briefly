@@ -27,8 +27,8 @@ import {
   type ArticleCoverUsage,
   type ArticleDocument,
   type ArticlePublicationHistory,
-  type PublicationIssue,
 } from "./articles";
+import type { PublicationRestorationIssue } from "./publication-restoration";
 import { articleSlugSchema } from "./article-slug";
 
 const historyRow = z.object({
@@ -81,7 +81,7 @@ interface RestorableDraft {
 
 type PublicationConversionResult =
   | { ok: true; draft: RestorableDraft }
-  | { ok: false; issues: PublicationIssue[] };
+  | { ok: false; issues: PublicationRestorationIssue[] };
 
 export type ListArticlePublicationHistoryResult =
   | { ok: true; history: ArticlePublicationHistory }
@@ -89,7 +89,7 @@ export type ListArticlePublicationHistoryResult =
 
 export type RestoreArticlePublicationResult =
   | { ok: true; article: Article }
-  | { ok: false; reason: "invalid"; issues: PublicationIssue[] }
+  | { ok: false; reason: "invalid"; issues: PublicationRestorationIssue[] }
   | {
       ok: false;
       reason:
@@ -206,7 +206,7 @@ function migratePublicationDocument(
   source: unknown,
 ):
   | { ok: true; document: ArticleDocument }
-  | { ok: false; issues: PublicationIssue[] } {
+  | { ok: false; issues: PublicationRestorationIssue[] } {
   if (storedSchemaVersion !== ARTICLE_DOCUMENT_SCHEMA_VERSION) {
     return {
       ok: false,
@@ -271,7 +271,7 @@ function sourceCoverUsage(
   references: z.output<typeof publicationReference>[],
 ):
   | { ok: true; cover: ArticleCoverUsage | null }
-  | { ok: false; issues: PublicationIssue[] } {
+  | { ok: false; issues: PublicationRestorationIssue[] } {
   if (input === null) return { ok: true, cover: null };
   const cover = publicationCover.safeParse(input);
   if (!cover.success) {

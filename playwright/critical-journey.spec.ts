@@ -8,6 +8,7 @@ const administratorPassword = "playwright-only-password";
 const originalTitle = "A durable first Publication";
 const revisedTitle = "A revised durable Publication";
 const postPublishDraftTitle = "A private post-publish Draft";
+const concurrentConflictDraftTitle = "A Draft edited during conflict";
 const slug = "critical-browser-journey";
 const originalBody = "The first immutable public body.";
 const revisedBody = "The revised immutable public body.";
@@ -17,10 +18,23 @@ const onePixelPng = Buffer.from(
 );
 
 interface PublicArticle {
+  id: string;
+  slug: string;
   title: string;
   publishedAt: string;
   updatedAt: string;
   html: string;
+}
+
+interface PublicationReceipt {
+  publicationId: string;
+  draftVersion: number;
+  article: PublicArticle;
+}
+
+interface PublishCommand {
+  draftVersion: number;
+  expectedCurrentPublicationId: string | null;
 }
 
 test("a first-time Administrator publishes, revises, and withdraws an Asset-backed Article", async ({
@@ -30,9 +44,26 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
   const anonymous = await browser.newContext({ baseURL: playwrightBaseUrl });
   const anonymousPage = await anonymous.newPage();
   const pressResponderWarnings: string[] = [];
+  const publicationPosts: PublishCommand[] = [];
+  const privateArticleReads: string[] = [];
   page.on("console", (message) => {
     if (message.text().includes("PressResponder was rendered without")) {
       pressResponderWarnings.push(message.text());
+    }
+  });
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (
+      request.method() === "POST" &&
+      /\/api\/admin\/articles\/[^/]+\/publications$/.test(pathname)
+    ) {
+      publicationPosts.push(request.postDataJSON() as PublishCommand);
+    }
+    if (
+      request.method() === "GET" &&
+      /\/api\/admin\/articles\/[^/]+$/.test(pathname)
+    ) {
+      privateArticleReads.push(pathname);
     }
   });
 
@@ -184,9 +215,12 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     ).toBeVisible();
 
     const preview = (await previewResponse.json()) as { draftVersion: number };
+    expect(previewResponse.request().postDataJSON()).toEqual({
+      draftVersion: preview.draftVersion,
+    });
     const anonymousPreview = await anonymous.request.post(
       new URL(previewResponse.url()).pathname,
-      { data: { version: preview.draftVersion } },
+      { data: { draftVersion: preview.draftVersion } },
     );
     expect(anonymousPreview.status()).toBe(401);
     expect(
@@ -198,6 +232,8 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
   });
 
   let firstPublication: PublicArticle;
+  let firstPublicationReceipt: PublicationReceipt;
+  let republishReceipt: PublicationReceipt;
   let publicMediaUrl: string;
   let releaseInitialHistory: (() => void) | undefined;
   let markInitialHistoryCaptured: (() => void) | undefined;
@@ -228,6 +264,14 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
       },
     );
 
+    const privateArticleReadsBeforePublish = privateArticleReads.length;
+    const publishResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        /\/api\/admin\/articles\/[^/]+\/publications$/.test(
+          new URL(response.url()).pathname,
+        ),
+    );
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     const confirmation = page.getByRole("alertdialog", {
       name: "Publish saved Draft?",
@@ -235,17 +279,34 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await confirmation
       .getByRole("button", { name: "Publish saved Draft" })
       .click();
+    const publishResponse = await publishResponsePromise;
+    expect(publishResponse.status()).toBe(201);
+    firstPublicationReceipt =
+      (await publishResponse.json()) as PublicationReceipt;
+    expect(publicationPosts).toEqual([
+      {
+        draftVersion: firstPublicationReceipt.draftVersion,
+        expectedCurrentPublicationId: null,
+      },
+    ]);
+    expect(firstPublicationReceipt.publicationId).toMatch(/^[0-9a-f-]{36}$/u);
+    expect(firstPublicationReceipt.article).toMatchObject({
+      title: originalTitle,
+      slug,
+      html: expect.stringContaining(originalBody),
+    });
     await expect(
       page.getByText("Article published", { exact: true }),
     ).toBeVisible();
+    await expect(
+      page.getByText(firstPublicationReceipt.publicationId, { exact: false }),
+    ).toBeVisible();
+    expect(privateArticleReads).toHaveLength(privateArticleReadsBeforePublish);
 
     const detail = await anonymous.request.get(`/api/articles/${slug}`);
     expect(detail.status()).toBe(200);
     firstPublication = (await detail.json()) as PublicArticle;
-    expect(firstPublication).toMatchObject({
-      title: originalTitle,
-      html: expect.stringContaining(originalBody),
-    });
+    expect(firstPublication).toEqual(firstPublicationReceipt.article);
     expect(firstPublication.publishedAt).toBe(firstPublication.updatedAt);
 
     const mediaMatch = firstPublication.html.match(/src="([^"]+)"/);
@@ -313,6 +374,14 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
       },
     );
 
+    const privateArticleReadsBeforeRepublish = privateArticleReads.length;
+    const republishResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        /\/api\/admin\/articles\/[^/]+\/publications$/.test(
+          new URL(response.url()).pathname,
+        ),
+    );
     await page.getByRole("button", { name: "Republish", exact: true }).click();
     const confirmation = page.getByRole("alertdialog", {
       name: "Republish saved Draft?",
@@ -339,9 +408,36 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
       failHistoryReloads = true;
       releaseRepublish?.();
     }
+    const republishResponse = await republishResponsePromise;
+    expect(republishResponse.status()).toBe(201);
+    republishReceipt = (await republishResponse.json()) as PublicationReceipt;
+    expect(publicationPosts).toEqual([
+      {
+        draftVersion: firstPublicationReceipt.draftVersion,
+        expectedCurrentPublicationId: null,
+      },
+      {
+        draftVersion: republishReceipt.draftVersion,
+        expectedCurrentPublicationId: firstPublicationReceipt.publicationId,
+      },
+    ]);
+    expect(republishReceipt.publicationId).not.toBe(
+      firstPublicationReceipt.publicationId,
+    );
+    expect(republishReceipt.article).toMatchObject({
+      title: revisedTitle,
+      slug,
+      html: expect.stringContaining(revisedBody),
+    });
     await expect(
       page.getByText("Article republished", { exact: true }),
     ).toBeVisible();
+    await expect(
+      page.getByText(republishReceipt.publicationId, { exact: false }),
+    ).toBeVisible();
+    expect(privateArticleReads).toHaveLength(
+      privateArticleReadsBeforeRepublish,
+    );
     await page.getByRole("tab", { name: /History/ }).click();
     await expect(
       page.getByText("Unable to load Publication History", { exact: true }),
@@ -369,6 +465,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     const detail = await anonymous.request.get(`/api/articles/${slug}`);
     expect(detail.status()).toBe(200);
     const republished = (await detail.json()) as PublicArticle;
+    expect(republished).toEqual(republishReceipt.article);
     expect(republished.title).toBe(revisedTitle);
     expect(republished.html).toContain(revisedBody);
     expect(republished.html).not.toContain(originalBody);
@@ -377,6 +474,347 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
       Date.parse(firstPublication.updatedAt),
     );
     expect(republished.html).toContain(publicMediaUrl);
+    expect(publicationPosts).toHaveLength(2);
+  });
+
+  await test.step("target canonical Publication Issues at their authoring surfaces", async () => {
+    const issueMessages = {
+      title: "Give this Article a Publication title.",
+      slug: "Choose a Publication slug.",
+      body: "Remove the unsupported body node.",
+      byline: "Provide a Publication byline.",
+      language: "Use a supported Publication language.",
+      cover: "Describe the Publication cover.",
+      asset: "Replace the unavailable referenced Asset.",
+    };
+    const publicationPostsBeforeValidation = publicationPosts.length;
+    await page.route(
+      /\/api\/admin\/articles\/[^/]+\/publications$/,
+      async (route) => {
+        await route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({
+            status: "error",
+            code: "PUBLICATION_INVALID",
+            issues: [
+              {
+                code: "REQUIRED",
+                path: "draft.title",
+                message: issueMessages.title,
+              },
+              {
+                code: "INVALID",
+                path: "draft.slug",
+                message: issueMessages.slug,
+              },
+              {
+                code: "UNSUPPORTED",
+                path: "draft.document.doc.content.0",
+                message: issueMessages.body,
+              },
+              {
+                code: "REQUIRED",
+                path: "draft.byline",
+                message: issueMessages.byline,
+              },
+              {
+                code: "INVALID",
+                path: "draft.language",
+                message: issueMessages.language,
+              },
+              {
+                code: "REQUIRED",
+                path: "draft.cover.alt",
+                message: issueMessages.cover,
+              },
+              {
+                code: "UNAVAILABLE",
+                path: `draft.assets.${firstPublicationReceipt.article.id}`,
+                message: issueMessages.asset,
+              },
+            ],
+          }),
+        });
+      },
+      { times: 1 },
+    );
+
+    await page.getByRole("button", { name: "Republish", exact: true }).click();
+    await page
+      .getByRole("alertdialog", { name: "Republish saved Draft?" })
+      .getByRole("button", { name: "Republish saved Draft" })
+      .click();
+
+    await expect(
+      page.getByText("Publication validation failed", { exact: true }),
+    ).toBeVisible();
+    expect(publicationPosts).toHaveLength(publicationPostsBeforeValidation + 1);
+
+    const writingSurface = page.getByLabel("Article writing surface");
+    await expect(
+      writingSurface.getByText(issueMessages.title, { exact: true }),
+    ).toBeVisible();
+    await expect(
+      writingSurface.getByText(issueMessages.body, { exact: true }),
+    ).toBeVisible();
+
+    const settingsRail = page.getByRole("complementary", {
+      name: "Article settings",
+    });
+    for (const message of [
+      issueMessages.title,
+      issueMessages.slug,
+      issueMessages.byline,
+      issueMessages.language,
+      issueMessages.cover,
+    ]) {
+      await expect(
+        settingsRail.getByText(message, { exact: true }),
+      ).toBeVisible();
+    }
+
+    await page
+      .getByRole("button", { name: "Insert image", exact: true })
+      .click();
+    const mediaDialog = page.getByRole("dialog", { name: "Insert image" });
+    await expect(
+      mediaDialog.getByText("Referenced Asset needs attention", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      mediaDialog.getByText(issueMessages.asset, { exact: true }),
+    ).toBeVisible();
+    await mediaDialog
+      .getByRole("button", { name: "Close insert image dialog" })
+      .click();
+  });
+
+  await test.step("reread a Publication Conflict without replaying Publish", async () => {
+    await page
+      .getByLabel("Article title", { exact: true })
+      .fill(`${postPublishDraftTitle} before conflict`);
+    await expect(
+      page.getByText("Unsaved changes", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText(/^Saved · Draft v\d+$/)).toBeVisible();
+
+    let releaseConflict: (() => void) | undefined;
+    let markConflictCaptured: (() => void) | undefined;
+    const conflictMayReturn = new Promise<void>((resolve) => {
+      releaseConflict = resolve;
+    });
+    const conflictCaptured = new Promise<void>((resolve) => {
+      markConflictCaptured = resolve;
+    });
+    await page.route(
+      /\/api\/admin\/articles\/[^/]+\/publications$/,
+      async (route) => {
+        markConflictCaptured?.();
+        await conflictMayReturn;
+        await route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({
+            status: "error",
+            code: "PUBLICATION_CONFLICT",
+          }),
+        });
+      },
+      { times: 1 },
+    );
+
+    const publicationPostsBeforeConflict = publicationPosts.length;
+    const articleReadsBeforeConflict = privateArticleReads.length;
+    await page.getByRole("button", { name: "Republish", exact: true }).click();
+    await page
+      .getByRole("alertdialog", { name: "Republish saved Draft?" })
+      .getByRole("button", { name: "Republish saved Draft" })
+      .click();
+    await conflictCaptured;
+    try {
+      await page
+        .getByLabel("Article title", { exact: true })
+        .fill(concurrentConflictDraftTitle);
+      await expect(
+        page.getByText("Unsaved changes", { exact: true }),
+      ).toBeVisible();
+      await expect(page.getByText(/^Saved · Draft v\d+$/)).toBeVisible();
+    } finally {
+      releaseConflict?.();
+    }
+
+    await expect(
+      page.getByText("Publication conflict", { exact: true }),
+    ).toBeVisible();
+    expect(privateArticleReads.length).toBeGreaterThan(
+      articleReadsBeforeConflict,
+    );
+    expect(publicationPosts).toHaveLength(publicationPostsBeforeConflict + 1);
+    await expect(page.getByLabel("Article title", { exact: true })).toHaveValue(
+      concurrentConflictDraftTitle,
+    );
+
+    await page
+      .getByRole("button", { name: "Continue with refreshed state" })
+      .click();
+    await expect(
+      page.getByText("Publication conflict", { exact: true }),
+    ).toHaveCount(0);
+    expect(publicationPosts).toHaveLength(publicationPostsBeforeConflict + 1);
+  });
+
+  await test.step("reconcile a transport failure without replaying Publish", async () => {
+    await page.route(
+      /\/api\/admin\/articles\/[^/]+\/publications$/,
+      async (route) => {
+        await route.abort("connectionreset");
+      },
+      { times: 1 },
+    );
+    const publicationPostsBeforeFailure = publicationPosts.length;
+
+    await page.getByRole("button", { name: "Republish", exact: true }).click();
+    await page
+      .getByRole("alertdialog", { name: "Republish saved Draft?" })
+      .getByRole("button", { name: "Republish saved Draft" })
+      .click();
+
+    await expect(
+      page.getByText("Publish connection was interrupted", { exact: true }),
+    ).toBeVisible();
+    expect(publicationPosts).toHaveLength(publicationPostsBeforeFailure + 1);
+    await expect(page.getByLabel("Article title", { exact: true })).toHaveValue(
+      concurrentConflictDraftTitle,
+    );
+    await page
+      .getByRole("button", { name: "Continue with refreshed state" })
+      .click();
+    expect(publicationPosts).toHaveLength(publicationPostsBeforeFailure + 1);
+  });
+
+  await test.step("retry a confirmed non-completion only after explicit approval", async () => {
+    await page.route(
+      /\/api\/admin\/articles\/[^/]+\/publications$/,
+      async (route) => {
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({
+            status: "error",
+            code: "PUBLICATION_NOT_COMPLETED",
+          }),
+        });
+      },
+      { times: 1 },
+    );
+    const publicationPostsBeforeNonCompletion = publicationPosts.length;
+
+    await page.getByRole("button", { name: "Republish", exact: true }).click();
+    await page
+      .getByRole("alertdialog", { name: "Republish saved Draft?" })
+      .getByRole("button", { name: "Republish saved Draft" })
+      .click();
+
+    await expect(
+      page.getByText("Publication was not completed", { exact: true }),
+    ).toBeVisible();
+    expect(publicationPosts).toHaveLength(
+      publicationPostsBeforeNonCompletion + 1,
+    );
+
+    await page.route(
+      /\/api\/admin\/articles\/[^/]+\/publications$/,
+      async (route) => {
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({
+            status: "error",
+            code: "PUBLICATION_STATE_UNCONFIRMED",
+          }),
+        });
+      },
+      { times: 1 },
+    );
+    await page
+      .getByRole("button", { name: "Retry this Publish command" })
+      .click();
+    await expect(
+      page.getByText("Publication outcome needs review", { exact: true }),
+    ).toBeVisible();
+    expect(publicationPosts).toHaveLength(
+      publicationPostsBeforeNonCompletion + 2,
+    );
+    await page
+      .getByRole("button", { name: "Continue with refreshed state" })
+      .click();
+    expect(publicationPosts).toHaveLength(
+      publicationPostsBeforeNonCompletion + 2,
+    );
+  });
+
+  await test.step("reconcile an unconfirmed outcome without replaying Publish", async () => {
+    await page.route(
+      /\/api\/admin\/articles\/[^/]+\/publications$/,
+      async (route) => {
+        if (route.request().method() !== "POST") {
+          await route.continue();
+          return;
+        }
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({
+            status: "error",
+            code: "PUBLICATION_STATE_UNCONFIRMED",
+          }),
+        });
+      },
+      { times: 1 },
+    );
+
+    const publicationPostsBeforeUnconfirmed = publicationPosts.length;
+    await page.getByRole("button", { name: "Republish", exact: true }).click();
+    const confirmation = page.getByRole("alertdialog", {
+      name: "Republish saved Draft?",
+    });
+    await confirmation
+      .getByRole("button", { name: "Republish saved Draft" })
+      .click();
+
+    await expect(
+      page.getByText("Publication outcome needs review", { exact: true }),
+    ).toBeVisible();
+    expect(publicationPosts).toHaveLength(
+      publicationPostsBeforeUnconfirmed + 1,
+    );
+    expect(publicationPosts.at(-1)).toMatchObject({
+      expectedCurrentPublicationId: republishReceipt.publicationId,
+    });
+    expect(publicationPosts.at(-1)!.draftVersion).toBeGreaterThan(
+      republishReceipt.draftVersion,
+    );
+    await expect(page.getByLabel("Article title", { exact: true })).toHaveValue(
+      concurrentConflictDraftTitle,
+    );
+    const stillCurrent = await anonymous.request.get(`/api/articles/${slug}`);
+    expect(stillCurrent.status()).toBe(200);
+    expect(await stillCurrent.json()).toEqual(republishReceipt.article);
+    expect(publicationPosts).toHaveLength(
+      publicationPostsBeforeUnconfirmed + 1,
+    );
+
+    await page
+      .getByRole("button", { name: "Continue with refreshed state" })
+      .click();
+    await expect(
+      page.getByText("Publication outcome needs review", { exact: true }),
+    ).toHaveCount(0);
+    expect(publicationPosts).toHaveLength(
+      publicationPostsBeforeUnconfirmed + 1,
+    );
   });
 
   await test.step("identify the live Publication without offering a no-op restore", async () => {
@@ -414,7 +852,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page.reload();
     await expect(page).toHaveURL(/\/admin\/articles\/[^/]+$/);
     await expect(page.getByLabel("Article title", { exact: true })).toHaveValue(
-      postPublishDraftTitle,
+      concurrentConflictDraftTitle,
     );
     await expect(page.getByLabel("Article body")).toContainText(revisedBody);
   });
