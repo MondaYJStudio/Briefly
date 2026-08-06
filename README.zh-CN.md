@@ -4,6 +4,8 @@
 
 Briefly 是为优质内容打造的现代化自托管发布引擎。它将富文本创作、不可变版本、私有媒体和清晰的内容 API 汇聚在一次紧凑部署中，让一篇文章从初稿出发，稳定抵达网站、应用与内容流的每一个终点。
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/aijnan/Briefly)
+
 ## 项目状态
 
 Briefly 目前处于 **pre-alpha 阶段**。Cloudflare 运行时基础已经可以运行，但文章创作与发布功能仍在开发中。
@@ -75,7 +77,7 @@ Briefly 是一个 pnpm 包、一个 TanStack Start 应用和一个 Cloudflare Wo
 
 Renderer Version `1` 至 `3` 均使用 Ticket 02 已在 workerd 中验证的无 DOM `@tiptap/static-renderer/pm/html-string` 路径。Version `2` 记录可发布的视频输出及 provider facts；Version `3` 记录由应用拥有的公开 Asset URL 和 Publication Asset 引用事实。生产依赖版本精确固定为：`@tiptap/core`、`@tiptap/pm` 和 `@tiptap/static-renderer` 均为 `3.29.2`，Zod 为 `4.4.3`。它在项目统一的 Cloudflare 兼容日期 `2026-07-28` 和 `nodejs_compat` 标志下运行。可复现的运行时、依赖、打包、安全与被拒绝路径证据保留在 [`prototype/publication-renderer/README.md`](prototype/publication-renderer/README.md)。
 
-`pnpm build` 会在 Cloudflare Vite 插件写入部署配置前选择 Wrangler 的 `production` 环境，避免后续部署意外携带本地 D1/R2 绑定。已提交的配置同时关闭了 Wrangler CLI 指标上报和部署依赖检测。
+`pnpm build` 使用仓库根目录的一键部署模板。维护者发布时使用 `pnpm build:production`，它会在 Cloudflare Vite 插件写入部署配置前选择已明确配置的 `production` 环境。已提交的配置同时关闭了 Wrangler CLI 指标上报和部署依赖检测。
 
 ## 本地开发
 
@@ -108,17 +110,19 @@ pnpm build
 非秘密运行时配置和绑定名称在 `wrangler.jsonc` 中声明：
 
 - `APP_ENV` — `local`、`test` 或 `production`
-- `APP_ORIGIN` — 精确的规范应用来源；生产环境必须使用 HTTPS
+- `APP_ORIGIN` — 自定义域名使用的可选规范来源；省略时，Briefly 使用当前 Worker 的 HTTPS 来源
 - `DB` — D1 绑定
 - `MEDIA_BUCKET` — 私有 R2 绑定
 
-Ticket 01 不要求应用秘密。后续功能需要的本地秘密应写入从 `.dev.vars.example` 复制而来的、已忽略的 `.dev.vars`。生产凭据必须通过 Cloudflare Secrets 创建，例如 `pnpm exec wrangler secret put <NAME> --env production`；不得将凭据写入 `wrangler.jsonc`、已提交的环境文件、日志或客户端代码。
+Briefly 需要两个彼此独立、至少 32 个字符的随机值：`BETTER_AUTH_SECRET` 是长期使用的认证密钥，`SETUP_SECRET` 只在首次设置页面填写一次。本地开发时，把它们写入由 `.dev.vars.example` 复制而来的、已忽略的 `.dev.vars`；生产值属于 Cloudflare Secrets。不得将这些值写入 `wrangler.jsonc`、已提交的环境文件、日志或客户端代码。
 
 ## Cloudflare 部署
 
-唯一受支持的部署形态是：一个 Cloudflare Worker、一个生产 D1 数据库和一个私有生产 R2 存储桶。只有经过检查的变更进入受保护的 `main` 后，已提交的 GitHub Actions 工作流才会发布生产版本。工作流先构建，再由 Wrangler 应用待处理且已提交的迁移；迁移成功后才部署 Worker，最后通过只读的 `GET /health` 能力探测完成冒烟检查。
+自托管时，点击本页顶部的 Deploy to Cloudflare 按钮即可。Cloudflare 会克隆这个公开仓库，要求填写两个密钥，自动创建 D1 数据库和私有 R2 存储桶，执行已提交的 D1 迁移，然后部署 Worker。请为两个密钥分别生成至少 32 个字符的随机值，并暂时保留 `SETUP_SECRET`，直到首次设置完成。
 
-首次发布前，请创建 Cloudflare 资源、替换 `wrangler.jsonc` 中的生产占位值，并按 [OPERATIONS.zh-CN.md](OPERATIONS.zh-CN.md) 配置受保护的 GitHub 环境和分支规则。应用凭据（包括后续的初始化、恢复与 Better Auth secret）属于 Cloudflare Secrets；Cloudflare 部署令牌和账户标识符属于受保护的 GitHub 环境 secret，二者都不会传给拉取请求任务。
+部署成功后，直接打开 Cloudflare 显示的 Worker 地址。第一次访问 `/admin` 会自动进入 `/setup`；填写管理员邮箱和密码，再粘贴部署表单中的同一个 `SETUP_SECRET`。使用 Cloudflare 自动分配的 `workers.dev` 地址时，无需填写 `APP_ORIGIN`。
+
+一键部署要求 Cloudflare 能公开读取本仓库（或你的公开 fork）。使用固定自定义域名的项目维护者应配置 `wrangler.jsonc` 中的 `production` 占位值，并按 [OPERATIONS.zh-CN.md](OPERATIONS.zh-CN.md) 走受保护的 GitHub Actions 发布流程：先构建、再迁移，迁移成功后部署，最后执行只读 `GET /health` 探测。
 
 Drizzle schema 文件是数据库结构的事实来源；Drizzle Kit 生成提交在 `src/db/migrations` 下的有序 SQL 与元数据。Wrangler 是唯一的迁移执行器并拥有 D1 迁移账本。项目不支持生产 schema push，Worker 也不会在初始化、请求处理或健康检查期间执行迁移。扩展—收缩迁移规则、0.x 发布兼容要求和故障诊断见运维手册。
 

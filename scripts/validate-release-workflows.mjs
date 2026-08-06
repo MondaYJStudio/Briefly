@@ -5,6 +5,12 @@ import { load } from "js-yaml";
 
 const PULL_REQUEST_WORKFLOW = ".github/workflows/pull-request.yml";
 const PRODUCTION_WORKFLOW = ".github/workflows/deploy-production.yml";
+const WRANGLER_CONFIGURATION = "wrangler.jsonc";
+
+function readJsonc(path) {
+  const source = readFileSync(path, "utf8");
+  return JSON.parse(source.replace(/,\s*([}\]])/gu, "$1"));
+}
 
 function packageScripts() {
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
@@ -122,7 +128,7 @@ function validateProductionWorkflow() {
   );
 
   const commands = runCommands(job, PRODUCTION_WORKFLOW);
-  const buildIndex = commands.indexOf("pnpm build");
+  const buildIndex = commands.indexOf("pnpm build:production");
   const migrationIndex = commands.indexOf("pnpm db:migrate:production");
   const deployIndex = commands.indexOf("pnpm deploy:worker");
   const smokeIndex = commands.indexOf("pnpm smoke:production");
@@ -177,6 +183,10 @@ function validateProductionWorkflow() {
 
   const scripts = packageScripts();
   assert.equal(
+    scripts["build:production"],
+    "CLOUDFLARE_ENV=production vite build && node scripts/verify-client-boundary.mjs",
+  );
+  assert.equal(
     scripts["db:migrate:production"],
     "wrangler d1 migrations apply DB --env production --remote",
     "Wrangler must apply committed production migrations and own its ledger",
@@ -187,12 +197,66 @@ function validateProductionWorkflow() {
     "node scripts/smoke-production.mjs",
   );
   assert.equal(
+    scripts["db:migrate:deploy"],
+    "wrangler d1 migrations apply DB --remote",
+  );
+  assert.equal(
     scripts.deploy,
-    undefined,
-    "Production releases must only run through the protected workflow",
+    "pnpm db:migrate:deploy && wrangler deploy",
+    "The public template deploy command must migrate its D1 binding before deployment",
+  );
+}
+
+function validatePublicDeployTemplate() {
+  const scripts = packageScripts();
+  assert.equal(scripts.dev, "CLOUDFLARE_ENV=local vite dev");
+  assert.equal(
+    scripts.build,
+    "vite build && node scripts/verify-client-boundary.mjs",
+  );
+
+  const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+  assert.deepEqual(Object.keys(packageJson.cloudflare?.bindings ?? {}).sort(), [
+    "BETTER_AUTH_SECRET",
+    "DB",
+    "MEDIA_BUCKET",
+    "SETUP_SECRET",
+  ]);
+
+  const wrangler = readJsonc(WRANGLER_CONFIGURATION);
+  assert.equal(wrangler.workers_dev, true);
+  assert.deepEqual(wrangler.vars, { APP_ENV: "production" });
+  assert.equal(wrangler.d1_databases?.[0]?.binding, "DB");
+  assert.equal(wrangler.d1_databases?.[0]?.database_name, "briefly");
+  assert.equal(wrangler.r2_buckets?.[0]?.binding, "MEDIA_BUCKET");
+  assert.equal(wrangler.r2_buckets?.[0]?.bucket_name, "briefly-media");
+  assert.deepEqual(wrangler.env?.local?.vars, {
+    APP_ENV: "local",
+    APP_ORIGIN: "http://localhost:3000",
+  });
+
+  const secretTemplate = readFileSync(".dev.vars.example", "utf8");
+  assert.match(secretTemplate, /^BETTER_AUTH_SECRET=/mu);
+  assert.match(secretTemplate, /^SETUP_SECRET=/mu);
+  assert.doesNotMatch(secretTemplate, /^APP_ORIGIN=/mu);
+
+  const readme = readFileSync("README.md", "utf8");
+  assert.ok(
+    readme.includes(
+      "[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/aijnan/Briefly)",
+    ),
+    "README must expose the public Deploy to Cloudflare button",
+  );
+  const chineseReadme = readFileSync("README.zh-CN.md", "utf8");
+  assert.ok(
+    chineseReadme.includes(
+      "[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/aijnan/Briefly)",
+    ),
+    "Chinese README must expose the public Deploy to Cloudflare button",
   );
 }
 
 validatePullRequestWorkflow();
 validateProductionWorkflow();
+validatePublicDeployTemplate();
 console.log("Release workflow definitions are valid.");

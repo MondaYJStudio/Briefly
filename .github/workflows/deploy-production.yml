@@ -37,7 +37,7 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
       - name: Build the reviewed production artifact
-        run: pnpm build
+        run: pnpm build:production
       - name: Apply pending reviewed D1 migrations
         run: pnpm db:migrate:production
         env:

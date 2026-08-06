@@ -14,9 +14,26 @@
       "workerd"
     ]
   },
+  "cloudflare": {
+    "bindings": {
+      "DB": {
+        "description": "Briefly's D1 database for the administrator, settings, drafts, and publication history."
+      },
+      "MEDIA_BUCKET": {
+        "description": "Briefly's private R2 bucket for uploaded media."
+      },
+      "BETTER_AUTH_SECRET": {
+        "description": "Generate a permanent random value of at least 32 characters. Do not reuse SETUP_SECRET."
+      },
+      "SETUP_SECRET": {
+        "description": "Generate a different random value of at least 32 characters, then paste it into Briefly's First-run setup page."
+      }
+    }
+  },
   "scripts": {
-    "dev": "vite dev",
-    "build": "CLOUDFLARE_ENV=production vite build && node scripts/verify-client-boundary.mjs",
+    "dev": "CLOUDFLARE_ENV=local vite dev",
+    "build": "vite build && node scripts/verify-client-boundary.mjs",
+    "build:production": "CLOUDFLARE_ENV=production vite build && node scripts/verify-client-boundary.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p test/tsconfig.json && tsc --noEmit -p playwright/tsconfig.json",
     "test": "vitest run",
@@ -30,7 +47,9 @@
     "cf-typegen": "wrangler types",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:deploy": "wrangler d1 migrations apply DB --remote",
     "db:migrate:production": "wrangler d1 migrations apply DB --env production --remote",
+    "deploy": "pnpm db:migrate:deploy && wrangler deploy",
     "deploy:worker": "wrangler deploy --env production",
     "smoke:production": "node scripts/smoke-production.mjs"
   },
