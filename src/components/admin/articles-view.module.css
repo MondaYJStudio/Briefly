@@ -1,56 +1,26 @@
-@reference "tailwindcss";
-
-.page {
-  @apply flex min-w-0 flex-1 flex-col;
-  padding: var(--space-8) var(--space-10) var(--space-16);
-  max-width: 72rem;
-  width: 100%;
-  margin: 0 auto;
-}
-
-.pageHead {
-  @apply mb-8 flex flex-wrap items-end justify-between;
-  gap: var(--space-4);
-}
-
 .pageTitle {
-  font-size: var(--text-2xl);
   font-weight: 700;
   letter-spacing: -0.02em;
-  line-height: var(--leading-tight);
+  line-height: 1.25;
 }
 
 .pageDesc {
   color: var(--foreground-muted);
-  margin-top: var(--space-2);
+
   max-width: 46rem;
 }
 
-.pageActions {
-  @apply flex items-center;
-  gap: var(--space-2);
-}
-
-.toolbar {
-  @apply mb-4 flex flex-wrap items-center justify-between;
-  gap: var(--space-3);
-}
-
 .tabs {
-  @apply flex flex-wrap;
-  gap: var(--space-1);
   border-bottom: 0;
 }
 
 .tab {
-  @apply inline-flex items-center border-0 bg-transparent;
-  gap: var(--space-2);
   padding: 0.5rem 0.75rem;
   font: inherit;
   font-weight: 550;
-  font-size: var(--text-small);
+
   color: var(--foreground-muted);
-  cursor: pointer;
+
   border-radius: var(--radius-m);
 }
 
@@ -67,8 +37,6 @@
 .searchMarker {
   width: 16rem;
   position: relative;
-  display: flex;
-  align-items: center;
 }
 
 .searchIcon {
@@ -79,7 +47,6 @@
 }
 
 .searchInput {
-  width: 100%;
   background: var(--content2);
   border: 1.5px solid transparent;
   border-radius: var(--radius-m);
@@ -97,19 +64,12 @@
 }
 
 .list {
-  display: flex;
-  flex-direction: column;
   list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
 .row {
-  display: grid;
   grid-template-columns: 3.5rem minmax(0, 1fr) auto;
-  gap: var(--space-4);
-  align-items: center;
-  padding: var(--space-4) var(--space-5);
+
   border-bottom: 1px solid var(--divider);
   transition: background var(--dur-fast) var(--ease-out);
 }
@@ -141,23 +101,10 @@
 }
 
 .main {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
   gap: 3px;
-  text-align: left;
-}
-
-.titleLine {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  flex-wrap: wrap;
 }
 
 .title {
-  font-size: var(--text-medium);
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--foreground);
@@ -170,42 +117,24 @@
 
 .slug {
   font-family: var(--font-mono);
-  font-size: var(--text-tiny);
+
   color: var(--foreground-faint);
 }
 
 .meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-4);
-  font-size: var(--text-tiny);
   color: var(--foreground-muted);
 }
 
 .metaItem {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
   white-space: nowrap;
-}
-
-.side {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
 }
 
 .rowButton {
   appearance: none;
   background: none;
-  border: 0;
-  padding: 0;
-  margin: 0;
+
   font: inherit;
   color: inherit;
-  cursor: pointer;
-  display: block;
-  width: 100%;
 }
 
 .rowButton:disabled {
@@ -216,24 +145,14 @@
 .menuTrigger {
   width: 2rem;
   height: 2rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+
   border-radius: var(--radius-s);
   background: none;
-  border: 0;
-  cursor: pointer;
+
   color: var(--foreground-muted);
 }
 
-.empty {
-  @apply flex flex-col items-center text-center;
-  padding: var(--space-10) var(--space-6);
-  gap: var(--space-3);
-}
-
 .emptyIcon {
-  @apply grid place-items-center;
   width: 3rem;
   height: 3rem;
   border-radius: var(--radius-m);
@@ -241,19 +160,8 @@
   color: var(--foreground-muted);
 }
 
-.emptyActions {
-  margin-top: var(--space-3);
-}
-
 .filterEmpty {
-  padding: var(--space-6);
-  text-align: center;
-  font-size: var(--text-small);
   color: var(--foreground-muted);
-}
-
-.feedback {
-  margin-bottom: var(--space-4);
 }
 
 .editDesktop {
@@ -261,19 +169,13 @@
 }
 
 .skeletonRow {
-  display: grid;
   grid-template-columns: 3.5rem minmax(0, 1fr);
-  gap: var(--space-4);
-  align-items: center;
-  padding: var(--space-4) var(--space-5);
+
   border-bottom: 1px solid var(--divider);
 }
 
 .skeletonStack {
-  display: flex;
-  flex-direction: column;
   gap: 0.5rem;
-  min-width: 0;
 }
 
 .skeleton {
@@ -301,42 +203,12 @@
 }
 
 @media (max-width: 860px) {
-  .page {
-    padding: var(--space-5) var(--space-4) var(--space-12);
-  }
-
-  .pageHead {
-    margin-bottom: var(--space-5);
-  }
-
   .row,
   .rowNoCover {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .coverThumb {
-    display: none;
-  }
-
   .editDesktop {
     display: none !important;
   }
-
-  .searchMarker {
-    width: 100%;
-  }
-}
-
-.cardPad {
-  padding: var(--space-6);
-}
-
-.loadingRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.actionTop {
-  margin-top: var(--space-4);
 }

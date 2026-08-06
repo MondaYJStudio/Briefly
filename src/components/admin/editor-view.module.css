@@ -1,5 +1,3 @@
-@reference "tailwindcss";
-
 /* ============ Right settings rail shell ============ */
 .rail {
   border-left: 1px solid var(--divider);
@@ -8,31 +6,22 @@
   min-height: 0;
 }
 
-.railTabs {
-  padding: var(--space-3) var(--space-4) 0;
-}
-
 .railToggle {
   display: none !important;
 }
 
 .tabsLineList {
-  display: flex;
-  gap: var(--space-1);
   border-bottom: 1px solid var(--divider);
 }
 
 .tabLine {
-  @apply inline-flex items-center border-0 bg-transparent;
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-small);
   font-weight: 550;
   color: var(--foreground-muted);
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  cursor: pointer;
+
   font-family: inherit;
-  gap: var(--space-2);
+
   min-height: 2.5rem;
   transition:
     color var(--dur-fast) var(--ease-out),
@@ -54,7 +43,7 @@
   min-width: 1.125rem;
   height: 1.125rem;
   display: inline-grid;
-  place-items: center;
+
   padding: 0 4px;
   background: var(--content2);
   border-radius: var(--radius-full);
@@ -74,7 +63,6 @@
 
 /* ============ Rail sections ============ */
 .railSection {
-  padding: var(--space-5) var(--space-4);
   border-bottom: 1px solid var(--divider);
 }
 
@@ -82,35 +70,24 @@
   border-bottom: 0;
 }
 
-.railSection > h3 {
-  font-size: var(--text-tiny);
+.railSectionHeading {
   font-weight: 650;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--foreground-faint);
-  margin-bottom: var(--space-4);
-}
-
-.railSection .fieldStack > * + * {
-  margin-top: var(--space-4);
 }
 
 .subheading {
-  font-size: var(--text-small);
   font-weight: 550;
-  margin-bottom: var(--space-2);
 }
 
 .issueList {
-  @apply list-disc pl-5;
-  font-size: var(--text-tiny);
   color: var(--danger-strong);
-  margin: 0 0 var(--space-2);
 }
 
 /* ============ Basic / Advanced secondary switch ============ */
 .subNav {
-  @apply inline-flex w-full;
+  width: 100%;
   gap: 2px;
   padding: 3px;
   background: var(--content2);
@@ -118,14 +95,11 @@
 }
 
 .subNavButton {
-  @apply inline-flex flex-1 items-center justify-center border-0 bg-transparent;
-  padding: 0.4rem var(--space-3);
+  padding: 0.4rem 0.75rem;
   font: inherit;
   font-weight: 600;
-  font-size: var(--text-small);
   color: var(--foreground-muted);
   border-radius: var(--radius-s);
-  cursor: pointer;
   transition:
     background var(--dur-fast) var(--ease-out),
     color var(--dur-fast) var(--ease-out);
@@ -139,11 +113,8 @@
 
 /* ============ Publish summary ============ */
 .pubDetail {
-  display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-2) var(--space-3);
   margin: 0;
-  font-size: var(--text-tiny);
 }
 
 .pubDetail dt {
@@ -159,25 +130,12 @@
 
 /* ============ Inherited-value notes ============ */
 .inheritNote {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  font-size: var(--text-tiny);
   color: var(--foreground-muted);
   background: var(--content2);
   border-radius: var(--radius-s);
-  padding: var(--space-2) var(--space-3);
-  margin-top: var(--space-2);
 }
 
 /* ============ Slug field ============ */
-.slugRow {
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
-}
-
 .slugRow > :first-child {
   flex: 1;
   min-width: 0;
@@ -199,32 +157,18 @@
 }
 
 .coverMeta {
-  @apply flex flex-col;
-  gap: var(--space-3);
-  padding: var(--space-3);
   border-top: 1px solid var(--divider);
 }
 
-.coverActions {
-  @apply flex flex-wrap;
-  gap: var(--space-2);
-}
-
 .coverDrop {
-  @apply flex flex-col items-center text-center;
-  gap: var(--space-3);
   border: 1.5px dashed var(--border-strong);
   border-radius: var(--radius-m);
-  padding: var(--space-6);
+
   color: var(--foreground-muted);
-  font-size: var(--text-tiny);
 }
 
 /* ============ Tag chip input ============ */
 .tagInput {
-  @apply flex flex-wrap items-center;
-  gap: var(--space-2);
-  padding: var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
   background: var(--content1);
@@ -236,18 +180,17 @@
 }
 
 .tagChip {
-  @apply inline-flex items-center;
-  gap: var(--space-1);
   background: var(--content2);
   border: 1px solid var(--border);
-  font-size: var(--text-tiny);
   font-weight: 500;
-  padding: 3px var(--space-2);
+  padding: 3px 0.5rem;
   border-radius: var(--radius-full);
 }
 
 .tagChip button {
-  @apply inline-flex border-0 bg-transparent;
+  display: inline-flex;
+  border: 0;
+  background-color: transparent;
   color: var(--foreground-faint);
   cursor: pointer;
   padding: 0;
@@ -260,11 +203,10 @@
 .tagInputField {
   flex: 1;
   min-width: 6rem;
-  border: 0;
   background: none;
   font: inherit;
   color: inherit;
-  padding: 3px var(--space-1);
+  padding: 3px 0.25rem;
 }
 
 .tagInputField:focus {
@@ -273,9 +215,6 @@
 
 /* ============ Publication history ============ */
 .pubItem {
-  @apply flex;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
   border-bottom: 1px solid var(--divider);
 }
 
@@ -284,14 +223,13 @@
 }
 
 .pubNum {
-  @apply grid place-items-center;
   width: 2.25rem;
   height: 2.25rem;
   border-radius: var(--radius-s);
   background: var(--content2);
   color: var(--foreground-muted);
   font-family: var(--font-mono);
-  font-size: var(--text-tiny);
+
   font-weight: 600;
   flex: none;
 }
@@ -309,17 +247,10 @@
 }
 
 .dangerZoneHead {
-  padding: var(--space-3) var(--space-4);
   background: var(--danger-soft-bg);
   color: var(--danger-strong);
-  font-size: var(--text-small);
-  font-weight: 650;
-}
 
-.dangerRow {
-  @apply flex flex-wrap items-center justify-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  font-weight: 650;
 }
 
 .dangerRow + .dangerRow {
@@ -327,18 +258,15 @@
 }
 
 .dangerCopy {
-  font-size: var(--text-tiny);
   color: var(--foreground-muted);
 }
 
 .dangerCopy strong {
   display: block;
   color: var(--foreground);
-  font-size: var(--text-small);
 }
 
 .dangerReason {
-  display: block;
   color: var(--danger-strong);
   font-weight: 550;
   margin-top: 2px;
@@ -380,44 +308,31 @@
 
 /* ============ Editor shell ============ */
 .editorMain {
-  display: flex;
-  flex-direction: column;
   min-width: 0;
   height: 100dvh;
 }
 
 .editorTopbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
   min-height: var(--topbar-h);
-  padding: 0 var(--space-4);
+
   background: var(--surface);
   border-bottom: 1px solid var(--divider);
   z-index: 40;
 }
 
 .titleWrap {
-  min-width: 0;
   flex: 1;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
 }
 
 .docTitle {
   font-weight: 600;
-  font-size: var(--text-small);
+
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .saveState {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-tiny);
   color: var(--foreground-muted);
   white-space: nowrap;
 }
@@ -441,65 +356,19 @@
   color: var(--foreground-faint);
 }
 
-.saveStateFull {
-}
-
-.saveStateCompact {
-  display: none;
-}
-
 .editorBody {
   flex: 1;
-  display: grid;
+
   grid-template-columns: minmax(0, 1fr) var(--rail-w);
   min-height: 0;
 }
 
-.editorScroll {
-  overflow-y: auto;
-  min-width: 0;
-}
-
 .editorCanvas {
   max-width: calc(var(--editor-measure) + 8rem);
-  margin: 0 auto;
-  padding: var(--space-8) var(--space-8) var(--space-16);
-}
-
-.fieldStack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.rowGap2 {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.rowBetween {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
 }
 
 .grow {
   flex: 1;
-  min-width: 0;
-}
-
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
 }
 
 .card {
@@ -509,42 +378,17 @@
   box-shadow: var(--shadow-s);
 }
 
-.cardPad {
-  padding: var(--space-6);
-}
-
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: var(--space-8) var(--space-4);
-}
-
 .emptyIcon {
   width: 3rem;
   height: 3rem;
   border-radius: var(--radius-l);
   background: var(--content2);
   color: var(--foreground-faint);
-  display: grid;
-  place-items: center;
-  margin-bottom: var(--space-4);
-}
-
-.emptyActions {
-  margin-top: var(--space-5);
-  display: flex;
-  gap: var(--space-2);
 }
 
 .alert {
-  display: flex;
-  gap: var(--space-3);
-  align-items: flex-start;
-  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-m);
-  font-size: var(--text-small);
+
   border: 1px solid transparent;
 }
 
@@ -566,30 +410,15 @@
 .moreTrigger {
   width: 2rem;
   height: 2rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+
   border-radius: var(--radius-s);
   background: none;
-  border: 0;
-  cursor: pointer;
-  color: var(--foreground-muted);
-}
 
-.fieldsetReset {
-  border: 0;
-  margin: 0;
-  padding: 0;
-  min-width: 0;
+  color: var(--foreground-muted);
 }
 
 .pendingState {
-  font-size: var(--text-tiny);
   color: var(--foreground-muted);
-}
-
-.previewBody {
-  padding: var(--space-5);
 }
 
 .previewTitle {
@@ -598,21 +427,14 @@
   font-weight: 700;
   letter-spacing: -0.015em;
   line-height: 1.25;
-  margin: 0;
 }
 
 .previewMeta {
   margin-top: 2px;
 }
 
-.actionTop {
-  margin-top: var(--space-2);
-}
-
 .issueListReset {
   list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
 .borderlessTab {
@@ -639,10 +461,6 @@
     display: none !important;
   }
 
-  .editorCanvas {
-    padding: var(--space-5) var(--space-4) var(--space-16);
-  }
-
   .docTitle {
     max-width: 9rem;
   }
@@ -650,15 +468,5 @@
   .editorTopbar :global(button[aria-label]) {
     min-width: 2.75rem;
     min-height: 2.75rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .saveStateFull {
-    display: none;
-  }
-
-  .saveStateCompact {
-    display: inline;
   }
 }

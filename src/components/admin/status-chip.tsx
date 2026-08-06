@@ -26,7 +26,9 @@ export function StatusChip({
   children: ReactNode;
 }>) {
   return (
-    <span className={`${styles.chip} ${variantClass[variant]}`}>
+    <span
+      className={`${styles.chip} inline-flex items-center text-xs gap-2 py-0 px-2 ${variantClass[variant]}`}
+    >
       {dot ? <span className={styles.dot} aria-hidden="true" /> : null}
       {icon ? <AdminIcon name={icon} size={12} strokeWidth={2.2} /> : null}
       {children}

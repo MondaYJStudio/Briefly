@@ -6,11 +6,7 @@ import { m } from "../../paraglide/messages.js";
 import styles from "./account-drawer.module.css";
 
 type PasswordState =
-  | "ready"
-  | "submitting"
-  | "validation"
-  | "request-failed"
-  | "success";
+  "ready" | "submitting" | "validation" | "request-failed" | "success";
 
 /**
  * Account as an overlay drawer: read-only sign-in email, change password
@@ -104,20 +100,22 @@ export function AccountDrawer({
       <Drawer.Content placement="right" className="briefly-drawer-wide">
         <Drawer.Dialog aria-label={m.account_menu()}>
           <Drawer.Header>
-            <div className={styles.head}>
+            <div
+              className={`flex w-full items-center justify-between gap-3`}
+            >
               <div>
                 <Drawer.Heading>
                   <strong>{m.account_menu()}</strong>
                 </Drawer.Heading>
-                <p className={`small faint ${styles.description}`}>
+                <p className={`text-xs faint ${styles.description}`}>
                   {m.account_drawer_description()}
                 </p>
               </div>
               <Drawer.CloseTrigger aria-label={m.close_account()} />
             </div>
           </Drawer.Header>
-          <Drawer.Body className={styles.body}>
-            <div className={styles.stack}>
+          <Drawer.Body className={`p-5`}>
+            <div className={`flex flex-col gap-4`}>
               {signOutState === "error" ? (
                 <Alert status="danger" role="alert">
                   <Alert.Content>
@@ -129,9 +127,13 @@ export function AccountDrawer({
                 </Alert>
               ) : null}
 
-              <div className={styles.card}>
-                <h2 className={styles.sectionTitle}>{m.sign_in_email()}</h2>
-                <div className={styles.field}>
+              <div className={`${styles.card} p-5`}>
+                <h2
+                  className={`${styles.sectionTitle} text-base mt-0 mx-0 mb-5`}
+                >
+                  {m.sign_in_email()}
+                </h2>
+                <div className={`flex w-full flex-col gap-2`}>
                   <Label htmlFor="adminEmail">{m.email()}</Label>
                   <Input
                     fullWidth
@@ -141,16 +143,23 @@ export function AccountDrawer({
                     readOnly
                     aria-describedby="admin-email-note"
                   />
-                  <p className={styles.hint} id="admin-email-note">
+                  <p
+                    className={`${styles.hint} text-xs m-0`}
+                    id="admin-email-note"
+                  >
                     {m.admin_email_note()}
                   </p>
                 </div>
               </div>
 
-              <div className={`${styles.card} ${styles.stack}`}>
+              <div className={`${styles.card} `}>
                 <div>
-                  <h2 className={styles.sectionLead}>{m.change_password()}</h2>
-                  <p className={styles.muted}>
+                  <h2
+                    className={`${styles.sectionLead} text-base mt-0 mx-0 mb-2`}
+                  >
+                    {m.change_password()}
+                  </h2>
+                  <p className={`${styles.muted} text-sm m-0 mb-5`}>
                     {m.change_password_description()}
                   </p>
                 </div>
@@ -165,7 +174,9 @@ export function AccountDrawer({
                         </Alert.Description>
                       </Alert.Content>
                     </Alert>
-                    <div className={styles.actions}>
+                    <div
+                      className={`flex flex-wrap items-center justify-end gap-3`}
+                    >
                       <Button
                         type="button"
                         onPress={() => {
@@ -179,19 +190,26 @@ export function AccountDrawer({
                     </div>
                   </>
                 ) : (
-                  <Form className={styles.stack} onSubmit={changePassword}>
+                  <Form
+                    className={`flex flex-col gap-4`}
+                    onSubmit={changePassword}
+                  >
                     {passwordState === "request-failed" ? (
                       <Alert status="danger" role="alert">
                         <Alert.Content>
-                          <Alert.Title>{m.unable_change_password()}</Alert.Title>
+                          <Alert.Title>
+                            {m.unable_change_password()}
+                          </Alert.Title>
                           <Alert.Description>
                             {m.unable_change_password_description()}
                           </Alert.Description>
                         </Alert.Content>
                       </Alert>
                     ) : null}
-                    <div className={styles.fieldStack}>
-                      <div className={styles.field}>
+                    <div className={`flex flex-col gap-5`}>
+                      <div
+                        className={`flex w-full flex-col gap-2`}
+                      >
                         <Label htmlFor="currentPassword">
                           {m.current_password()}
                         </Label>
@@ -211,7 +229,7 @@ export function AccountDrawer({
                         />
                         {currentPasswordError ? (
                           <p
-                            className={styles.fieldError}
+                            className={`${styles.fieldError} text-xs m-0`}
                             id="current-password-error"
                             role="alert"
                           >
@@ -219,7 +237,9 @@ export function AccountDrawer({
                           </p>
                         ) : null}
                       </div>
-                      <div className={styles.field}>
+                      <div
+                        className={`flex w-full flex-col gap-2`}
+                      >
                         <Label htmlFor="newPassword">{m.new_password()}</Label>
                         <Input
                           fullWidth
@@ -241,20 +261,25 @@ export function AccountDrawer({
                         />
                         {newPasswordError ? (
                           <p
-                            className={styles.fieldError}
+                            className={`${styles.fieldError} text-xs m-0`}
                             id="new-password-error"
                             role="alert"
                           >
                             {newPasswordError}
                           </p>
                         ) : (
-                          <p className={styles.hint} id="new-password-hint">
+                          <p
+                            className={`${styles.hint} text-xs m-0`}
+                            id="new-password-hint"
+                          >
                             {m.minimum_password()} {passwordHint}
                           </p>
                         )}
                       </div>
                     </div>
-                    <div className={styles.actions}>
+                    <div
+                      className={`flex flex-wrap items-center justify-end gap-3`}
+                    >
                       <Button
                         type="submit"
                         isPending={passwordState === "submitting"}
@@ -266,14 +291,20 @@ export function AccountDrawer({
                 )}
               </div>
 
-              <div className={styles.card}>
-                <h2 className={styles.sectionTitle}>{m.session_section()}</h2>
-                <div className={styles.sessionRow}>
+              <div className={`${styles.card} p-5`}>
+                <h2
+                  className={`${styles.sectionTitle} text-base mt-0 mx-0 mb-5`}
+                >
+                  {m.session_section()}
+                </h2>
+                <div
+                  className={`flex flex-wrap items-center justify-between gap-4`}
+                >
                   <div>
-                    <p className={styles.sessionLabel}>
+                    <p className={`${styles.sessionLabel} text-sm m-0`}>
                       {m.sign_out_this_session()}
                     </p>
-                    <p className={styles.muted}>
+                    <p className={`${styles.muted} text-sm m-0`}>
                       {m.sign_out_this_session_description()}
                     </p>
                   </div>

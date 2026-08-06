@@ -99,13 +99,20 @@ export function ArticlesView({
   const failedEmpty = state === "failed" && articles.length === 0;
 
   return (
-    <main className={styles.page} id="admin-main">
-      <header className={styles.pageHead}>
+    <main
+      className={`flex min-w-0 flex-1 flex-col max-w-6xl w-full mx-auto pt-8 px-10 pb-16 max-[860px]:pt-5 max-[860px]:px-4 max-[860px]:pb-12`}
+      id="admin-main"
+    >
+      <header
+        className={`flex flex-wrap items-end justify-between mb-8 gap-4 max-[860px]:mb-5`}
+      >
         <div>
-          <h1 className={styles.pageTitle}>{m.articles()}</h1>
-          <p className={styles.pageDesc}>{m.articles_page_description()}</p>
+          <h1 className={`${styles.pageTitle} text-2xl`}>{m.articles()}</h1>
+          <p className={`${styles.pageDesc} mt-2`}>
+            {m.articles_page_description()}
+          </p>
         </div>
-        <div className={styles.pageActions}>
+        <div className={`flex items-center gap-2`}>
           <Button
             type="button"
             aria-label={m.create_article_draft()}
@@ -120,7 +127,11 @@ export function ArticlesView({
       </header>
 
       {listError && articles.length > 0 ? (
-        <Alert status="danger" role="alert" className={styles.feedback}>
+        <Alert
+          status="danger"
+          role="alert"
+          className={`mb-4`}
+        >
           <Alert.Content>
             <Alert.Title>{m.articles_load_failed()}</Alert.Title>
             <Alert.Description>
@@ -140,7 +151,11 @@ export function ArticlesView({
       ) : null}
 
       {createError ? (
-        <Alert status="danger" role="alert" className={styles.feedback}>
+        <Alert
+          status="danger"
+          role="alert"
+          className={`mb-4`}
+        >
           <Alert.Content>
             <Alert.Title>{m.articles_create_failed()}</Alert.Title>
             <Alert.Description>
@@ -172,13 +187,15 @@ export function ArticlesView({
         </Alert>
       ) : articles.length === 0 ? (
         <div className={styles.card}>
-          <div className={styles.empty}>
-            <div className={styles.emptyIcon}>
+          <div
+            className={`flex flex-col items-center text-center py-10 px-6 gap-3`}
+          >
+            <div className={`${styles.emptyIcon} grid place-items-center`}>
               <AdminIcon name="articles" size={24} />
             </div>
             <h3>{m.articles_empty_title()}</h3>
             <p>{m.articles_empty_description()}</p>
-            <div className={styles.emptyActions}>
+            <div className={`mt-3`}>
               <Button
                 type="button"
                 isPending={creating}
@@ -192,9 +209,11 @@ export function ArticlesView({
         </div>
       ) : (
         <>
-          <div className={styles.toolbar}>
+          <div
+            className={`flex flex-wrap items-center justify-between mb-4 gap-3`}
+          >
             <div
-              className={styles.tabs}
+              className={`${styles.tabs} flex flex-wrap gap-1`}
               role="tablist"
               aria-label={m.filter_by_lifecycle()}
             >
@@ -216,7 +235,7 @@ export function ArticlesView({
               ).map(([id, label, count]) => (
                 <button
                   key={id}
-                  className={styles.tab}
+                  className={`${styles.tab} inline-flex items-center border-0 bg-transparent text-sm cursor-pointer gap-2`}
                   type="button"
                   role="tab"
                   aria-selected={filter === id}
@@ -229,7 +248,7 @@ export function ArticlesView({
             </div>
             <Tooltip.Root delay={500}>
               <Tooltip.Trigger
-                className={styles.searchMarker}
+                className={`${styles.searchMarker} flex items-center max-[860px]:w-full`}
                 aria-label={m.search_articles_future()}
               >
                 <AdminIcon
@@ -238,7 +257,7 @@ export function ArticlesView({
                   className={styles.searchIcon}
                 />
                 <input
-                  className={styles.searchInput}
+                  className={`${styles.searchInput} w-full`}
                   type="search"
                   placeholder={m.search_articles_placeholder()}
                   disabled
@@ -255,7 +274,7 @@ export function ArticlesView({
             id="article-panel"
             aria-label={m.article_drafts_panel()}
           >
-            <ul className={styles.list}>
+            <ul className={`${styles.list} flex flex-col m-0 p-0`}>
               {visible.map((article) => (
                 <ArticleRow
                   key={article.id}
@@ -274,7 +293,9 @@ export function ArticlesView({
                 />
               ))}
               {visible.length === 0 ? (
-                <li className={styles.filterEmpty}>{m.no_articles_match()}</li>
+                <li className={`${styles.filterEmpty} text-center text-sm p-6`}>
+                  {m.no_articles_match()}
+                </li>
               ) : null}
             </ul>
           </div>
@@ -317,54 +338,58 @@ function ArticleRow({
 
   return (
     <li
-      className={`${styles.row}${cover ? "" : ` ${styles.rowNoCover}`}`}
+      className={`${styles.row} grid items-center gap-4 py-4 px-5${cover ? "" : ` ${styles.rowNoCover}`}`}
       data-selected={isSelected}
     >
       {cover ? (
         <img
-          className={styles.coverThumb}
+          className={`${styles.coverThumb} max-[860px]:hidden`}
           src={`/media/private/${cover.assetId}`}
           alt=""
           loading="lazy"
         />
       ) : null}
       <button
-        className={`${styles.rowButton} ${styles.main}`}
+        className={`${styles.rowButton} border-0 cursor-pointer block w-full p-0 m-0 ${styles.main} min-w-0 flex flex-col text-left`}
         type="button"
         aria-label={`${title} · ${m.draft_version({ version: String(article.draft.version) })}`}
         disabled={disabled}
         onClick={onOpen}
       >
-        <span className={styles.titleLine}>
+        <span
+          className={`flex items-center min-w-0 flex-wrap gap-2`}
+        >
           <span
-            className={`${styles.title}${article.draft.title ? "" : ` ${styles.titleUntitled}`}`}
+            className={`${styles.title} text-base${article.draft.title ? "" : ` ${styles.titleUntitled}`}`}
           >
             {title}
           </span>
           {lifecycleChip(projection)}
         </span>
-        <span className={styles.slug}>
+        <span className={`${styles.slug} text-xs`}>
           {article.draft.slug ? `/${article.draft.slug}` : m.no_slug_yet()}
         </span>
-        <span className={styles.meta}>
-          <span className={styles.metaItem}>
+        <span
+          className={`${styles.meta} flex flex-wrap text-xs gap-y-1 gap-x-4`}
+        >
+          <span className={`${styles.metaItem} inline-flex items-center gap-1`}>
             {m.draft_version({ version: String(article.draft.version) })}
           </span>
-          <span className={styles.metaItem}>
+          <span className={`${styles.metaItem} inline-flex items-center gap-1`}>
             <AdminIcon name="clock" size={12} strokeWidth={2.2} />
             {m.edited()}{" "}
             <time dateTime={new Date(article.draft.updatedAt).toISOString()}>
               {new Date(article.draft.updatedAt).toLocaleString()}
             </time>
           </span>
-          <span className={styles.metaItem}>
+          <span className={`${styles.metaItem} inline-flex items-center gap-1`}>
             {canUnpublish
               ? m.current_publication_selected()
               : m.no_current_publication_selected()}
           </span>
         </span>
       </button>
-      <span className={styles.side}>
+      <span className={`flex items-center gap-2`}>
         <Button
           className={styles.editDesktop}
           size="sm"
@@ -377,7 +402,7 @@ function ArticleRow({
         </Button>
         <Dropdown.Root>
           <Dropdown.Trigger
-            className={styles.menuTrigger}
+            className={`${styles.menuTrigger} inline-flex items-center justify-center border-0 cursor-pointer`}
             aria-label={m.more_actions_for({ title })}
             isDisabled={disabled && !actionPending}
           >
@@ -438,18 +463,23 @@ function ArticleRow({
 function ArticleListSkeleton() {
   return (
     <div aria-busy="true" role="status" aria-label={m.loading_article_drafts()}>
-      <div className={styles.toolbar}>
+      <div
+        className={`flex flex-wrap items-center justify-between mb-4 gap-3`}
+      >
         <div
           className={styles.skeleton}
           style={{ width: "22rem", height: "2rem" }}
         />
       </div>
       <div className={styles.card}>
-        <div className={styles.list}>
+        <div className={`${styles.list} flex flex-col m-0 p-0`}>
           {[40, 55, 35, 48].map((width) => (
-            <div className={styles.skeletonRow} key={width}>
+            <div
+              className={`${styles.skeletonRow} grid items-center gap-4 py-4 px-5`}
+              key={width}
+            >
               <div className={`${styles.skeleton} ${styles.coverThumb}`} />
-              <div className={styles.skeletonStack}>
+              <div className={`${styles.skeletonStack} flex flex-col min-w-0`}>
                 <div
                   className={styles.skeleton}
                   style={{ width: `${width}%`, height: "1rem" }}

@@ -1,15 +1,11 @@
-@reference "tailwindcss";
-
 .shell {
-  display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
   min-height: 100dvh;
 }
 
 .editorShell {
-  display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
-  height: 100dvh;
+
   overflow: hidden;
 }
 
@@ -20,18 +16,14 @@
 }
 
 .sidebar {
-  @apply sticky top-0 flex h-dvh flex-col;
   background: var(--surface);
   border-right: 1px solid var(--divider);
   z-index: 60;
 }
 
 .sidebarBrand {
-  @apply flex w-full cursor-pointer items-center border-0 text-left;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-5);
   font-weight: 650;
-  font-size: var(--text-medium);
+
   letter-spacing: -0.01em;
   border-bottom: 1px solid var(--divider);
   color: var(--foreground);
@@ -40,7 +32,6 @@
 }
 
 .logoMark {
-  @apply grid shrink-0 place-items-center;
   width: 1.5rem;
   height: 1.5rem;
   border-radius: 6px;
@@ -52,15 +43,10 @@
 }
 
 .nav {
-  @apply flex flex-1 flex-col overflow-y-auto;
-  padding: var(--space-3);
   gap: 2px;
 }
 
 .navItem {
-  @apply flex w-full cursor-pointer items-center border-0 text-left no-underline;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-m);
   background: none;
   color: var(--foreground-muted);
@@ -84,16 +70,10 @@
 }
 
 .sidebarFooter {
-  @apply flex flex-col;
   border-top: 1px solid var(--divider);
-  padding: var(--space-3);
-  gap: var(--space-1);
 }
 
 .adminId {
-  @apply flex w-full min-w-0 cursor-pointer items-center border-0 text-left;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-m);
   background: none;
   font: inherit;
@@ -111,30 +91,23 @@
 }
 
 .avatar {
-  @apply grid shrink-0 place-items-center;
   width: 2rem;
   height: 2rem;
   border-radius: var(--radius-full);
   background: var(--content3);
   color: var(--foreground-muted);
   font-weight: 600;
-  font-size: var(--text-tiny);
 }
 
 .meta {
-  min-width: 0;
   flex: 1;
 }
 
 .metaLabel {
-  display: block;
-  font-size: var(--text-tiny);
   color: var(--foreground-faint);
 }
 
 .email {
-  display: block;
-  font-size: var(--text-tiny);
   font-weight: 550;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -142,7 +115,6 @@
 }
 
 .menuRow {
-  @apply flex w-full min-w-0 items-center;
   gap: 0.75rem;
 }
 
@@ -153,22 +125,19 @@
 
 .menuLabel {
   flex: 1;
-  min-width: 0;
 }
 
 .menuValue {
   margin-left: auto;
   color: var(--foreground-faint);
-  font-size: var(--text-tiny);
+
   font-weight: 550;
   letter-spacing: 0.01em;
-  flex-shrink: 0;
 }
 
 .menuAffordance {
   margin-left: auto;
   color: var(--foreground-faint);
-  flex-shrink: 0;
 }
 
 .chevron {
@@ -180,18 +149,9 @@
   min-width: 13.5rem;
 }
 
-.main {
-  @apply flex min-w-0 flex-col;
-}
-
 .mobileBar {
-  display: none;
-  position: sticky;
-  top: 0;
   z-index: 55;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
+
   background: var(--surface);
   border-bottom: 1px solid var(--divider);
 }
@@ -201,23 +161,21 @@
   padding: 0.5rem;
 }
 
+.main {
+  min-width: 0;
+}
+
 .scrim {
   display: none;
   position: fixed;
   inset: 0;
   z-index: 59;
   background: var(--backdrop);
-  border: 0;
-  padding: 0;
   cursor: default;
 }
 
 .scrimOpen {
   display: block;
-}
-
-.signOutError {
-  margin: 0 var(--space-1) var(--space-2);
 }
 
 @media (max-width: 860px) {
@@ -229,7 +187,7 @@
   .sidebar {
     position: fixed;
     left: 0;
-    top: 0;
+
     bottom: 0;
     width: min(18rem, 88vw);
     transform: translateX(-100%);
@@ -239,10 +197,6 @@
 
   .sidebarOpen {
     transform: translateX(0);
-  }
-
-  .mobileBar {
-    display: flex;
   }
 
   .editorShell .mobileBar {

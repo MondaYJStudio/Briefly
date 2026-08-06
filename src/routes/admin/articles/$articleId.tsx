@@ -45,7 +45,10 @@ function ArticleEditorRoute() {
 
   if (workspace.selected?.id !== articleId) {
     return (
-      <main className={pageStyles.page} id="admin-main">
+      <main
+        className={`flex min-w-0 flex-1 flex-col max-w-6xl w-full mx-auto pt-8 px-10 pb-16 max-[860px]:pt-5 max-[860px]:px-4 max-[860px]:pb-12`}
+        id="admin-main"
+      >
         {loadState === "failed" ? (
           <Alert status="danger" role="alert">
             <Alert.Content>
@@ -54,7 +57,7 @@ function ArticleEditorRoute() {
                 {m.article_unavailable_description()}
               </Alert.Description>
               <Button
-                className={pageStyles.actionTop}
+                className={`mt-4`}
                 type="button"
                 variant="secondary"
                 onPress={() => void navigate({ to: "/admin/articles" })}
@@ -65,7 +68,7 @@ function ArticleEditorRoute() {
           </Alert>
         ) : (
           <div
-            className={`${pageStyles.card} ${pageStyles.cardPad} ${pageStyles.loadingRow}`}
+            className={`${pageStyles.card} p-6 flex items-center gap-3`}
             role="status"
           >
             <Spinner aria-label={m.loading_article_editor()} />

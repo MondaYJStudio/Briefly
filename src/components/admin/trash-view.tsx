@@ -57,15 +57,22 @@ export function TrashView({
     trashActionState === "purged" && trashedArticles.length === 0;
 
   return (
-    <main className={styles.page} id="admin-main">
-      <header className={styles.pageHead}>
+    <main
+      className={`flex min-w-0 flex-1 flex-col max-w-6xl w-full mx-auto pt-8 px-10 pb-16 max-[860px]:pt-5 max-[860px]:px-4 max-[860px]:pb-10`}
+      id="admin-main"
+    >
+      <header className={`flex flex-wrap items-end justify-between mb-8 gap-4`}>
         <div>
-          <h1 className={styles.pageTitle}>{m.trash_page_title()}</h1>
-          <p className={styles.pageDesc}>{m.trash_page_description()}</p>
+          <h1 className={`${styles.pageTitle} text-2xl`}>
+            {m.trash_page_title()}
+          </h1>
+          <p className={`${styles.pageDesc} mt-2`}>
+            {m.trash_page_description()}
+          </p>
         </div>
       </header>
 
-      <div className={styles.stack}>
+      <div className={`flex flex-col gap-4`}>
         {trashActionState === "trashed" ? (
           <Alert status="success" role="status">
             <Alert.Content>
@@ -115,13 +122,19 @@ export function TrashView({
 
         {showPurgedOutcome ? (
           <div className={styles.card}>
-            <div className={styles.empty}>
+            <div
+              className={`flex flex-col items-center text-center py-16 px-6`}
+            >
               <div className={`${styles.emptyIcon} ${styles.emptyIconSuccess}`}>
                 <AdminIcon name="check" size={24} />
               </div>
-              <h3>{m.trash_purged_title()}</h3>
-              <p>{m.trash_purged_description()}</p>
-              <div className={styles.emptyActions}>
+              <h3 className={`${styles.emptyTitle} text-base`}>
+                {m.trash_purged_title()}
+              </h3>
+              <p className={`${styles.emptyCopy} mt-1`}>
+                {m.trash_purged_description()}
+              </p>
+              <div className={`flex mt-5 gap-2`}>
                 <Button
                   type="button"
                   variant="secondary"
@@ -136,13 +149,19 @@ export function TrashView({
           <TrashListSkeleton />
         ) : trashViewState === "error" ? (
           <div className={styles.card}>
-            <div className={styles.empty}>
+            <div
+              className={`flex flex-col items-center text-center py-16 px-6`}
+            >
               <div className={`${styles.emptyIcon} ${styles.emptyIconDanger}`}>
                 <AdminIcon name="alert" size={24} />
               </div>
-              <h3>{m.trash_load_failed_title()}</h3>
-              <p>{m.trash_load_failed_description()}</p>
-              <div className={styles.emptyActions}>
+              <h3 className={`${styles.emptyTitle} text-base`}>
+                {m.trash_load_failed_title()}
+              </h3>
+              <p className={`${styles.emptyCopy} mt-1`}>
+                {m.trash_load_failed_description()}
+              </p>
+              <div className={`flex mt-5 gap-2`}>
                 <Button type="button" onPress={() => void reloadTrashView()}>
                   {m.trash_retry()}
                 </Button>
@@ -151,13 +170,21 @@ export function TrashView({
           </div>
         ) : trashedArticles.length === 0 ? (
           <div className={styles.card}>
-            <div className={styles.empty}>
-              <div className={styles.emptyIcon}>
+            <div
+              className={`flex flex-col items-center text-center py-16 px-6`}
+            >
+              <div
+                className={`${styles.emptyIcon} grid place-items-center mb-4`}
+              >
                 <AdminIcon name="trash" size={24} />
               </div>
-              <h3>{m.trash_empty_title()}</h3>
-              <p>{m.trash_empty_description()}</p>
-              <div className={styles.emptyActions}>
+              <h3 className={`${styles.emptyTitle} text-base`}>
+                {m.trash_empty_title()}
+              </h3>
+              <p className={`${styles.emptyCopy} mt-1`}>
+                {m.trash_empty_description()}
+              </p>
+              <div className={`flex mt-5 gap-2`}>
                 <Button
                   type="button"
                   variant="secondary"
@@ -170,15 +197,21 @@ export function TrashView({
           </div>
         ) : (
           <div className={styles.card}>
-            <ul className={styles.list} aria-label={m.trash_list_label()}>
+            <ul
+              className={`${styles.list} m-0 p-0`}
+              aria-label={m.trash_list_label()}
+            >
               {trashedArticles.map((article) => {
                 const title = displayTitle(article);
                 return (
-                  <li key={article.id} className={styles.row}>
-                    <div className={styles.rowMain}>
-                      <div className={styles.titleLine}>
+                  <li
+                    key={article.id}
+                    className={`${styles.row} flex flex-wrap items-start justify-between gap-4 py-4 px-5`}
+                  >
+                    <div className={`min-w-0 flex-1`}>
+                      <div className={`flex flex-wrap items-center gap-2 mb-1`}>
                         <span
-                          className={`${styles.title}${article.title ? "" : ` ${styles.untitled}`}`}
+                          className={`${styles.title} text-base${article.title ? "" : ` ${styles.untitled}`}`}
                         >
                           {title}
                         </span>
@@ -188,7 +221,9 @@ export function TrashView({
                             : m.trash_never_published()}
                         </StatusChip>
                       </div>
-                      <span className={styles.meta}>
+                      <span
+                        className={`${styles.meta} flex flex-wrap text-sm gap-3`}
+                      >
                         <span>
                           {m.trash_trashed_at({
                             when: formatTrashedAt(article.trashedAt),
@@ -210,7 +245,9 @@ export function TrashView({
                         </span>
                       </span>
                     </div>
-                    <div className={styles.side}>
+                    <div
+                      className={`flex flex-wrap items-center shrink-0 gap-2`}
+                    >
                       <Button
                         size="sm"
                         type="button"
@@ -311,17 +348,17 @@ export function TrashView({
               </AlertDialog.Heading>
             </AlertDialog.Header>
             <AlertDialog.Body>
-              <p className={styles.purgeWarning}>
+              <p className={`${styles.purgeWarning} text-xs`}>
                 {m.trash_purge_warning({
                   title: purgeTarget ? displayTitle(purgeTarget) : "",
                 })}
               </p>
-              <ul className={styles.purgePoints}>
+              <ul className={`${styles.purgePoints} text-xs mt-3`}>
                 <li>{m.trash_purge_point_content()}</li>
                 <li>{m.trash_purge_point_media()}</li>
                 <li>{m.trash_purge_point_tombstone()}</li>
               </ul>
-              <div className={styles.confirmField}>
+              <div className={`flex flex-col gap-2 mt-5`}>
                 <Label htmlFor={confirmInputId}>
                   {m.trash_purge_type_phrase({ phrase: confirmPhrase })}
                 </Label>
@@ -376,11 +413,14 @@ function TrashListSkeleton() {
       role="status"
       aria-label={m.trash_loading_label()}
     >
-      <div className={styles.list} aria-hidden="true">
+      <div className={`${styles.list} m-0 p-0`} aria-hidden="true">
         {trashSkeletonRows.map((row) => (
-          <div className={styles.skeletonRow} key={row.title}>
-            <div className={styles.skeletonMain}>
-              <div className={styles.skeletonTitleLine}>
+          <div
+            className={`${styles.skeletonRow} flex flex-wrap items-start justify-between gap-4 py-4 px-5`}
+            key={row.title}
+          >
+            <div className={`min-w-0 flex-1 flex flex-col gap-2`}>
+              <div className={`flex flex-wrap items-center gap-2`}>
                 <div
                   className={styles.skeleton}
                   style={{ width: row.title, height: "1rem" }}
@@ -390,7 +430,7 @@ function TrashListSkeleton() {
                   style={{ width: "5.5rem", height: "1.25rem" }}
                 />
               </div>
-              <div className={styles.skeletonMeta}>
+              <div className={`flex flex-wrap gap-3`}>
                 {row.meta.map((width) => (
                   <div
                     key={width}
@@ -400,7 +440,7 @@ function TrashListSkeleton() {
                 ))}
               </div>
             </div>
-            <div className={styles.skeletonSide}>
+            <div className={`flex shrink-0 items-center gap-2`}>
               <div
                 className={styles.skeleton}
                 style={{ width: "4rem", height: "2rem" }}

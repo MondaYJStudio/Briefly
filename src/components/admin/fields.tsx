@@ -20,20 +20,31 @@ export function SettingsField({
   children: ReactNode;
 }>) {
   return (
-    <div className={styles.field}>
-      <Label htmlFor={htmlFor} className={styles.label}>
+    <div className={`flex w-full flex-col gap-2`}>
+      <Label
+        htmlFor={htmlFor}
+        className={`${styles.label} text-sm flex items-baseline gap-2`}
+      >
         {label}
-        {optional ? <span className={styles.optional}>{optional}</span> : null}
+        {optional ? (
+          <span className={`${styles.optional} text-xs`}>{optional}</span>
+        ) : null}
       </Label>
       {children}
       {issues.length > 0 ? (
-        <ul id={`${htmlFor}-error`} className={styles.issues} role="alert">
+        <ul
+          id={`${htmlFor}-error`}
+          className={`${styles.issues} list-disc text-xs pl-5 m-0`}
+          role="alert"
+        >
           {issues.map((issue) => (
             <li key={issue}>{issue}</li>
           ))}
         </ul>
       ) : null}
-      {description ? <p className={styles.description}>{description}</p> : null}
+      {description ? (
+        <p className={`${styles.description} text-xs m-0`}>{description}</p>
+      ) : null}
     </div>
   );
 }

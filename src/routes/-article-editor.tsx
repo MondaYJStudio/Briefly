@@ -155,7 +155,7 @@ export function ArticleEditor({
   return (
     <div className="article-editor">
       <div
-        className={styles.fmtBar}
+        className={`${styles.fmtBar} flex flex-wrap items-center py-2 px-3 mb-6 mx-auto`}
         role="toolbar"
         aria-label={m.text_formatting()}
       >
@@ -182,12 +182,12 @@ export function ArticleEditor({
         >
           <AdminIcon name="redo" size={16} />
         </Button>
-        <span className={styles.fmtSep} aria-hidden="true" />
+        <span className={`${styles.fmtSep} my-0 mx-1`} aria-hidden="true" />
 
         {/* Paragraph style dropdown */}
         <Dropdown.Root>
           <Dropdown.Trigger
-            className={styles.fmtStyleTrigger}
+            className={`${styles.fmtStyleTrigger} inline-flex items-center border-0 cursor-pointer gap-2 py-0 px-3`}
             aria-label={m.paragraph_style()}
           >
             {activeEditor.isActive("heading", { level: 2 })
@@ -229,18 +229,22 @@ export function ArticleEditor({
                 {m.paragraph()}
               </Dropdown.Item>
               <Dropdown.Item id="h2" textValue={m.heading_2()}>
-                <strong className={styles.heading2Sample}>{m.heading_2()}</strong>
+                <strong className={styles.heading2Sample}>
+                  {m.heading_2()}
+                </strong>
               </Dropdown.Item>
               <Dropdown.Item id="h3" textValue={m.heading_3()}>
                 <strong>{m.heading_3()}</strong>
               </Dropdown.Item>
               <Dropdown.Item id="h4" textValue={m.heading_4()}>
-                <strong className={styles.heading4Sample}>{m.heading_4()}</strong>
+                <strong className={styles.heading4Sample}>
+                  {m.heading_4()}
+                </strong>
               </Dropdown.Item>
             </Dropdown.Menu>
           </Dropdown.Popover>
         </Dropdown.Root>
-        <span className={styles.fmtSep} aria-hidden="true" />
+        <span className={`${styles.fmtSep} my-0 mx-1`} aria-hidden="true" />
 
         {/* Inline formatting */}
         <Button
@@ -302,7 +306,7 @@ export function ArticleEditor({
         >
           <AdminIcon name="link" size={16} />
         </Button>
-        <span className={styles.fmtSep} aria-hidden="true" />
+        <span className={`${styles.fmtSep} my-0 mx-1`} aria-hidden="true" />
 
         {/* Lists and blocks */}
         <Button
@@ -373,7 +377,7 @@ export function ArticleEditor({
         >
           <AdminIcon name="break" size={16} />
         </Button>
-        <span className={styles.fmtSep} aria-hidden="true" />
+        <span className={`${styles.fmtSep} my-0 mx-1`} aria-hidden="true" />
         <Button
           isIconOnly
           size="sm"
@@ -452,7 +456,7 @@ export function ArticleEditor({
               {m.link_active_in_selection()}
             </p>
           ) : null}
-          <div className="editor-tool-actions">
+          <div className="editor-tool-actions flex justify-end flex-wrap gap-2 max-[860px]:flex-col-reverse max-[860px]:[&>*]:w-full">
             <Button
               type="button"
               variant="secondary"
@@ -518,7 +522,7 @@ export function ArticleEditor({
               })}
             </p>
           ) : null}
-          <div className="editor-tool-actions">
+          <div className="editor-tool-actions flex justify-end flex-wrap gap-2 max-[860px]:flex-col-reverse max-[860px]:[&>*]:w-full">
             <Button type="button" onPress={applyCodeBlockLanguage}>
               {activeEditor.isActive("codeBlock")
                 ? m.update_code_block()
@@ -564,7 +568,7 @@ function PublicationGuidance({
 }: Readonly<{ issues: PublicationIssue[] }>) {
   if (issues.length === 0) return null;
   return (
-    <ul className={styles.issueList} role="alert">
+    <ul className={`${styles.issueList} list-disc text-sm pl-5`} role="alert">
       {issues.map((issue) => (
         <li key={`${issue.code}:${issue.path}`}>
           {localizePublicationIssue(issue)}
@@ -597,11 +601,12 @@ function EditorToolModal({
           className={`editor-tool-modal${isWide ? " editor-tool-modal--wide" : ""}`}
         >
           <Modal.Header>
-            <div className="briefly-drawer-head">
+            <div className="briefly-drawer-head flex items-center justify-between gap-3 w-full">
               <Modal.Heading>{title}</Modal.Heading>
               <Modal.CloseTrigger
                 aria-label={
-                  closeLabel ?? m.close_dialog_for({ title: title.toLowerCase() })
+                  closeLabel ??
+                  m.close_dialog_for({ title: title.toLowerCase() })
                 }
               />
             </div>
@@ -732,7 +737,9 @@ function ArticleVideoAuthoring({
   return (
     <div className="editor-tool-panel space-y-4">
       <div className="space-y-1">
-        <p className="text-sm text-default-500">{m.video_panel_description()}</p>
+        <p className="text-sm text-default-500">
+          {m.video_panel_description()}
+        </p>
       </div>
       <div className="space-y-2">
         <Label htmlFor="videoEmbedInput">{m.video_url_or_identifier()}</Label>
@@ -796,7 +803,9 @@ function ArticleVideoAuthoring({
               }
             }}
           />
-          <p className="text-sm text-default-500">{m.video_title_a11y_note()}</p>
+          <p className="text-sm text-default-500">
+            {m.video_title_a11y_note()}
+          </p>
         </div>
       ) : null}
       <Button
