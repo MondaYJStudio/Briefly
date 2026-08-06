@@ -2,7 +2,6 @@ export {
   account,
   authenticationRateLimit,
   betterAuthSchema,
-  installation,
   session,
   user,
   verification,

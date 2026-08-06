@@ -67,7 +67,7 @@ Treat workflow logs as operational metadata, not a place for credentials, reques
 
 Configure `BETTER_AUTH_SECRET` (at least 32 characters) and `SETUP_SECRET` (any non-empty value) as independent Cloudflare configuration before the first request reaches a deployment. Prefer a cryptographically secure generator for `BETTER_AUTH_SECRET`. For production, set them with `pnpm exec wrangler secret put <NAME> --env production` (or the equivalent Worker var for one-click `SETUP_SECRET`); never put real values in committed `wrangler.jsonc`, GitHub variables, logs, URLs, or a committed `.dev.vars` file.
 
-A fresh installation is claimed at `/admin/setup`. Initialization accepts the configured setup secret only while the D1 installation marker is uninitialized. D1 constraints and an atomic claim prevent a concurrent request from creating a second Better Auth user. After success, initialization and Better Auth email sign-up remain permanently closed; the setup secret is not stored in D1. Authentication identity is private and is not reused as a public Byline.
+A fresh installation is claimed at `/admin/setup`. Initialization accepts the configured setup secret only while no Administrator exists in `auth_user`. D1 constraints prevent a concurrent request from creating a second Better Auth user. After success, initialization and Better Auth email sign-up remain permanently closed; the setup secret is not stored in D1. Authentication identity is private and is not reused as a public Byline.
 
 The sole Administrator password is 12–128 characters. A password-manager-generated password is recommended. Sign-in failures use the same response for an unknown email and an incorrect password.
 

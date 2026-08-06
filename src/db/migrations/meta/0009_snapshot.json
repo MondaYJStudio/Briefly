@@ -102,7 +102,9 @@
       "indexes": {
         "auth_account_user_id_idx": {
           "name": "auth_account_user_id_idx",
-          "columns": ["user_id"],
+          "columns": [
+            "user_id"
+          ],
           "isUnique": false
         }
       },
@@ -111,8 +113,12 @@
           "name": "auth_account_user_id_auth_user_id_fk",
           "tableFrom": "auth_account",
           "tableTo": "auth_user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -170,7 +176,9 @@
       "indexes": {
         "article_trashed_at_idx": {
           "name": "article_trashed_at_idx",
-          "columns": ["trashed_at"],
+          "columns": [
+            "trashed_at"
+          ],
           "isUnique": false
         }
       },
@@ -179,8 +187,14 @@
           "name": "article_current_publication_belongs_to_article",
           "tableFrom": "article",
           "tableTo": "publication",
-          "columnsFrom": ["current_publication_id", "id"],
-          "columnsTo": ["id", "article_id"],
+          "columnsFrom": [
+            "current_publication_id",
+            "id"
+          ],
+          "columnsTo": [
+            "id",
+            "article_id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -292,8 +306,12 @@
           "name": "article_draft_article_id_article_id_fk",
           "tableFrom": "article_draft",
           "tableTo": "article",
-          "columnsFrom": ["article_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "article_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -301,8 +319,14 @@
           "name": "article_draft_slug_belongs_to_article",
           "tableFrom": "article_draft",
           "tableTo": "article_slug",
-          "columnsFrom": ["slug_key", "article_id"],
-          "columnsTo": ["slug_key", "article_id"],
+          "columnsFrom": [
+            "slug_key",
+            "article_id"
+          ],
+          "columnsTo": [
+            "slug_key",
+            "article_id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -337,7 +361,9 @@
       "indexes": {
         "article_draft_asset_reference_asset_idx": {
           "name": "article_draft_asset_reference_asset_idx",
-          "columns": ["asset_id"],
+          "columns": [
+            "asset_id"
+          ],
           "isUnique": false
         }
       },
@@ -346,8 +372,12 @@
           "name": "article_draft_asset_reference_article_id_article_draft_article_id_fk",
           "tableFrom": "article_draft_asset_reference",
           "tableTo": "article_draft",
-          "columnsFrom": ["article_id"],
-          "columnsTo": ["article_id"],
+          "columnsFrom": [
+            "article_id"
+          ],
+          "columnsTo": [
+            "article_id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -355,15 +385,22 @@
           "name": "article_draft_asset_reference_asset_id_asset_id_fk",
           "tableFrom": "article_draft_asset_reference",
           "tableTo": "asset",
-          "columnsFrom": ["asset_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "asset_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "article_draft_asset_reference_article_id_asset_id_pk": {
-          "columns": ["article_id", "asset_id"],
+          "columns": [
+            "article_id",
+            "asset_id"
+          ],
           "name": "article_draft_asset_reference_article_id_asset_id_pk"
         }
       },
@@ -399,12 +436,17 @@
       "indexes": {
         "article_slug_key_article_id_unique": {
           "name": "article_slug_key_article_id_unique",
-          "columns": ["slug_key", "article_id"],
+          "columns": [
+            "slug_key",
+            "article_id"
+          ],
           "isUnique": true
         },
         "article_slug_article_id_idx": {
           "name": "article_slug_article_id_idx",
-          "columns": ["article_id"],
+          "columns": [
+            "article_id"
+          ],
           "isUnique": false
         }
       },
@@ -413,8 +455,12 @@
           "name": "article_slug_article_id_article_id_fk",
           "tableFrom": "article_slug",
           "tableTo": "article",
-          "columnsFrom": ["article_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "article_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -507,22 +553,33 @@
       "indexes": {
         "asset_object_key_unique": {
           "name": "asset_object_key_unique",
-          "columns": ["object_key"],
+          "columns": [
+            "object_key"
+          ],
           "isUnique": true
         },
         "asset_public_asset_id_unique": {
           "name": "asset_public_asset_id_unique",
-          "columns": ["public_asset_id"],
+          "columns": [
+            "public_asset_id"
+          ],
           "isUnique": true
         },
         "asset_public_reference_unique": {
           "name": "asset_public_reference_unique",
-          "columns": ["id", "public_asset_id", "lifecycle_state"],
+          "columns": [
+            "id",
+            "public_asset_id",
+            "lifecycle_state"
+          ],
           "isUnique": true
         },
         "asset_library_order_idx": {
           "name": "asset_library_order_idx",
-          "columns": ["lifecycle_state", "uploaded_at"],
+          "columns": [
+            "lifecycle_state",
+            "uploaded_at"
+          ],
           "isUnique": false
         }
       },
@@ -572,7 +629,9 @@
       "indexes": {
         "auth_rate_limit_reset_at_idx": {
           "name": "auth_rate_limit_reset_at_idx",
-          "columns": ["reset_at"],
+          "columns": [
+            "reset_at"
+          ],
           "isUnique": false
         }
       },
@@ -580,47 +639,6 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
-    },
-    "installation": {
-      "name": "installation",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'uninitialized'"
-        },
-        "initialized_at": {
-          "name": "initialized_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "installation_singleton": {
-          "name": "installation_singleton",
-          "value": "\"installation\".\"id\" = 1"
-        },
-        "installation_valid_state": {
-          "name": "installation_valid_state",
-          "value": "\"installation\".\"state\" IN ('uninitialized', 'initialized')"
-        }
-      }
     },
     "publication": {
       "name": "publication",
@@ -766,22 +784,32 @@
       "indexes": {
         "publication_id_article_id_unique": {
           "name": "publication_id_article_id_unique",
-          "columns": ["id", "article_id"],
+          "columns": [
+            "id",
+            "article_id"
+          ],
           "isUnique": true
         },
         "publication_article_number_unique": {
           "name": "publication_article_number_unique",
-          "columns": ["article_id", "publication_number"],
+          "columns": [
+            "article_id",
+            "publication_number"
+          ],
           "isUnique": true
         },
         "publication_slug_key_idx": {
           "name": "publication_slug_key_idx",
-          "columns": ["slug_key"],
+          "columns": [
+            "slug_key"
+          ],
           "isUnique": false
         },
         "publication_article_id_idx": {
           "name": "publication_article_id_idx",
-          "columns": ["article_id"],
+          "columns": [
+            "article_id"
+          ],
           "isUnique": false
         }
       },
@@ -790,8 +818,12 @@
           "name": "publication_article_id_article_id_fk",
           "tableFrom": "publication",
           "tableTo": "article",
-          "columnsFrom": ["article_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "article_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -799,8 +831,14 @@
           "name": "publication_slug_belongs_to_article",
           "tableFrom": "publication",
           "tableTo": "article_slug",
-          "columnsFrom": ["slug_key", "article_id"],
-          "columnsTo": ["slug_key", "article_id"],
+          "columnsFrom": [
+            "slug_key",
+            "article_id"
+          ],
+          "columnsTo": [
+            "slug_key",
+            "article_id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -845,7 +883,9 @@
       "indexes": {
         "publication_asset_reference_asset_idx": {
           "name": "publication_asset_reference_asset_idx",
-          "columns": ["asset_id"],
+          "columns": [
+            "asset_id"
+          ],
           "isUnique": false
         }
       },
@@ -854,8 +894,12 @@
           "name": "publication_asset_reference_publication_id_publication_id_fk",
           "tableFrom": "publication_asset_reference",
           "tableTo": "publication",
-          "columnsFrom": ["publication_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "publication_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -868,14 +912,21 @@
             "public_asset_id",
             "asset_lifecycle_state"
           ],
-          "columnsTo": ["id", "public_asset_id", "lifecycle_state"],
+          "columnsTo": [
+            "id",
+            "public_asset_id",
+            "lifecycle_state"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "publication_asset_reference_publication_id_asset_id_pk": {
-          "columns": ["publication_id", "asset_id"],
+          "columns": [
+            "publication_id",
+            "asset_id"
+          ],
           "name": "publication_asset_reference_publication_id_asset_id_pk"
         }
       },
@@ -980,12 +1031,16 @@
       "indexes": {
         "auth_session_token_unique": {
           "name": "auth_session_token_unique",
-          "columns": ["token"],
+          "columns": [
+            "token"
+          ],
           "isUnique": true
         },
         "auth_session_user_id_idx": {
           "name": "auth_session_user_id_idx",
-          "columns": ["user_id"],
+          "columns": [
+            "user_id"
+          ],
           "isUnique": false
         }
       },
@@ -994,8 +1049,12 @@
           "name": "auth_session_user_id_auth_user_id_fk",
           "tableFrom": "auth_session",
           "tableTo": "auth_user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1124,12 +1183,16 @@
       "indexes": {
         "auth_user_singleton_unique": {
           "name": "auth_user_singleton_unique",
-          "columns": ["singleton"],
+          "columns": [
+            "singleton"
+          ],
           "isUnique": true
         },
         "auth_user_email_unique": {
           "name": "auth_user_email_unique",
-          "columns": ["email"],
+          "columns": [
+            "email"
+          ],
           "isUnique": true
         }
       },
@@ -1192,7 +1255,9 @@
       "indexes": {
         "auth_verification_identifier_idx": {
           "name": "auth_verification_identifier_idx",
-          "columns": ["identifier"],
+          "columns": [
+            "identifier"
+          ],
           "isUnique": false
         }
       },

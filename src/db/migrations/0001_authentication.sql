@@ -23,15 +23,6 @@ CREATE TABLE `auth_rate_limit` (
 );
 --> statement-breakpoint
 CREATE INDEX `auth_rate_limit_reset_at_idx` ON `auth_rate_limit` (`reset_at`);--> statement-breakpoint
-CREATE TABLE `installation` (
-	`id` integer PRIMARY KEY NOT NULL,
-	`state` text DEFAULT 'uninitialized' NOT NULL,
-	`initialized_at` integer,
-	CONSTRAINT "installation_singleton" CHECK("installation"."id" = 1),
-	CONSTRAINT "installation_valid_state" CHECK("installation"."state" IN ('uninitialized', 'initialized'))
-);
---> statement-breakpoint
-INSERT INTO `installation` (`id`) VALUES (1);--> statement-breakpoint
 CREATE TABLE `auth_session` (
 	`id` text PRIMARY KEY NOT NULL,
 	`expires_at` integer NOT NULL,

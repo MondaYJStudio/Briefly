@@ -648,47 +648,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "installation": {
-      "name": "installation",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'uninitialized'"
-        },
-        "initialized_at": {
-          "name": "initialized_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "installation_singleton": {
-          "name": "installation_singleton",
-          "value": "\"installation\".\"id\" = 1"
-        },
-        "installation_valid_state": {
-          "name": "installation_valid_state",
-          "value": "\"installation\".\"state\" IN ('uninitialized', 'initialized')"
-        }
-      }
-    },
     "publication": {
       "name": "publication",
       "columns": {

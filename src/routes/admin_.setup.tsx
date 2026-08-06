@@ -69,7 +69,6 @@ function Setup() {
       description={
         state === "success" ? m.setup_success() : m.setup_description()
       }
-      footerLink={{ href: "/admin/login", label: m.sign_in() }}
       showHeader={state !== "success"}
     >
       {state === "checking" ? (

@@ -42,9 +42,6 @@ export async function checkRuntimeHealth(
 
     const authentication = await bindings.DB.prepare(
       `SELECT
-         (SELECT state FROM installation WHERE id = 1) AS installationState,
-         (SELECT COUNT(id) + COUNT(state) + COUNT(initialized_at)
-            FROM installation) AS installationColumns,
          (SELECT COUNT(id) + COUNT(singleton) + COUNT(name) + COUNT(email) +
                  COUNT(email_verified) + COUNT(image) + COUNT(created_at) +
                  COUNT(updated_at)
@@ -80,10 +77,6 @@ export async function checkRuntimeHealth(
                 'asset_public_asset_id_unique'
               )) AS requiredIndexCount,
          (SELECT COUNT(*) FROM sqlite_master
-            WHERE type = 'table' AND name = 'installation'
-              AND sql LIKE '%installation_singleton%'
-              AND sql LIKE '%installation_valid_state%') AS installationConstraints,
-         (SELECT COUNT(*) FROM sqlite_master
             WHERE type = 'table' AND name = 'auth_user'
               AND sql LIKE '%auth_user_singleton%') AS userConstraints,
          (SELECT COUNT(*) FROM sqlite_master
@@ -92,19 +85,13 @@ export async function checkRuntimeHealth(
               AND sql LIKE '%asset_width_positive%'
               AND sql LIKE '%asset_height_positive%') AS assetConstraints`,
     ).first<{
-      installationState: string | null;
       requiredIndexCount: number;
-      installationConstraints: number;
       userConstraints: number;
       assetConstraints: number;
     }>();
     if (
       !authentication ||
-      !["uninitialized", "initialized"].includes(
-        authentication.installationState ?? "",
-      ) ||
       authentication.requiredIndexCount !== 5 ||
-      authentication.installationConstraints !== 1 ||
       authentication.userConstraints !== 1 ||
       authentication.assetConstraints !== 1
     ) {

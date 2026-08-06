@@ -9,10 +9,10 @@ export type InitializationResult =
 export async function installationIsInitialized(
   database: D1Database,
 ): Promise<boolean> {
-  const installation = await database
-    .prepare("SELECT state FROM installation WHERE id = 1")
-    .first<{ state: string }>();
-  return installation?.state === "initialized";
+  const row = await database
+    .prepare("SELECT 1 AS ok FROM auth_user LIMIT 1")
+    .first<{ ok: number }>();
+  return row !== null;
 }
 
 export async function initializeAdministrator(
@@ -42,22 +42,13 @@ export async function initializeAdministrator(
       bindings.DB.prepare(
         `INSERT INTO auth_user
              (id, singleton, name, email, email_verified, created_at, updated_at)
-           SELECT ?, 1, 'Administrator', ?, 0, ?, ?
-           WHERE EXISTS (
-             SELECT 1 FROM installation
-             WHERE id = 1 AND state = 'uninitialized'
-           )`,
+           VALUES (?, 1, 'Administrator', ?, 0, ?, ?)`,
       ).bind(userId, email, now, now),
       bindings.DB.prepare(
         `INSERT INTO auth_account
              (id, account_id, provider_id, user_id, password, created_at, updated_at)
            VALUES (?, ?, 'credential', ?, ?, ?, ?)`,
       ).bind(crypto.randomUUID(), userId, userId, passwordHash, now, now),
-      bindings.DB.prepare(
-        `UPDATE installation
-           SET state = 'initialized', initialized_at = ?
-           WHERE id = 1 AND state = 'uninitialized'`,
-      ).bind(now),
     ]);
     return { ok: true };
   } catch {

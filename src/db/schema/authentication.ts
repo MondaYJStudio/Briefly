@@ -80,26 +80,6 @@ export const verification = sqliteTable(
   (table) => [index("auth_verification_identifier_idx").on(table.identifier)],
 );
 
-export const installation = sqliteTable(
-  "installation",
-  {
-    id: integer("id").primaryKey(),
-    state: text("state", {
-      enum: ["uninitialized", "initialized"],
-    })
-      .notNull()
-      .default("uninitialized"),
-    initializedAt: integer("initialized_at", { mode: "timestamp_ms" }),
-  },
-  (table) => [
-    check("installation_singleton", sql`${table.id} = 1`),
-    check(
-      "installation_valid_state",
-      sql`${table.state} IN ('uninitialized', 'initialized')`,
-    ),
-  ],
-);
-
 export const authenticationRateLimit = sqliteTable(
   "auth_rate_limit",
   {

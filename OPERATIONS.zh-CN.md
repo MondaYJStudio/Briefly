@@ -67,7 +67,7 @@ Briefly 处于 0.x 生命周期。发布说明必须明确指出任何破坏性 
 
 在部署接收第一个请求前，将 `BETTER_AUTH_SECRET`（至少 32 个字符）和 `SETUP_SECRET`（任意非空值）配置为相互独立的 Cloudflare 配置项。`BETTER_AUTH_SECRET` 建议用密码学安全的密码生成器生成。生产环境使用 `pnpm exec wrangler secret put <NAME> --env production` 写入（一键部署的 `SETUP_SECRET` 也可作为可见 Worker 变量）；不要把真实值放进已提交的 `wrangler.jsonc`、GitHub 变量、日志、URL 或已提交的 `.dev.vars`。
 
-全新安装通过 `/admin/setup` 认领。仅当 D1 安装标记仍为未初始化且请求提供正确 setup secret 时，初始化才会成功。D1 约束与原子认领会阻止并发请求创建第二个 Better Auth 用户。初始化成功后，初始化入口和 Better Auth 邮箱注册都会永久关闭；setup secret 不会存入 D1。认证身份保持私有，也不会被复用为公开署名。
+全新安装通过 `/admin/setup` 认领。仅当 `auth_user` 中尚无 Administrator 且请求提供正确 setup secret 时，初始化才会成功。D1 约束会阻止并发请求创建第二个 Better Auth 用户。初始化成功后，初始化入口和 Better Auth 邮箱注册都会永久关闭；setup secret 不会存入 D1。认证身份保持私有，也不会被复用为公开署名。
 
 唯一管理员的密码长度为 12–128 个字符，建议使用密码管理器生成。未知邮箱和错误密码返回完全相同的登录失败响应。
 

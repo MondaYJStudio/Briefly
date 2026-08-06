@@ -123,9 +123,6 @@ describe("Article unpublish", () => {
       env.DB.prepare("DELETE FROM auth_account"),
       env.DB.prepare("DELETE FROM auth_user"),
       env.DB.prepare("DELETE FROM auth_rate_limit"),
-      env.DB.prepare(
-        "UPDATE installation SET state = 'uninitialized', initialized_at = NULL WHERE id = 1",
-      ),
     ]);
   });
 

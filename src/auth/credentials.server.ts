@@ -29,8 +29,6 @@ async function findAdministratorCredential(
               auth_account.user_id AS userId
          FROM auth_account
          INNER JOIN auth_user ON auth_user.id = auth_account.user_id
-         INNER JOIN installation
-           ON installation.id = 1 AND installation.state = 'initialized'
         WHERE auth_user.singleton = 1
           AND auth_account.provider_id = 'credential'
           AND auth_account.password IS NOT NULL

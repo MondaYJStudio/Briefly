@@ -211,23 +211,6 @@ describe("Worker HTTP runtime", () => {
     }
   });
 
-  it("reports a missing authentication bootstrap capability", async () => {
-    await env.DB.prepare("DELETE FROM installation WHERE id = 1").run();
-
-    try {
-      const response = await SELF.fetch("http://briefly.test/health");
-
-      expect(response.status).toBe(503);
-      expect(await response.json()).toMatchObject({
-        status: "error",
-        code: "SCHEMA_INCOMPATIBLE",
-        schema: { status: "incompatible" },
-      });
-    } finally {
-      await env.DB.prepare("INSERT INTO installation (id) VALUES (1)").run();
-    }
-  });
-
   it("reports a missing authentication constraint capability", async () => {
     await env.DB.prepare("DROP INDEX auth_user_singleton_unique").run();
 
