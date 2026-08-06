@@ -521,7 +521,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await mediaDialog
       .getByRole("tab", { name: "Upload new", exact: true })
       .click();
-    await mediaDialog.getByLabel("Upload a verified image").setInputFiles({
+    await mediaDialog.getByLabel("Upload an image").setInputFiles({
       name: "critical-journey.png",
       mimeType: "image/png",
       buffer: onePixelPng,
@@ -582,7 +582,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page.getByRole("button", { name: "Upload image" }).click();
     const uploadDialog = page.getByRole("dialog", { name: "Upload image" });
     await expect(uploadDialog).toBeVisible();
-    await uploadDialog.getByLabel("Upload verified image").setInputFiles({
+    await uploadDialog.getByLabel("Upload image").setInputFiles({
       name: "not-an-image.txt",
       mimeType: "text/plain",
       buffer: Buffer.from("not an image"),
