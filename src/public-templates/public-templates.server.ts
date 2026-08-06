@@ -11,8 +11,10 @@ import {
   PUBLIC_TEMPLATE_R2_PREFIX,
   type InstalledPublicTemplate,
   type PublicTemplateValidationIssue,
+  isReservedBrieflyPublicPath,
 } from "./public-templates";
 
+export { isReservedBrieflyPublicPath };
 const templateManifestSchema = z.object({
   id: z.string().trim().min(1).max(120),
   version: z.string().trim().min(1).max(64),
@@ -346,6 +348,129 @@ export async function listInstalledPublicTemplates(
       installed_at: number;
     }>();
   return results.map((row) => templateFromRow(row, activeInstallationId));
+}
+
+export type ActivatePublicTemplateResult =
+  | { ok: true; template: InstalledPublicTemplate }
+  | { ok: false; reason: "not-found" };
+
+export type DeactivatePublicTemplateResult = { active: false };
+
+export async function activateInstalledPublicTemplate(
+  database: D1Database,
+  installationId: string,
+): Promise<ActivatePublicTemplateResult> {
+  const row = await database
+    .prepare(
+      `SELECT installation_id, manifest_id, version, name, installed_at
+       FROM installed_public_template
+       WHERE installation_id = ?`,
+    )
+    .bind(installationId)
+    .first<{
+      installation_id: string;
+      manifest_id: string;
+      version: string;
+      name: string;
+      installed_at: number;
+    }>();
+  if (!row) return { ok: false, reason: "not-found" };
+
+  await database
+    .prepare(
+      `UPDATE site_public_presentation
+       SET active_installation_id = ?
+       WHERE id = 1`,
+    )
+    .bind(installationId)
+    .run();
+
+  return {
+    ok: true,
+    template: templateFromRow(row, installationId),
+  };
+}
+
+export async function deactivateActivePublicTemplate(
+  database: D1Database,
+): Promise<DeactivatePublicTemplateResult> {
+  await database
+    .prepare(
+      `UPDATE site_public_presentation
+       SET active_installation_id = NULL
+       WHERE id = 1`,
+    )
+    .run();
+  return { active: false };
+}
+
+function relativePathFromUrlPathname(pathname: string): string | null {
+  if (pathname === "/" || pathname === "") return PUBLIC_TEMPLATE_INDEX_FILENAME;
+  const trimmed = pathname.replace(/^\/+/, "").replace(/\/+$/, "");
+  if (!trimmed) return PUBLIC_TEMPLATE_INDEX_FILENAME;
+  const normalized = normalizePackagePath(trimmed);
+  if (!normalized.ok) return null;
+  return normalized.relativePath;
+}
+
+export type ServeActivePublicTemplateResult =
+  | { kind: "pass-through" }
+  | { kind: "method-not-allowed" }
+  | { kind: "unavailable" }
+  | { kind: "response"; response: Response };
+
+export async function serveActivePublicTemplate(
+  database: D1Database,
+  bucket: R2Bucket,
+  request: Request,
+): Promise<ServeActivePublicTemplateResult> {
+  const activeInstallationId = await readActiveInstallationId(database);
+  if (!activeInstallationId) return { kind: "pass-through" };
+
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return { kind: "method-not-allowed" };
+  }
+
+  const url = new URL(request.url);
+  const relativePath = relativePathFromUrlPathname(url.pathname);
+  let object: R2ObjectBody | null = null;
+  let contentType = "application/octet-stream";
+
+  if (relativePath !== null) {
+    object = await bucket.get(objectKeyFor(activeInstallationId, relativePath));
+    contentType =
+      object?.httpMetadata?.contentType ??
+      contentTypesByExtension[extensionFor(relativePath) ?? ""] ??
+      "application/octet-stream";
+  }
+
+  if (!object) {
+    object = await bucket.get(
+      objectKeyFor(activeInstallationId, PUBLIC_TEMPLATE_INDEX_FILENAME),
+    );
+    contentType =
+      object?.httpMetadata?.contentType ?? "text/html; charset=utf-8";
+    if (!object) return { kind: "unavailable" };
+  }
+
+  const headers = new Headers({
+    "content-type": contentType,
+    "x-content-type-options": "nosniff",
+  });
+  if (typeof object.size === "number") {
+    headers.set("content-length", String(object.size));
+  }
+
+  const body =
+    request.method === "HEAD" ? null : await object.arrayBuffer();
+
+  return {
+    kind: "response",
+    response: new Response(body, {
+      status: 200,
+      headers,
+    }),
+  };
 }
 
 export async function installPublicTemplateFromZip(

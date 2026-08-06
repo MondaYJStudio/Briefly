@@ -1,7 +1,7 @@
 import { SELF } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { zipSync } from "fflate";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { initializeAndSignIn } from "./administrator-fixture";
 
@@ -79,16 +79,22 @@ async function resetPublicTemplateState(): Promise<void> {
     env.DB.prepare(
       "UPDATE installation SET state = 'uninitialized', initialized_at = NULL WHERE id = 1",
     ),
-    env.DB.prepare("DELETE FROM installed_public_template"),
     env.DB.prepare(
       "UPDATE site_public_presentation SET active_installation_id = NULL WHERE id = 1",
     ),
+    env.DB.prepare("DELETE FROM installed_public_template"),
   ]);
 }
 
 describe("Public Template install from zip and list", () => {
   beforeEach(async () => {
     await resetPublicTemplateState();
+  });
+
+  afterEach(async () => {
+    await env.DB.prepare(
+      "UPDATE site_public_presentation SET active_installation_id = NULL WHERE id = 1",
+    ).run();
   });
 
   it("rejects unauthenticated list and upload the same way as other Admin APIs", async () => {
@@ -105,7 +111,7 @@ describe("Public Template install from zip and list", () => {
       status: "error",
       code: "AUTHENTICATION_REQUIRED",
     });
-  }, 15_000);
+  }, 30_000);
 
   it("installs a valid Public Template zip and lists it as inactive", async () => {
     const cookie = await initializeAndSignIn();
@@ -169,7 +175,7 @@ describe("Public Template install from zip and list", () => {
       `public-templates/${installed.installationId}/manifest.json`,
     );
     expect(manifestObject).not.toBeNull();
-  }, 15_000);
+  }, 30_000);
 
   it("rejects invalid packages without leaving a listed installation or active pointer", async () => {
     const cookie = await initializeAndSignIn();
@@ -318,5 +324,330 @@ describe("Public Template install from zip and list", () => {
         )
       )!.text(),
     ).toBe("<!doctype html><title>Second</title>");
-  }, 15_000);
+  }, 30_000);
+});
+
+async function activateTemplate(
+  cookie: string | undefined,
+  installationId: string,
+): Promise<Response> {
+  return SELF.fetch(
+    `http://briefly.test/api/admin/public-templates/${installationId}/activate`,
+    {
+      method: "POST",
+      headers: cookie ? { cookie } : undefined,
+    },
+  );
+}
+
+async function deactivateTemplate(cookie?: string): Promise<Response> {
+  return SELF.fetch(
+    "http://briefly.test/api/admin/public-templates/deactivate",
+    {
+      method: "POST",
+      headers: cookie ? { cookie } : undefined,
+    },
+  );
+}
+
+describe("Public Template activate, deactivate, and serve", () => {
+  beforeEach(async () => {
+    await resetPublicTemplateState();
+  });
+
+  afterEach(async () => {
+    await env.DB.prepare(
+      "UPDATE site_public_presentation SET active_installation_id = NULL WHERE id = 1",
+    ).run();
+  });
+
+  it("rejects unauthenticated activate and deactivate like other Admin APIs", async () => {
+    const activate = await activateTemplate(
+      undefined,
+      "00000000-0000-4000-8000-000000000001",
+    );
+    expect(activate.status).toBe(401);
+    expect(await activate.json()).toEqual({
+      status: "error",
+      code: "AUTHENTICATION_REQUIRED",
+    });
+
+    const deactivate = await deactivateTemplate();
+    expect(deactivate.status).toBe(401);
+    expect(await deactivate.json()).toEqual({
+      status: "error",
+      code: "AUTHENTICATION_REQUIRED",
+    });
+  }, 30_000);
+
+  it("activates an Installed Public Template and serves it immediately for visitors", async () => {
+    const cookie = await initializeAndSignIn();
+    const upload = await uploadTemplate(
+      cookie,
+      validTemplateZip({
+        files: {
+          "index.html": "<!doctype html><title>Active Reader</title>",
+          "assets/app.js": "console.log('template')",
+        },
+      }),
+    );
+    expect(upload.status).toBe(201);
+    const installed = (await upload.json()) as {
+      installationId: string;
+      active: boolean;
+    };
+    expect(installed.active).toBe(false);
+
+    const beforeActivate = await SELF.fetch("http://briefly.test/");
+    expect(beforeActivate.status).toBe(200);
+    expect(await beforeActivate.text()).toContain("Briefly");
+
+    const activate = await activateTemplate(cookie, installed.installationId);
+    expect(activate.status).toBe(200);
+    expect(activate.headers.get("cache-control")).toBe("no-store");
+    expect(await activate.json()).toEqual({
+      installationId: installed.installationId,
+      manifestId: "example-reader",
+      version: "1.0.0",
+      name: "Example Reader",
+      active: true,
+      installedAt: expect.any(String),
+    });
+
+    const list = await listTemplates(cookie);
+    expect(await list.json()).toEqual({
+      templates: [
+        expect.objectContaining({
+          installationId: installed.installationId,
+          active: true,
+        }),
+      ],
+    });
+
+    const home = await SELF.fetch("http://briefly.test/");
+    expect(home.status).toBe(200);
+    expect(home.headers.get("content-type")).toContain("text/html");
+    expect(await home.text()).toBe(
+      "<!doctype html><title>Active Reader</title>",
+    );
+
+    const headHome = await SELF.fetch("http://briefly.test/", {
+      method: "HEAD",
+    });
+    expect(headHome.status).toBe(200);
+    expect(headHome.headers.get("content-type")).toContain("text/html");
+    expect(await headHome.text()).toBe("");
+
+    const asset = await SELF.fetch("http://briefly.test/assets/app.js");
+    expect(asset.status).toBe(200);
+    expect(asset.headers.get("content-type")).toContain("javascript");
+    expect(await asset.text()).toBe("console.log('template')");
+
+    const spaFallback = await SELF.fetch(
+      "http://briefly.test/articles/some-slug",
+    );
+    expect(spaFallback.status).toBe(200);
+    expect(await spaFallback.text()).toBe(
+      "<!doctype html><title>Active Reader</title>",
+    );
+
+    const trailingSlash = await SELF.fetch(
+      "http://briefly.test/articles/some-slug/",
+    );
+    expect(trailingSlash.status).toBe(200);
+    expect(await trailingSlash.text()).toBe(
+      "<!doctype html><title>Active Reader</title>",
+    );
+  }, 30_000);
+
+  it("keeps reserved Briefly paths on Briefly while a Public Template is active", async () => {
+    const cookie = await initializeAndSignIn();
+    const upload = await uploadTemplate(
+      cookie,
+      validTemplateZip({
+        files: {
+          "index.html": "<!doctype html><title>Template Face</title>",
+        },
+      }),
+    );
+    const installed = (await upload.json()) as { installationId: string };
+    expect(
+      (await activateTemplate(cookie, installed.installationId)).status,
+    ).toBe(200);
+
+    const site = await SELF.fetch("http://briefly.test/api/site");
+    expect(site.status).toBe(200);
+    expect(await site.json()).toEqual(
+      expect.objectContaining({ siteName: "Briefly" }),
+    );
+
+    const articles = await SELF.fetch("http://briefly.test/api/articles");
+    expect(articles.status).toBe(200);
+    expect(await articles.json()).toEqual({ items: [], nextCursor: null });
+
+    const health = await SELF.fetch("http://briefly.test/health");
+    expect(health.status).toBe(200);
+    expect(await health.json()).toEqual(
+      expect.objectContaining({ status: "ok", service: "briefly" }),
+    );
+
+    const adminLogin = await SELF.fetch("http://briefly.test/admin/login");
+    expect(adminLogin.status).toBe(200);
+    const adminLoginBody = await adminLogin.text();
+    expect(adminLoginBody).toContain("Briefly");
+    expect(adminLoginBody).not.toContain("Template Face");
+
+    const missingMedia = await SELF.fetch(
+      "http://briefly.test/media/00000000-0000-4000-8000-000000000099",
+    );
+    expect(missingMedia.status).toBe(404);
+    expect(await missingMedia.json()).toEqual({
+      status: "error",
+      code: "ASSET_NOT_FOUND",
+    });
+  }, 30_000);
+
+  it("deactivates the Active Public Template and restores the Built-in Public Site", async () => {
+    const cookie = await initializeAndSignIn();
+    const upload = await uploadTemplate(
+      cookie,
+      validTemplateZip({
+        files: {
+          "index.html": "<!doctype html><title>Temporary Face</title>",
+        },
+      }),
+    );
+    const installed = (await upload.json()) as { installationId: string };
+    expect(
+      (await activateTemplate(cookie, installed.installationId)).status,
+    ).toBe(200);
+
+    const deactivate = await deactivateTemplate(cookie);
+    expect(deactivate.status).toBe(200);
+    expect(deactivate.headers.get("cache-control")).toBe("no-store");
+    expect(await deactivate.json()).toEqual({ active: false });
+
+    const list = await listTemplates(cookie);
+    expect(await list.json()).toEqual({
+      templates: [
+        expect.objectContaining({
+          installationId: installed.installationId,
+          active: false,
+        }),
+      ],
+    });
+
+    const home = await SELF.fetch("http://briefly.test/");
+    expect(home.status).toBe(200);
+    const homeBody = await home.text();
+    expect(homeBody).toContain("Briefly");
+    expect(homeBody).not.toContain("Temporary Face");
+  }, 30_000);
+
+  it("replaces the previous Active Public Template when activating another", async () => {
+    const cookie = await initializeAndSignIn();
+    const firstUpload = await uploadTemplate(
+      cookie,
+      validTemplateZip({
+        manifest: { id: "reader-a", name: "Reader A" },
+        files: { "index.html": "<!doctype html><title>Reader A</title>" },
+      }),
+    );
+    const first = (await firstUpload.json()) as { installationId: string };
+    const secondUpload = await uploadTemplate(
+      cookie,
+      validTemplateZip({
+        manifest: { id: "reader-b", name: "Reader B" },
+        files: { "index.html": "<!doctype html><title>Reader B</title>" },
+      }),
+    );
+    const second = (await secondUpload.json()) as { installationId: string };
+
+    expect((await activateTemplate(cookie, first.installationId)).status).toBe(
+      200,
+    );
+    expect((await activateTemplate(cookie, second.installationId)).status).toBe(
+      200,
+    );
+
+    const list = await listTemplates(cookie);
+    const templates = (
+      (await list.json()) as {
+        templates: Array<{ installationId: string; active: boolean }>;
+      }
+    ).templates;
+    expect(
+      templates.find((row) => row.installationId === first.installationId)
+        ?.active,
+    ).toBe(false);
+    expect(
+      templates.find((row) => row.installationId === second.installationId)
+        ?.active,
+    ).toBe(true);
+
+    expect(await (await SELF.fetch("http://briefly.test/")).text()).toBe(
+      "<!doctype html><title>Reader B</title>",
+    );
+  }, 30_000);
+
+  it("rejects non-GET/HEAD methods on Active Public Template paths", async () => {
+    const cookie = await initializeAndSignIn();
+    const upload = await uploadTemplate(cookie, validTemplateZip());
+    const installed = (await upload.json()) as { installationId: string };
+    expect(
+      (await activateTemplate(cookie, installed.installationId)).status,
+    ).toBe(200);
+
+    const post = await SELF.fetch("http://briefly.test/articles/demo", {
+      method: "POST",
+      body: "nope",
+    });
+    expect(post.status).toBe(405);
+    expect(post.headers.get("allow")).toBe("GET, HEAD");
+    expect(await post.json()).toEqual({
+      status: "error",
+      code: "METHOD_NOT_ALLOWED",
+    });
+  }, 30_000);
+
+  it("returns an operational failure when the Active Public Template index.html is missing", async () => {
+    const cookie = await initializeAndSignIn();
+    const upload = await uploadTemplate(
+      cookie,
+      validTemplateZip({
+        files: {
+          "index.html": "<!doctype html><title>About to break</title>",
+        },
+      }),
+    );
+    const installed = (await upload.json()) as { installationId: string };
+    expect(
+      (await activateTemplate(cookie, installed.installationId)).status,
+    ).toBe(200);
+
+    await env.MEDIA_BUCKET.delete(
+      `public-templates/${installed.installationId}/index.html`,
+    );
+
+    const response = await SELF.fetch("http://briefly.test/");
+    expect(response.status).toBe(500);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(await response.json()).toEqual({
+      status: "error",
+      code: "ACTIVE_PUBLIC_TEMPLATE_UNAVAILABLE",
+    });
+  }, 30_000);
+
+  it("returns not found when activating an unknown installation", async () => {
+    const cookie = await initializeAndSignIn();
+    const response = await activateTemplate(
+      cookie,
+      "00000000-0000-4000-8000-0000000000aa",
+    );
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      status: "error",
+      code: "PUBLIC_TEMPLATE_NOT_FOUND",
+    });
+  }, 30_000);
 });

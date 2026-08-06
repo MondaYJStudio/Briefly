@@ -40,3 +40,15 @@ export interface PublicTemplateValidationIssue {
   path: string;
   message: string;
 }
+
+export function isReservedBrieflyPublicPath(pathname: string): boolean {
+  return (
+    pathname === "/health" ||
+    pathname === "/api" ||
+    pathname.startsWith("/api/") ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/media" ||
+    pathname.startsWith("/media/")
+  );
+}

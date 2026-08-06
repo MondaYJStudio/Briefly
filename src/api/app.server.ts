@@ -44,6 +44,8 @@ import {
   type RuntimeBindings,
 } from "../env/runtime.server";
 import {
+  activateInstalledPublicTemplate,
+  deactivateActivePublicTemplate,
   installPublicTemplateFromZip,
   listInstalledPublicTemplates,
 } from "../public-templates/public-templates.server";
@@ -630,6 +632,44 @@ function createApi(getBindings: () => RuntimeBindings) {
       },
       { body: t.Object({ file: t.File() }) },
     )
+    .post(
+      "/admin/public-templates/:installationId/activate",
+      async ({ params, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        const result = await activateInstalledPublicTemplate(
+          bindings.DB,
+          params.installationId,
+        );
+        return result.ok
+          ? result.template
+          : status(404, {
+              status: "error" as const,
+              code: "PUBLIC_TEMPLATE_NOT_FOUND" as const,
+            });
+      },
+      {
+        params: t.Object({ installationId: t.String({ format: "uuid" }) }),
+      },
+    )
+    .post("/admin/public-templates/deactivate", async ({ request, set, status }) => {
+      const bindings = getBindings();
+      set.headers["cache-control"] = "no-store";
+      if (!(await administratorIsAuthenticated(bindings, request)))
+        return status(401, {
+          status: "error" as const,
+          code: "AUTHENTICATION_REQUIRED" as const,
+        });
+
+      const result = await deactivateActivePublicTemplate(bindings.DB);
+      return { active: result.active };
+    })
     .post(
       "/admin/assets",
       async ({ body, request, set, status }) => {

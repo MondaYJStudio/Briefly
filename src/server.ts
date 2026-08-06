@@ -13,6 +13,8 @@ import {
   requestUsesApplicationOrigin,
 } from "./env/origin.server";
 
+import { isReservedBrieflyPublicPath } from "./public-templates/public-templates";
+
 type WorkerBindings = RuntimeBindings;
 
 function authenticationRateLimitFor(
@@ -240,6 +242,38 @@ const worker = {
           requestId,
         );
         response.headers.set("cache-control", "no-store");
+      } else if (!isReservedBrieflyPublicPath(requestUrl.pathname)) {
+        const { serveActivePublicTemplate } =
+          await import("./public-templates/public-templates.server");
+        const served = await serveActivePublicTemplate(
+          configuration.bindings.DB,
+          configuration.bindings.MEDIA_BUCKET,
+          request,
+        );
+        if (served.kind === "method-not-allowed") {
+          response = jsonResponse(
+            { status: "error", code: "METHOD_NOT_ALLOWED" },
+            405,
+            requestId,
+          );
+          response.headers.set("allow", "GET, HEAD");
+          diagnosisCode = "METHOD_NOT_ALLOWED";
+        } else if (served.kind === "unavailable") {
+          response = jsonResponse(
+            { status: "error", code: "ACTIVE_PUBLIC_TEMPLATE_UNAVAILABLE" },
+            500,
+            requestId,
+          );
+          diagnosisCode = "INTERNAL_ERROR";
+        } else if (served.kind === "response") {
+          served.response.headers.set("x-request-id", requestId);
+          response = served.response;
+        } else {
+          response = withRequestId(
+            await handleStartRequest(request, configuration.bindings),
+            requestId,
+          );
+        }
       } else {
         response = withRequestId(
           await handleStartRequest(request, configuration.bindings),
