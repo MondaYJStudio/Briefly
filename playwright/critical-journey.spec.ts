@@ -241,7 +241,9 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page.getByLabel("Email").fill(administratorEmail);
     await page.getByLabel("Password").fill(administratorPassword);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByText(administratorEmail, { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(administratorEmail, { exact: true }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", {
         name: `Settings and account menu — ${administratorEmail}`,
@@ -264,9 +266,10 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await expect(
       page.getByRole("navigation", { name: "Content sections" }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Articles" }),
-    ).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "Articles" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
 
     await page.getByRole("link", { name: "Media" }).click();
     await expect(page).toHaveURL(/\/admin\/media$/);
@@ -286,9 +289,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
     await expect(page).toHaveURL(/\/admin\/articles$/);
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog", { name: "Settings" })).toHaveCount(
-      0,
-    );
+    await expect(page.getByRole("dialog", { name: "Settings" })).toHaveCount(0);
 
     await identityMenu().click();
     await page.getByRole("menuitem", { name: "Account" }).click();
@@ -1123,6 +1124,113 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
       concurrentConflictDraftTitle,
     );
     await expect(page.getByLabel("Article body")).toContainText(revisedBody);
+  });
+
+  await test.step("Trash restore stays unpublished and purge requires typed title confirmation", async () => {
+    await page
+      .getByRole("button", { name: "Move this Article to Trash?" })
+      .click();
+    const trashConfirm = page.getByRole("alertdialog", {
+      name: "Move this Article to Trash?",
+    });
+    await trashConfirm
+      .getByRole("button", { name: "Move Article to Trash" })
+      .click();
+    await expect(page).toHaveURL(/\/admin\/articles$/);
+    await page.getByRole("link", { name: "Trash" }).click();
+    await expect(page).toHaveURL(/\/admin\/trash$/);
+    await expect(
+      page.getByText("Recovery and permanent removal", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(concurrentConflictDraftTitle, { exact: true }),
+    ).toBeVisible();
+
+    await page
+      .getByRole("button", {
+        name: `Restore ${concurrentConflictDraftTitle} from Trash`,
+      })
+      .click();
+    const restoreDialog = page.getByRole("alertdialog", {
+      name: "Restore this Article from Trash?",
+    });
+    const restoreTrigger = page.getByRole("button", {
+      name: `Restore ${concurrentConflictDraftTitle} from Trash`,
+    });
+    await restoreDialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(restoreDialog).toHaveCount(0);
+    await expect(restoreTrigger).toBeFocused();
+
+    await restoreTrigger.click();
+    await page
+      .getByRole("alertdialog", { name: "Restore this Article from Trash?" })
+      .getByRole("button", { name: "Restore Article" })
+      .click();
+    await expect(
+      page.getByText("Article restored", { exact: true }),
+    ).toBeVisible();
+    expect(
+      (await anonymous.request.get(`/api/articles/${slug}`)).status(),
+    ).toBe(404);
+
+    await page.getByRole("link", { name: "Articles" }).click();
+    await page
+      .getByRole("button", {
+        name: new RegExp(`^${concurrentConflictDraftTitle}`),
+      })
+      .click();
+    await expect(page).toHaveURL(/\/admin\/articles\/[^/]+$/);
+    await page
+      .getByRole("button", { name: "Move this Article to Trash?" })
+      .click();
+    await page
+      .getByRole("alertdialog", { name: "Move this Article to Trash?" })
+      .getByRole("button", { name: "Move Article to Trash" })
+      .click();
+    await expect(page).toHaveURL(/\/admin\/articles$/);
+    await page.getByRole("link", { name: "Trash" }).click();
+
+    const purgeButton = page.getByRole("button", {
+      name: `Permanently purge ${concurrentConflictDraftTitle}`,
+    });
+    await purgeButton.click();
+    const purgeDialog = page.getByRole("alertdialog", {
+      name: "Delete permanently",
+    });
+    const confirmInput = purgeDialog.getByRole("textbox");
+    const confirmPurge = purgeDialog.getByRole("button", {
+      name: "Delete permanently",
+      exact: true,
+    });
+    await expect(confirmPurge).toBeDisabled();
+    await confirmInput.fill("wrong title");
+    await expect(confirmPurge).toBeDisabled();
+    await confirmInput.fill(concurrentConflictDraftTitle);
+    await expect(confirmPurge).toBeEnabled();
+    await purgeDialog.getByRole("button", { name: /Cancel/ }).click();
+    await expect(purgeDialog).toHaveCount(0);
+    await expect(purgeButton).toBeFocused();
+
+    await purgeButton.click();
+    await page
+      .getByRole("alertdialog", { name: "Delete permanently" })
+      .getByRole("textbox")
+      .fill(concurrentConflictDraftTitle);
+    await page
+      .getByRole("alertdialog", { name: "Delete permanently" })
+      .getByRole("button", { name: "Delete permanently", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Deleted permanently" }),
+    ).toBeVisible();
+    await expect(page.getByText(/410 Gone/, { exact: false })).toBeVisible();
+    await expect(page.getByText(/media files were not touched/i)).toBeVisible();
+    await expect(
+      page.getByText(concurrentConflictDraftTitle, { exact: true }),
+    ).toHaveCount(0);
+    expect(
+      (await anonymous.request.get(`/api/articles/${slug}`)).status(),
+    ).toBe(410);
   });
 
   await test.step("sign out and reject the discarded browser session", async () => {

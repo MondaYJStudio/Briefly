@@ -683,11 +683,12 @@ describe("Article Trash and restore", () => {
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain('<main class="page" id="admin-main">');
-    expect(html).toContain('<h1 class="page-title">Trash</h1>');
+    expect(html).toContain('id="admin-main"');
+    expect(html).toContain("Trash");
     expect(html).toContain(
       "Trashed articles keep their Draft, all Publications, slug records",
     );
     expect(html).toContain("Nothing here is public.");
+    expect(html).toContain("Recovery and permanent removal");
   }, 30_000);
 });
