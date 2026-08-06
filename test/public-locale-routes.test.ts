@@ -112,7 +112,8 @@ describe("public Interface Locale routes", () => {
     const html = await response.text();
 
     expect(html).toContain('<html lang="en"');
-    expect(html).toContain("Back to home");
+    expect(html).toMatch(/masthead__name"><a href="\/"/);
+    expect(html).not.toContain("Back to home");
     expect(html).toContain("Published");
     const englishDate = html.match(
       /Published(?:<!--\s*-->)?\s*<time dateTime="([^"]+)">([^<]+)<\/time>/,
@@ -150,7 +151,8 @@ describe("public Interface Locale routes", () => {
     const html = await response.text();
 
     expect(html).toContain('<html lang="zh-CN"');
-    expect(html).toContain("返回首页");
+    expect(html).toMatch(/masthead__name"><a href="\/zh-CN\/?"/);
+    expect(html).not.toContain("返回首页");
     expect(html).toContain("发布于");
     const chineseDate = html.match(
       /发布于(?:<!--\s*-->)?\s*<time dateTime="([^"]+)">([^<]+)<\/time>/,
@@ -177,7 +179,8 @@ describe("public Interface Locale routes", () => {
     const englishHtml = await english.text();
     expect(englishHtml).toContain('<html lang="en"');
     expect(englishHtml).toContain("Article unavailable");
-    expect(englishHtml).toContain("Back to home");
+    expect(englishHtml).toMatch(/masthead__name"><a href="\/"/);
+    expect(englishHtml).not.toContain("Back to home");
 
     const chinese = await SELF.fetch(
       "http://briefly.test/zh-CN/articles/does-not-exist",
@@ -186,7 +189,8 @@ describe("public Interface Locale routes", () => {
     const chineseHtml = await chinese.text();
     expect(chineseHtml).toContain('<html lang="zh-CN"');
     expect(chineseHtml).toContain("文章不可用");
-    expect(chineseHtml).toContain("返回首页");
+    expect(chineseHtml).toMatch(/masthead__name"><a href="\/zh-CN\/?"/);
+    expect(chineseHtml).not.toContain("返回首页");
   });
 
   it("localizes the home chrome for both locale URLs", async () => {

@@ -153,19 +153,6 @@ export function PublicSiteShell({
             </nav>
           ) : null}
           <div className="masthead__controls">
-            <label className="locale-switch">
-              <span className="sr-only">{m.interface_language()}</span>
-              <select
-                value={locale}
-                aria-label={m.interface_language()}
-                onChange={(event) =>
-                  switchLocale(event.target.value as Locale)
-                }
-              >
-                <option value="en">{m.switch_to_english()}</option>
-                <option value="zh-CN">{m.switch_to_zh_cn()}</option>
-              </select>
-            </label>
             <button
               className="theme-toggle"
               type="button"
@@ -185,10 +172,25 @@ export function PublicSiteShell({
         {children}
 
         <footer className="colophon reveal" style={revealStyle(5)}>
-          <p>
-            {m.public_powered_by()}{" "}
-            <a href="https://github.com/MondaYJStudio/Briefly">Briefly</a>
-          </p>
+          <div className="colophon__row">
+            <p>
+              {m.public_powered_by()}{" "}
+              <a href="https://github.com/MondaYJStudio/Briefly">Briefly</a>
+            </p>
+            <label className="colophon__locale">
+              <span className="sr-only">{m.interface_language()}</span>
+              <select
+                value={locale}
+                aria-label={m.interface_language()}
+                onChange={(event) =>
+                  switchLocale(event.target.value as Locale)
+                }
+              >
+                <option value="en">{m.switch_to_english()}</option>
+                <option value="zh-CN">{m.switch_to_zh_cn()}</option>
+              </select>
+            </label>
+          </div>
         </footer>
       </div>
     </div>

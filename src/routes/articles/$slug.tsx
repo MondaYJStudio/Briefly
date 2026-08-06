@@ -1,4 +1,4 @@
-import { Link, createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound } from "@tanstack/react-router";
 import type { CSSProperties } from "react";
 
 import { getApiClient } from "../api.$";
@@ -53,13 +53,18 @@ function revealStyle(index: number): CSSProperties {
   return { "--i": index } as CSSProperties;
 }
 
+function MetaSep() {
+  return (
+    <span className="article-header__sep" aria-hidden="true">
+      ·
+    </span>
+  );
+}
+
 function ArticleUnavailable() {
   return (
     <PublicSiteShell siteName="Briefly" variant="interior">
-      <main>
-        <Link className="back-link" to="/">
-          ← {m.public_back_to_home()}
-        </Link>
+      <main className="reading">
         <section className="unavailable reveal" style={revealStyle(1)}>
           <div className="section-head">
             <h2>{m.public_article_unavailable()}</h2>
@@ -79,13 +84,11 @@ function ArticlePage() {
 
   return (
     <PublicSiteShell siteName={site.siteName} variant="interior">
-      <main>
-        <Link className="back-link reveal" style={revealStyle(1)} to="/">
-          ← {m.public_back_to_home()}
-        </Link>
+      <main className="reading">
         <article lang={article.language}>
-          <header className="article-header reveal" style={revealStyle(2)}>
+          <header className="article-header reveal" style={revealStyle(1)}>
             <h1 className="article-header__title">{article.title}</h1>
+            <hr className="article-header__rule" aria-hidden="true" />
             <p className="article-header__meta">
               <span>
                 {article.byline.url ? (
@@ -108,12 +111,27 @@ function ArticlePage() {
                 </time>
               </span>
               {updated ? (
-                <span>
-                  {m.public_updated()}{" "}
-                  <time dateTime={publicationTimestamp(article.updatedAt)}>
-                    {updatedLabel}
-                  </time>
-                </span>
+                <>
+                  <MetaSep />
+                  <span>
+                    {m.public_updated()}{" "}
+                    <time dateTime={publicationTimestamp(article.updatedAt)}>
+                      {updatedLabel}
+                    </time>
+                  </span>
+                </>
+              ) : null}
+              {article.tags.length > 0 ? (
+                <>
+                  <span className="article-header__meta-pipe" aria-hidden="true">
+                    |
+                  </span>
+                  <span className="article-header__tags">
+                    {article.tags.map((tag) => (
+                      <span key={tag}>{tag}</span>
+                    ))}
+                  </span>
+                </>
               ) : null}
             </p>
             {article.summary ? (
@@ -122,7 +140,7 @@ function ArticlePage() {
           </header>
           <div
             className="article-body reveal"
-            style={revealStyle(3)}
+            style={revealStyle(2)}
             // Publication HTML is authored by the sole Administrator and
             // rendered server-side into semantic markup at publish time.
             dangerouslySetInnerHTML={{ __html: article.html }}
