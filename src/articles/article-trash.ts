@@ -1,23 +1,20 @@
 /** Shared Trash purge confirmation rules (UI + Worker). */
 
-export function expectedPurgeConfirmation(input: {
-  articleId: string;
-  title: string;
-}): string {
-  return input.title.length > 0 ? input.title : input.articleId;
-}
+export const purgeConfirmationPhrases = {
+  en: "confirm delete",
+  "zh-CN": "确认删除",
+} as const;
+
+const acceptedPurgeConfirmationPhrases = Object.values(
+  purgeConfirmationPhrases,
+);
 
 export function purgeConfirmationMatches(input: {
-  articleId: string;
-  title: string;
   confirmationTitle: string;
 }): boolean {
-  if (input.confirmationTitle.length === 0) return false;
-  return (
-    input.confirmationTitle ===
-    expectedPurgeConfirmation({
-      articleId: input.articleId,
-      title: input.title,
-    })
+  const normalized = input.confirmationTitle.trim();
+  if (normalized.length === 0) return false;
+  return acceptedPurgeConfirmationPhrases.includes(
+    normalized as (typeof acceptedPurgeConfirmationPhrases)[number],
   );
 }

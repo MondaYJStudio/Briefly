@@ -1,19 +1,9 @@
-import {
-  Alert,
-  AlertDialog,
-  Button,
-  Input,
-  Label,
-  Spinner,
-} from "@heroui/react";
+import { Alert, AlertDialog, Button, Input, Label } from "@heroui/react";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useId, useRef, useState } from "react";
 
 import type { ArticleTrashEntry } from "../../articles/articles";
-import {
-  expectedPurgeConfirmation,
-  purgeConfirmationMatches,
-} from "../../articles/article-trash";
+import { purgeConfirmationMatches } from "../../articles/article-trash";
 import { m } from "../../paraglide/messages.js";
 import { getLocale } from "../../paraglide/runtime.js";
 import { AdminIcon } from "./icons";
@@ -30,10 +20,7 @@ function formatTrashedAt(trashedAt: string | Date): string {
   return date.toLocaleString(getLocale());
 }
 
-/**
- * Trash: trashed articles with restore and permanent-purge confirmations,
- * plus the reference "three different verbs" explainer.
- */
+/** Trash: trashed articles with restore and permanent-purge confirmations. */
 export function TrashView({
   workspace,
 }: Readonly<{ workspace: ArticleWorkspace }>) {
@@ -57,19 +44,10 @@ export function TrashView({
   const purgeTriggerRef = useRef<HTMLElement | null>(null);
   const confirmInputId = useId();
   const navigate = useNavigate();
-  const expectedConfirmation = purgeTarget
-    ? expectedPurgeConfirmation({
-        articleId: purgeTarget.id,
-        title: purgeTarget.title,
-      })
-    : "";
-  const purgeConfirmed =
-    purgeTarget !== null &&
-    purgeConfirmationMatches({
-      articleId: purgeTarget.id,
-      title: purgeTarget.title,
-      confirmationTitle: purgeConfirmation,
-    });
+  const confirmPhrase = m.trash_purge_confirm_phrase();
+  const purgeConfirmed = purgeConfirmationMatches({
+    confirmationTitle: purgeConfirmation,
+  });
 
   useEffect(() => {
     if (purgeTarget === null) setPurgeConfirmation("");
@@ -88,15 +66,6 @@ export function TrashView({
       </header>
 
       <div className={styles.stack}>
-        <Alert status="warning" role="note">
-          <Alert.Content>
-            <Alert.Title>{m.trash_capability_title()}</Alert.Title>
-            <Alert.Description>
-              {m.trash_capability_description()}
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
-
         {trashActionState === "trashed" ? (
           <Alert status="success" role="status">
             <Alert.Content>
@@ -164,10 +133,7 @@ export function TrashView({
             </div>
           </div>
         ) : trashViewState === "loading" ? (
-          <div className={`card card-pad ${styles.loadingRow}`} role="status">
-            <Spinner aria-label={m.trash_loading_label()} />
-            <span>{m.trash_loading()}</span>
-          </div>
+          <TrashListSkeleton />
         ) : trashViewState === "error" ? (
           <div className="card">
             <div className="empty">
@@ -284,28 +250,6 @@ export function TrashView({
             </ul>
           </div>
         )}
-
-        {!showPurgedOutcome && trashedArticles.length > 0 ? (
-          <div className="card card-pad">
-            <h2 className={styles.verbsTitle}>{m.trash_verbs_title()}</h2>
-            <div className={styles.verbsStack}>
-              <p className={`small muted ${styles.verbLine}`}>
-                <StatusChip variant="warning">
-                  {m.trash_verb_unpublish()}
-                </StatusChip>
-                {m.trash_verb_unpublish_description()}
-              </p>
-              <p className={`small muted ${styles.verbLine}`}>
-                <StatusChip variant="default">{m.trash_verb_move()}</StatusChip>
-                {m.trash_verb_move_description()}
-              </p>
-              <p className={`small muted ${styles.verbLine}`}>
-                <StatusChip variant="danger">{m.trash_verb_purge()}</StatusChip>
-                {m.trash_verb_purge_description()}
-              </p>
-            </div>
-          </div>
-        ) : null}
       </div>
 
       <AlertDialog.Backdrop
@@ -379,16 +323,14 @@ export function TrashView({
               </ul>
               <div className={styles.confirmField}>
                 <Label htmlFor={confirmInputId}>
-                  {purgeTarget && purgeTarget.title.length > 0
-                    ? m.trash_purge_type_title({ title: purgeTarget.title })
-                    : m.trash_purge_type_id()}
+                  {m.trash_purge_type_phrase({ phrase: confirmPhrase })}
                 </Label>
                 <Input
                   fullWidth
                   id={confirmInputId}
                   value={purgeConfirmation}
                   autoComplete="off"
-                  placeholder={expectedConfirmation}
+                  placeholder={confirmPhrase}
                   onChange={(event) =>
                     setPurgeConfirmation(event.currentTarget.value)
                   }
@@ -417,5 +359,60 @@ export function TrashView({
         </AlertDialog.Container>
       </AlertDialog.Backdrop>
     </main>
+  );
+}
+
+const trashSkeletonRows = [
+  { title: "40%", meta: ["28%", "18%", "32%"] },
+  { title: "55%", meta: ["24%", "20%", "36%"] },
+  { title: "35%", meta: ["30%", "22%", "28%"] },
+] as const;
+
+function TrashListSkeleton() {
+  return (
+    <div
+      className="card"
+      aria-busy="true"
+      role="status"
+      aria-label={m.trash_loading_label()}
+    >
+      <div className={styles.list} aria-hidden="true">
+        {trashSkeletonRows.map((row) => (
+          <div className={styles.skeletonRow} key={row.title}>
+            <div className={styles.skeletonMain}>
+              <div className={styles.skeletonTitleLine}>
+                <div
+                  className="skeleton"
+                  style={{ width: row.title, height: "1rem" }}
+                />
+                <div
+                  className="skeleton"
+                  style={{ width: "5.5rem", height: "1.25rem" }}
+                />
+              </div>
+              <div className={styles.skeletonMeta}>
+                {row.meta.map((width) => (
+                  <div
+                    key={width}
+                    className="skeleton"
+                    style={{ width, height: "0.75rem" }}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className={styles.skeletonSide}>
+              <div
+                className="skeleton"
+                style={{ width: "4rem", height: "2rem" }}
+              />
+              <div
+                className="skeleton"
+                style={{ width: "5.5rem", height: "2rem" }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
