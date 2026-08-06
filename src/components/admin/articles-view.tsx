@@ -106,17 +106,6 @@ export function ArticlesView({
           <p className={styles.pageDesc}>{m.articles_page_description()}</p>
         </div>
         <div className={styles.pageActions}>
-          {!loadingEmpty ? (
-            <Button
-              type="button"
-              variant="ghost"
-              aria-label={m.reload_articles()}
-              isDisabled={creating || articleSelectionDisabled}
-              onPress={() => void reloadArticles({ soft: articles.length > 0 })}
-            >
-              {m.retry()}
-            </Button>
-          ) : null}
           <Button
             type="button"
             aria-label={m.create_article_draft()}
@@ -142,6 +131,7 @@ export function ArticlesView({
             type="button"
             size="sm"
             variant="secondary"
+            aria-label={m.reload_articles()}
             onPress={() => void reloadArticles({ soft: true })}
           >
             {m.retry()}
@@ -174,6 +164,7 @@ export function ArticlesView({
             type="button"
             size="sm"
             variant="secondary"
+            aria-label={m.reload_articles()}
             onPress={() => void reloadArticles()}
           >
             {m.retry()}

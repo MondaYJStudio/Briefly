@@ -967,16 +967,21 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
       }
       await route.continue();
     });
-    await page.getByRole("button", { name: "Reload Articles" }).click();
+    await page.reload();
     await expect(page.getByText("Unable to load Articles")).toBeVisible();
     await expect(
       page.getByRole("button", {
         name: new RegExp(`${postPublishDraftTitle} · Draft v`),
       }),
-    ).toBeVisible();
+    ).toHaveCount(0);
     await page.unroute("**/api/admin/articles");
     await page.getByRole("button", { name: "Reload Articles" }).click();
     await expect(page.getByText("Unable to load Articles")).toHaveCount(0);
+    await expect(
+      page.getByRole("button", {
+        name: new RegExp(`${postPublishDraftTitle} · Draft v`),
+      }),
+    ).toBeVisible();
   });
 
   await test.step("target canonical Publication Issues at their authoring surfaces", async () => {
