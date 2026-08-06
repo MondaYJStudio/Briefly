@@ -394,6 +394,7 @@ export async function installPublicTemplateFromZip(
     return { ok: false, reason: "storage-failed" };
   }
 
+  const previousInstallationId = existing?.installation_id;
   try {
     if (existing) {
       const activeInstallationId = await readActiveInstallationId(database);
@@ -438,7 +439,6 @@ export async function installPublicTemplateFromZip(
         );
       }
       await database.batch(statements);
-      await deleteInstallationPrefix(bucket, existing.installation_id);
     } else {
       await database
         .prepare(
@@ -459,6 +459,14 @@ export async function installPublicTemplateFromZip(
   } catch {
     await deleteInstallationPrefix(bucket, installationId).catch(() => {});
     return { ok: false, reason: "storage-failed" };
+  }
+
+  // D1 already points at the new tree; old-prefix cleanup must not undo a
+  // successful install by deleting the new objects.
+  if (previousInstallationId) {
+    await deleteInstallationPrefix(bucket, previousInstallationId).catch(
+      () => {},
+    );
   }
 
   const activeInstallationId = await readActiveInstallationId(database);
