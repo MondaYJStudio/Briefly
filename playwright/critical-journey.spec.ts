@@ -945,6 +945,28 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await expect(page.getByLabel("Article body")).toContainText(revisedBody);
   });
 
+  await test.step("sign out and reject the discarded browser session", async () => {
+    const signOutRequest = page.waitForRequest(
+      (request) =>
+        request.method() === "POST" &&
+        new URL(request.url()).pathname === "/api/auth/sign-out",
+    );
+    await page
+      .getByRole("button", {
+        name: "Settings and account menu — Administrator",
+      })
+      .click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    const request = await signOutRequest;
+    expect(request.headers()["content-type"]).toBe("application/json");
+    expect(request.postDataJSON()).toEqual({});
+    await expect(page).toHaveURL(/\/sign-in$/);
+
+    await page.goto("/admin");
+    await expect(page).toHaveURL(/\/sign-in$/);
+    expect((await page.request.get("/api/admin/session")).status()).toBe(401);
+  });
+
   expect(pressResponderWarnings).toEqual([]);
   await anonymous.close();
 });

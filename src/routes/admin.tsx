@@ -78,7 +78,11 @@ function AdminLayout() {
   async function signOut() {
     setSignOutState("submitting");
     try {
-      const response = await fetch("/api/auth/sign-out", { method: "POST" });
+      const response = await fetch("/api/auth/sign-out", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
       if (response.ok) {
         globalThis.location.replace("/sign-in");
       } else {
