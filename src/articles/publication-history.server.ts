@@ -714,6 +714,7 @@ export async function restoreArticlePublication(
         version: draftVersion,
         title: restored.title,
         slug: restored.slug,
+        slugIsManual: true,
         summary: restored.summary,
         tags: restored.tags,
         byline: restored.byline,

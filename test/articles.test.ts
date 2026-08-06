@@ -43,6 +43,7 @@ describe("Article Draft administration", () => {
         version: 1,
         title: "",
         slug: null,
+        slugIsManual: false,
         summary: null,
         tags: [],
         byline: null,
@@ -54,6 +55,76 @@ describe("Article Draft administration", () => {
       },
     });
     expect(JSON.stringify(article)).not.toContain(administrator.email);
+  }, 15_000);
+
+  it("persists Slug auto/manual provenance across Draft reloads", async () => {
+    const cookie = await initializeAndSignIn();
+    const created = await (
+      await SELF.fetch("http://briefly.test/api/admin/articles", {
+        method: "POST",
+        headers: { cookie },
+      })
+    ).json<{ id: string; draft: { version: number } }>();
+
+    const autoSave = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${created.id}/draft`,
+      {
+        method: "PUT",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          version: 1,
+          title: "跟随标题",
+          slug: "跟随标题",
+          slugIsManual: false,
+          summary: null,
+          tags: [],
+          byline: null,
+          language: null,
+        }),
+      },
+    );
+    expect(autoSave.status).toBe(200);
+    expect(await autoSave.json()).toMatchObject({
+      draft: {
+        version: 2,
+        title: "跟随标题",
+        slug: "跟随标题",
+        slugIsManual: false,
+      },
+    });
+
+    const manualSave = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${created.id}/draft`,
+      {
+        method: "PUT",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          version: 2,
+          title: "跟随标题",
+          slug: "locked-url",
+          slugIsManual: true,
+          summary: null,
+          tags: [],
+          byline: null,
+          language: null,
+        }),
+      },
+    );
+    expect(manualSave.status).toBe(200);
+
+    const loaded = await SELF.fetch(
+      `http://briefly.test/api/admin/articles/${created.id}`,
+      { headers: { cookie } },
+    );
+    expect(loaded.status).toBe(200);
+    expect(await loaded.json()).toMatchObject({
+      draft: {
+        version: 3,
+        title: "跟随标题",
+        slug: "locked-url",
+        slugIsManual: true,
+      },
+    });
   }, 15_000);
 
   it("saves normalized metadata, preserves null summary, then lists and loads the Draft", async () => {
@@ -74,6 +145,7 @@ describe("Article Draft administration", () => {
           version: 1,
           title: "  第一篇文章  ",
           slug: " cafe\u0301-札记 ",
+          slugIsManual: true,
           summary: null,
           tags: [" TypeScript ", "typescript", "Cloud   Workers", "云 计算"],
           byline: { name: " Guest Writer ", url: "https://example.com/me" },
@@ -89,6 +161,7 @@ describe("Article Draft administration", () => {
         version: 2,
         title: "第一篇文章",
         slug: "café-札记",
+        slugIsManual: true,
         summary: null,
         tags: ["typescript", "cloud workers", "云 计算"],
         byline: {

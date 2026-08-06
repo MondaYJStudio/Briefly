@@ -7,6 +7,7 @@ import {
   Form,
   Input,
   ListBox,
+  Modal,
   Select,
   Separator,
   Spinner,
@@ -15,8 +16,21 @@ import {
 import { ClientOnly } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 
-import type { ArticlePublicationHistoryEntry } from "../../articles/articles";
+import type {
+  ArticleCoverUsage,
+  ArticlePublicationHistoryEntry,
+} from "../../articles/articles";
+import { slugAfterManualEdit, slugAfterReset } from "../../articles/slug-follow";
+import { commitTagChipInput } from "../../articles/tag-chips";
+import type { AssetLibraryEntry, ReadyAsset } from "../../assets/assets";
+import {
+  VerifiedAssetPicker,
+  type VerifiedAssetPickerState,
+} from "../../assets/verified-asset-picker";
+import { m } from "../../paraglide/messages.js";
+import { getApiClient } from "../../routes/api.$";
 import type { SiteSettings } from "../../site-settings/site-settings";
+import styles from "./editor-view.module.css";
 import { SettingsField } from "./fields";
 import { AdminIcon } from "./icons";
 import { LANGUAGE_OPTIONS } from "./language-options";
@@ -221,7 +235,7 @@ export function EditorView({
         </Dropdown.Root>
         <Button
           isIconOnly
-          className="rail-toggle"
+          className={styles.railToggle}
           size="sm"
           type="button"
           variant="ghost"
@@ -527,7 +541,9 @@ function EditorRail({
     historyHasUnpublishedChanges,
     historyState,
   } = workspace;
+  const [subTab, setSubTab] = useState<"basic" | "advanced">("basic");
   if (!selected) return null;
+  const draft = selected.draft;
   const hasCurrentPublication = selected.currentPublicationId !== null;
   const currentPublication = publicationHistory.find(
     (publication) => publication.isCurrent,
@@ -538,34 +554,41 @@ function EditorRail({
   const changesPending =
     hasCurrentPublication &&
     (workspace.hasUnsavedChanges || historyHasUnpublishedChanges);
-  const cover = selected.draft.cover;
   const issueMessages = (surface: PublicationIssueSurface) =>
     publicationIssuesForSurface(workspace.publicationIssues, surface).map(
       (issue) => issue.message,
     );
+  const unpublishDisabledReason =
+    workspace.unpublishActionDisabled && !hasCurrentPublication
+      ? m.unpublish_disabled_no_current_publication()
+      : null;
+  const trashDisabledReason =
+    workspace.trashActionDisabled && !serverConfirmed
+      ? m.trash_disabled_not_server_confirmed()
+      : null;
 
   return (
     <aside
       id="article-settings-rail"
-      className={`rail${railOpen ? " is-open" : ""}`}
-      aria-label="Article settings"
+      className={`${styles.rail}${railOpen ? ` ${styles.railOpen}` : ""}`}
+      aria-label={m.article_settings()}
     >
-      <div className="rail-tabs row-between">
+      <div className={`${styles.railTabs} row-between`}>
         <div
-          className="tabs-line-list"
+          className={styles.tabsLineList}
           role="tablist"
-          aria-label="Article settings sections"
+          aria-label={m.rail_settings_sections()}
           style={{ borderBottom: 0 }}
         >
           {(
             [
-              ["settings", "Settings"],
-              ["history", "History"],
+              ["settings", m.rail_tab_settings()],
+              ["history", m.rail_tab_history()],
             ] as const
           ).map(([id, label]) => (
             <button
               key={id}
-              className="tab-line"
+              className={styles.tabLine}
               type="button"
               role="tab"
               aria-selected={tab === id}
@@ -573,7 +596,7 @@ function EditorRail({
             >
               {label}
               {id === "history" && workspace.publicationHistory.length > 0 ? (
-                <span className="count">
+                <span className={styles.tabCount}>
                   {workspace.publicationHistory.length}
                 </span>
               ) : null}
@@ -581,10 +604,9 @@ function EditorRail({
           ))}
         </div>
         <button
-          className="tab-line rail-close"
-          style={{ borderBottom: 0, minHeight: "2rem", padding: "0.25rem" }}
+          className={`${styles.tabLine} ${styles.railClose}`}
           type="button"
-          aria-label="Close article settings"
+          aria-label={m.close_article_settings()}
           onClick={onClose}
         >
           <AdminIcon name="close" size={16} />
@@ -592,9 +614,9 @@ function EditorRail({
       </div>
 
       {tab === "settings" ? (
-        <div role="tabpanel" aria-label="Settings">
+        <div role="tabpanel" aria-label={m.rail_tab_settings()}>
           {/* ---- Publish ---- */}
-          <section className="rail-section">
+          <section className={styles.railSection}>
             <h3>Publish</h3>
             <div className="field-stack">
               <div className="row" style={{ gap: "var(--space-2)" }}>
@@ -625,7 +647,7 @@ function EditorRail({
                         : "Not public — nothing is live yet."}
                 </span>
               </div>
-              <dl className="pub-detail">
+              <dl className={styles.pubDetail}>
                 <dt>Draft</dt>
                 <dd>
                   v{selected.draft.version}
@@ -677,257 +699,294 @@ function EditorRail({
             </div>
           </section>
 
-          {/* ---- Basics ---- */}
-          <section className="rail-section">
-            <h3>Basics</h3>
-            <div className="field-stack">
-              <SettingsField
-                label="Title"
-                htmlFor="articleTitleRail"
-                issues={issueMessages("title")}
+          {/* ---- Basic / Advanced switch ---- */}
+          <section
+            className={`${styles.railSection} ${styles.railSectionFlush}`}
+          >
+            <div
+              className={styles.subNav}
+              role="tablist"
+              aria-label={m.rail_subnav_label()}
+            >
+              <button
+                type="button"
+                role="tab"
+                className={styles.subNavButton}
+                aria-selected={subTab === "basic"}
+                onClick={() => setSubTab("basic")}
               >
-                <Input
-                  fullWidth
-                  id="articleTitleRail"
-                  value={selected.draft.title}
-                  onChange={(event) =>
-                    workspace.updateDraft({ title: event.target.value })
-                  }
-                />
-              </SettingsField>
-              <SettingsField
-                label="Unicode slug (optional)"
-                htmlFor="articleSlug"
-                description="Saved as trimmed Unicode NFC; global uniqueness is case-insensitive."
-                issues={issueMessages("slug")}
+                {m.rail_tab_basic()}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                className={styles.subNavButton}
+                aria-selected={subTab === "advanced"}
+                onClick={() => setSubTab("advanced")}
               >
-                <Input
-                  fullWidth
-                  id="articleSlug"
-                  value={selected.draft.slug ?? ""}
-                  onChange={(event) =>
-                    workspace.updateDraft({
-                      slug: event.target.value || null,
-                    })
-                  }
-                />
-              </SettingsField>
-              <SettingsField
-                label="Plain-text summary (optional)"
-                htmlFor="articleSummary"
-              >
-                <TextArea
-                  fullWidth
-                  id="articleSummary"
-                  value={selected.draft.summary ?? ""}
-                  onChange={(event) =>
-                    workspace.updateDraft({
-                      summary: event.target.value || null,
-                    })
-                  }
-                />
-              </SettingsField>
-              <SettingsField
-                label="Flat tags (comma separated)"
-                htmlFor="articleTags"
-              >
-                <Input
-                  fullWidth
-                  id="articleTags"
-                  value={selected.draft.tags.join(", ")}
-                  onChange={(event) =>
-                    workspace.updateDraft({
-                      tags: event.target.value
-                        .split(",")
-                        .map((tag) => tag.trim())
-                        .filter(Boolean),
-                    })
-                  }
-                />
-              </SettingsField>
+                {m.rail_tab_advanced()}
+              </button>
             </div>
           </section>
 
-          {/* ---- Byline & language ---- */}
-          <section className="rail-section">
-            <h3>Byline &amp; language</h3>
-            <div className="field-stack">
-              <SettingsField
-                label="Byline override name (optional)"
-                htmlFor="articleBylineName"
-                issues={issueMessages("byline")}
-              >
-                <Input
-                  fullWidth
-                  id="articleBylineName"
-                  value={selected.draft.byline?.name ?? ""}
-                  onChange={(event) =>
-                    workspace.updateDraft({
-                      byline: event.target.value
-                        ? {
-                            name: event.target.value,
-                            url: selected.draft.byline?.url ?? null,
-                          }
-                        : null,
-                    })
-                  }
+          {subTab === "basic" ? (
+            <section
+              className={styles.railSection}
+              role="tabpanel"
+              aria-label={m.rail_tab_basic()}
+            >
+              <div className="field-stack">
+                <SettingsField
+                  label={m.title_label()}
+                  htmlFor="articleTitleRail"
+                  issues={issueMessages("title")}
+                >
+                  <Input
+                    fullWidth
+                    id="articleTitleRail"
+                    value={draft.title}
+                    onChange={(event) =>
+                      workspace.updateDraft({ title: event.target.value })
+                    }
+                  />
+                </SettingsField>
+                <SettingsField
+                  label={m.summary_label()}
+                  htmlFor="articleSummary"
+                >
+                  <TextArea
+                    fullWidth
+                    id="articleSummary"
+                    value={draft.summary ?? ""}
+                    onChange={(event) =>
+                      workspace.updateDraft({
+                        summary: event.target.value || null,
+                      })
+                    }
+                  />
+                </SettingsField>
+                <TagsField
+                  tags={draft.tags}
+                  disabled={lifecycleActionPending}
+                  onChange={(tags) => workspace.updateDraft({ tags })}
                 />
-              </SettingsField>
-              {siteSettings ? (
-                <p className="inherit-note">
-                  Inheriting{" "}
-                  <span className="val">{siteSettings.defaultByline.name}</span>
-                </p>
-              ) : null}
-              <SettingsField
-                label="Byline override URL (optional)"
-                htmlFor="articleBylineUrl"
-              >
-                <Input
-                  fullWidth
-                  id="articleBylineUrl"
-                  type="url"
-                  disabled={!selected.draft.byline}
-                  value={selected.draft.byline?.url ?? ""}
-                  onChange={(event) =>
-                    selected.draft.byline &&
-                    workspace.updateDraft({
-                      byline: {
-                        ...selected.draft.byline,
-                        url: event.target.value || null,
-                      },
-                    })
-                  }
+                <CoverField
+                  cover={draft.cover}
+                  disabled={lifecycleActionPending}
+                  issues={issueMessages("cover")}
+                  onChange={(cover) => workspace.updateDraft({ cover })}
                 />
-              </SettingsField>
-              <SettingsField
-                label="Language override"
-                htmlFor="articleLanguage"
-                optional="optional"
-                issues={issueMessages("language")}
-              >
-                <Select
-                  fullWidth
-                  id="articleLanguage"
-                  aria-label="Language override"
-                  selectedKey={selected.draft.language ?? undefined}
-                  onSelectionChange={(key) =>
-                    workspace.updateDraft({
-                      language: key === null || key === "" ? null : String(key),
-                    })
+              </div>
+            </section>
+          ) : (
+            <section
+              className={styles.railSection}
+              role="tabpanel"
+              aria-label={m.rail_tab_advanced()}
+            >
+              <div className="field-stack">
+                <SettingsField
+                  label={m.advanced_slug_label()}
+                  htmlFor="articleSlug"
+                  issues={issueMessages("slug")}
+                  description={
+                    <>
+                      {m.slug_uniqueness_note()}{" "}
+                      {draft.slugIsManual
+                        ? m.slug_manual_hint()
+                        : m.slug_following_title_hint()}
+                    </>
                   }
                 >
-                  <Select.Trigger className="briefly-language-trigger">
-                    <Select.Value />
-                    <Select.Indicator />
-                  </Select.Trigger>
-                  <Select.Popover>
-                    <ListBox aria-label="Language override options">
-                      <ListBox.Item id="" textValue="Inherit default language">
-                        Inherit default language
-                      </ListBox.Item>
-                      {LANGUAGE_OPTIONS.map((language) => (
-                        <ListBox.Item
-                          key={language.id}
-                          id={language.id}
-                          className="briefly-language-option"
-                          textValue={`${language.label} (${language.detail})`}
-                        >
-                          <span>{language.label}</span>
-                          <span className="briefly-select-detail mono">
-                            {language.detail}
-                          </span>
-                        </ListBox.Item>
-                      ))}
-                    </ListBox>
-                  </Select.Popover>
-                </Select>
-              </SettingsField>
-              {siteSettings ? (
-                <p className="inherit-note">
-                  Inheriting{" "}
-                  <span className="val mono">
-                    {siteSettings.defaultLanguage}
-                  </span>
-                </p>
-              ) : null}
-            </div>
-          </section>
+                  <div className={styles.slugRow}>
+                    <Input
+                      fullWidth
+                      id="articleSlug"
+                      value={draft.slug ?? ""}
+                      onChange={(event) => {
+                        const next = slugAfterManualEdit(event.target.value);
+                        workspace.updateDraft({
+                          slug: next.slug,
+                          slugIsManual: true,
+                        });
+                      }}
+                    />
+                    {draft.slugIsManual ? (
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="secondary"
+                        isDisabled={lifecycleActionPending}
+                        onPress={() =>
+                          workspace.updateDraft({
+                            slug: slugAfterReset(draft.title).slug,
+                            slugIsManual: false,
+                          })
+                        }
+                      >
+                        <AdminIcon name="undo" size={14} />
+                        {m.reset_slug_to_title()}
+                      </Button>
+                    ) : null}
+                  </div>
+                </SettingsField>
 
-          {/* ---- Cover ---- */}
-          <section className="rail-section">
-            <h3>Cover</h3>
-            {issueMessages("cover").length > 0 ? (
-              <ul
-                className="list-disc pl-5 small"
-                role="alert"
-                style={{ color: "var(--danger-strong)" }}
-              >
-                {issueMessages("cover").map((issue) => (
-                  <li key={issue}>{issue}</li>
-                ))}
-              </ul>
-            ) : null}
-            {cover ? (
-              <div className="cover-box">
-                <img src={`/media/private/${cover.assetId}`} alt={cover.alt} />
-                <div className="cover-actions">
-                  <Button
-                    size="sm"
-                    type="button"
-                    variant="secondary"
-                    isDisabled={lifecycleActionPending}
-                    onPress={() => workspace.updateDraft({ cover: null })}
+                <SettingsField
+                  label={m.byline_override_name_label()}
+                  htmlFor="articleBylineName"
+                  issues={issueMessages("byline")}
+                >
+                  <Input
+                    fullWidth
+                    id="articleBylineName"
+                    value={draft.byline?.name ?? ""}
+                    onChange={(event) =>
+                      workspace.updateDraft({
+                        byline: event.target.value
+                          ? {
+                              name: event.target.value,
+                              url: draft.byline?.url ?? null,
+                            }
+                          : null,
+                      })
+                    }
+                  />
+                </SettingsField>
+                {siteSettings ? (
+                  <p className={styles.inheritNote}>
+                    {m.inheriting_value({
+                      value: siteSettings.defaultByline.name,
+                    })}
+                  </p>
+                ) : null}
+                <SettingsField
+                  label={m.byline_override_url_label()}
+                  htmlFor="articleBylineUrl"
+                >
+                  <Input
+                    fullWidth
+                    id="articleBylineUrl"
+                    type="url"
+                    disabled={!draft.byline}
+                    value={draft.byline?.url ?? ""}
+                    onChange={(event) =>
+                      draft.byline &&
+                      workspace.updateDraft({
+                        byline: {
+                          ...draft.byline,
+                          url: event.target.value || null,
+                        },
+                      })
+                    }
+                  />
+                </SettingsField>
+                <SettingsField
+                  label={m.language_override_label()}
+                  htmlFor="articleLanguage"
+                  optional="optional"
+                  issues={issueMessages("language")}
+                >
+                  <Select
+                    fullWidth
+                    id="articleLanguage"
+                    aria-label={m.language_override_label()}
+                    selectedKey={draft.language ?? undefined}
+                    onSelectionChange={(key) =>
+                      workspace.updateDraft({
+                        language:
+                          key === null || key === "" ? null : String(key),
+                      })
+                    }
                   >
-                    Remove cover
-                  </Button>
-                </div>
+                    <Select.Trigger className="briefly-language-trigger">
+                      <Select.Value />
+                      <Select.Indicator />
+                    </Select.Trigger>
+                    <Select.Popover>
+                      <ListBox aria-label={m.language_override_label()}>
+                        <ListBox.Item
+                          id=""
+                          textValue={m.inherit_default_language()}
+                        >
+                          {m.inherit_default_language()}
+                        </ListBox.Item>
+                        {LANGUAGE_OPTIONS.map((language) => (
+                          <ListBox.Item
+                            key={language.id}
+                            id={language.id}
+                            className="briefly-language-option"
+                            textValue={`${language.label} (${language.detail})`}
+                          >
+                            <span>{language.label}</span>
+                            <span className="briefly-select-detail mono">
+                              {language.detail}
+                            </span>
+                          </ListBox.Item>
+                        ))}
+                      </ListBox>
+                    </Select.Popover>
+                  </Select>
+                </SettingsField>
+                {siteSettings ? (
+                  <p className={styles.inheritNote}>
+                    {m.inheriting_value({
+                      value: siteSettings.defaultLanguage,
+                    })}
+                  </p>
+                ) : null}
               </div>
-            ) : (
-              <div className="cover-drop">
-                No cover yet. Choose one in the “Figures and cover” panel of the
-                canvas — alternative text is required.
-              </div>
-            )}
-          </section>
+            </section>
+          )}
 
           {/* ---- Danger zone ---- */}
-          <section className="rail-section" style={{ borderBottom: 0 }}>
-            <h3>Danger zone</h3>
-            <div className="danger-zone">
-              <div className="danger-zone-head">Careful — deliberate acts</div>
-              <div className="danger-row">
-                <p className="danger-copy">
-                  <strong>Unpublish</strong>
-                  Take the live version down. Draft and history stay.
+          <section
+            className={`${styles.railSection} ${styles.railSectionFlush}`}
+          >
+            <h3>{m.danger_zone_title()}</h3>
+            <div className={styles.dangerZone}>
+              <div className={styles.dangerZoneHead}>
+                {m.danger_zone_caution()}
+              </div>
+              <div className={styles.dangerRow}>
+                <p className={styles.dangerCopy}>
+                  <strong>{m.unpublish()}</strong>
+                  {m.danger_unpublish_description()}
+                  {unpublishDisabledReason ? (
+                    <span className={styles.dangerReason}>
+                      {unpublishDisabledReason}
+                    </span>
+                  ) : null}
                 </p>
                 <Button
                   size="sm"
                   type="button"
                   variant="danger-soft"
-                  aria-label="Unpublish this Article?"
                   isDisabled={workspace.unpublishActionDisabled}
                   isPending={workspace.unpublishState === "unpublishing"}
                   onPress={onOpenUnpublishDialog}
                 >
-                  Unpublish Article
+                  {m.unpublish()}
                 </Button>
               </div>
-              <div className="danger-row">
-                <p className="danger-copy">
-                  <strong>Move to Trash</strong>
-                  Reversible. Restores as unpublished.
+              <div className={styles.dangerRow}>
+                <p className={styles.dangerCopy}>
+                  <strong>{m.move_to_trash()}</strong>
+                  {m.danger_trash_description()}
+                  {trashDisabledReason ? (
+                    <span className={styles.dangerReason}>
+                      {trashDisabledReason}
+                    </span>
+                  ) : null}
                 </p>
                 <Button
                   size="sm"
                   type="button"
                   variant="danger-soft"
-                  aria-label="Move this Article to Trash?"
                   isDisabled={workspace.trashActionDisabled}
                   isPending={workspace.trashActionState === "trashing"}
                   onPress={onOpenTrashDialog}
                 >
-                  Move Article to Trash
+                  {m.move_to_trash()}
                 </Button>
               </div>
             </div>
@@ -937,6 +996,315 @@ function EditorRail({
         <HistoryPanel workspace={workspace} />
       )}
     </aside>
+  );
+}
+
+/** Enter/comma chip entry for flat, normalized Article tags. */
+function TagsField({
+  tags,
+  disabled,
+  onChange,
+}: Readonly<{
+  tags: string[];
+  disabled: boolean;
+  onChange: (tags: string[]) => void;
+}>) {
+  const [draftInput, setDraftInput] = useState("");
+
+  function commit(rawInput: string, options?: { flushTrailing?: boolean }) {
+    const result = commitTagChipInput(tags, rawInput, options);
+    const changed =
+      result.tags.length !== tags.length ||
+      result.tags.some((tag, index) => tag !== tags[index]);
+    if (changed) onChange(result.tags);
+    setDraftInput(result.remainder);
+  }
+
+  return (
+    <SettingsField
+      label={m.tags_label()}
+      htmlFor="articleTagsRail"
+      optional="optional"
+    >
+      <div className={styles.tagInput}>
+        {tags.map((tag) => (
+          <span key={tag} className={styles.tagChip}>
+            {tag}
+            <button
+              type="button"
+              disabled={disabled}
+              aria-label={m.remove_tag({ tag })}
+              onClick={() =>
+                onChange(tags.filter((existing) => existing !== tag))
+              }
+            >
+              <AdminIcon name="close" size={11} strokeWidth={2.4} />
+            </button>
+          </span>
+        ))}
+        <input
+          className={styles.tagInputField}
+          id="articleTagsRail"
+          type="text"
+          disabled={disabled}
+          placeholder={tags.length === 0 ? m.tags_input_placeholder() : ""}
+          value={draftInput}
+          onChange={(event) => {
+            const value = event.target.value;
+            if (value.includes(",")) {
+              commit(value, { flushTrailing: false });
+            } else {
+              setDraftInput(value);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commit(draftInput);
+            } else if (
+              event.key === "Backspace" &&
+              draftInput === "" &&
+              tags.length > 0
+            ) {
+              onChange(tags.slice(0, -1));
+            }
+          }}
+          onBlur={() => {
+            if (draftInput.trim().length > 0) commit(draftInput);
+          }}
+        />
+      </div>
+      <p className="small faint">{m.tags_hint()}</p>
+    </SettingsField>
+  );
+}
+
+/** Cover preview, alt state, and Replace/Remove backed by the shared picker. */
+function CoverField({
+  cover,
+  disabled,
+  issues,
+  onChange,
+}: Readonly<{
+  cover: ArticleCoverUsage | null;
+  disabled: boolean;
+  issues: string[];
+  onChange: (cover: ArticleCoverUsage | null) => void;
+}>) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  return (
+    <div>
+      <h4 className={styles.subheading}>{m.cover_label()}</h4>
+      {issues.length > 0 ? (
+        <ul className={styles.issueList} role="alert">
+          {issues.map((issue) => (
+            <li key={issue}>{issue}</li>
+          ))}
+        </ul>
+      ) : null}
+      {cover ? (
+        <div className={styles.coverBox}>
+          <img src={`/media/private/${cover.assetId}`} alt={cover.alt} />
+          <div className={styles.coverMeta}>
+            <SettingsField
+              label={m.cover_alternative_text()}
+              htmlFor="articleCoverAltRail"
+            >
+              <Input
+                fullWidth
+                id="articleCoverAltRail"
+                disabled={disabled}
+                value={cover.alt}
+                onChange={(event) =>
+                  onChange({ ...cover, alt: event.target.value })
+                }
+              />
+            </SettingsField>
+            <div className={styles.coverActions}>
+              <Button
+                size="sm"
+                type="button"
+                variant="secondary"
+                isDisabled={disabled}
+                onPress={() => setPickerOpen(true)}
+              >
+                {m.replace_cover()}
+              </Button>
+              <Button
+                size="sm"
+                type="button"
+                variant="secondary"
+                isDisabled={disabled}
+                onPress={() => onChange(null)}
+              >
+                {m.remove_cover()}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className={styles.coverDrop}>
+          <p>{m.no_cover_yet_rail()}</p>
+          <Button
+            size="sm"
+            type="button"
+            isDisabled={disabled}
+            onPress={() => setPickerOpen(true)}
+          >
+            {m.choose_cover()}
+          </Button>
+        </div>
+      )}
+      <CoverPickerDialog
+        open={pickerOpen}
+        initialAlt={cover?.alt ?? ""}
+        onOpenChange={setPickerOpen}
+        onConfirm={(next) => {
+          onChange(next);
+          setPickerOpen(false);
+        }}
+      />
+    </div>
+  );
+}
+
+/** The shared verified Asset picker, reused for Cover Replace from the rail. */
+function CoverPickerDialog({
+  open,
+  initialAlt,
+  onOpenChange,
+  onConfirm,
+}: Readonly<{
+  open: boolean;
+  initialAlt: string;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (cover: ArticleCoverUsage) => void;
+}>) {
+  const [assets, setAssets] = useState<ReadyAsset[]>([]);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [state, setState] = useState<VerifiedAssetPickerState>("loading");
+  const [alt, setAlt] = useState(initialAlt);
+  const [statusMessage, setStatusMessage] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setAlt(initialAlt);
+    setSelectedAssetId(null);
+    setStatusMessage("");
+    setState("loading");
+    let active = true;
+    void getApiClient()
+      .admin.assets.get()
+      .then((response) => {
+        if (response.status !== 200 || !response.data)
+          throw new Error("Assets unavailable");
+        if (active) {
+          setAssets(
+            response.data.assets.filter(
+              (
+                asset,
+              ): asset is Extract<
+                AssetLibraryEntry,
+                { lifecycleState: "ready" }
+              > => asset.lifecycleState === "ready",
+            ),
+          );
+          setState("ready");
+        }
+      })
+      .catch(() => {
+        if (active) setState("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, [open, initialAlt]);
+
+  async function uploadFile(file: File) {
+    setState("uploading");
+    setStatusMessage(m.uploading_and_verifying_image());
+    try {
+      const response = await getApiClient().admin.assets.post({ file });
+      if (response.status !== 201 || !response.data)
+        throw new Error("Upload failed");
+      setAssets((current) => [response.data, ...current]);
+      setSelectedAssetId(response.data.id);
+      setStatusMessage(
+        m.filename_uploaded_and_selected({
+          filename: response.data.originalFilename,
+        }),
+      );
+      setState("uploaded");
+    } catch {
+      setStatusMessage(m.image_upload_verify_failed());
+      setState("error");
+    }
+  }
+
+  function confirm() {
+    const trimmedAlt = alt.trim();
+    if (!selectedAssetId || trimmedAlt.length === 0) {
+      setStatusMessage(m.select_asset_and_cover_alt());
+      return;
+    }
+    onConfirm({ assetId: selectedAssetId, alt: trimmedAlt });
+  }
+
+  return (
+    <Modal.Backdrop isOpen={open} onOpenChange={onOpenChange}>
+      <Modal.Container>
+        <Modal.Dialog
+          aria-label={m.optional_cover()}
+          className="editor-tool-modal editor-tool-modal--wide"
+        >
+          <Modal.Header>
+            <div className="briefly-drawer-head">
+              <Modal.Heading>{m.optional_cover()}</Modal.Heading>
+              <Modal.CloseTrigger aria-label={m.close_insert_image_dialog()} />
+            </div>
+          </Modal.Header>
+          <Modal.Body>
+            <div className="editor-tool-panel space-y-4">
+              <VerifiedAssetPicker
+                assets={assets}
+                selectedAssetId={selectedAssetId}
+                state={state === "error" ? "ready" : state}
+                uploading={state === "uploading"}
+                onSelect={(asset) => {
+                  setSelectedAssetId(asset.id);
+                  setStatusMessage(
+                    m.filename_selected({ filename: asset.originalFilename }),
+                  );
+                }}
+                onUpload={uploadFile}
+              />
+              <SettingsField
+                label={m.cover_alternative_text()}
+                htmlFor="coverPickerAltRail"
+              >
+                <Input
+                  fullWidth
+                  id="coverPickerAltRail"
+                  value={alt}
+                  onChange={(event) => setAlt(event.target.value)}
+                />
+              </SettingsField>
+              {statusMessage ? (
+                <p className="small muted" role="status" aria-live="polite">
+                  {statusMessage}
+                </p>
+              ) : null}
+              <div className="editor-tool-actions">
+                <Button type="button" onPress={confirm}>
+                  {m.use_selected_asset_as_cover()}
+                </Button>
+              </div>
+            </div>
+          </Modal.Body>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
   );
 }
 
@@ -956,8 +1324,8 @@ function HistoryPanel({
     useState<ArticlePublicationHistoryEntry | null>(null);
 
   return (
-    <div role="tabpanel" aria-label="History">
-      <section className="rail-section" style={{ borderBottom: 0 }}>
+    <div role="tabpanel" aria-label={m.rail_tab_history()}>
+      <section className={`${styles.railSection} ${styles.railSectionFlush}`}>
         <h3>Publication history</h3>
         <div className="field-stack">
           {historyHasUnpublishedChanges && historyState === "ready" ? (
@@ -1057,9 +1425,9 @@ function HistoryPanel({
               {publicationHistory.map((publication) => (
                 <li
                   key={publication.id}
-                  className={`pub-item${publication.isCurrent ? " is-live" : ""}`}
+                  className={`${styles.pubItem}${publication.isCurrent ? ` ${styles.pubItemLive}` : ""}`}
                 >
-                  <span className="pub-num">
+                  <span className={styles.pubNum}>
                     #{publication.publicationNumber}
                   </span>
                   <div className="grow">

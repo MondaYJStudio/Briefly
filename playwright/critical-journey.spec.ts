@@ -428,10 +428,34 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
   });
 
   await test.step("author metadata, text, and an accessible figure, then await a server-confirmed autosave", async () => {
-    await page.getByLabel("Unicode slug (optional)").fill(slug);
+    await expect(
+      page.getByText("No Current Publication to unpublish", { exact: true }),
+    ).toBeVisible();
+    await page.getByRole("tab", { name: "Advanced", exact: true }).click();
+    await expect(page.getByLabel("Slug (optional)")).toHaveValue(originalTitle);
+    await page.getByLabel("Slug (optional)").fill(slug);
+    await expect(
+      page.getByText("Manually set — Title changes won't change it.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Reset to Title", exact: true })
+      .click();
+    await expect(page.getByLabel("Slug (optional)")).toHaveValue(originalTitle);
+    await page.getByLabel("Slug (optional)").fill(slug);
+    await page.getByRole("tab", { name: "Basic", exact: true }).click();
     await page
       .getByLabel("Plain-text summary (optional)")
       .fill("A browser-proven Publication.");
+    await page.getByLabel("Tags optional").fill("browser,journey");
+    await page.getByLabel("Tags optional").press("Enter");
+    await expect(
+      page.getByRole("button", { name: "Remove tag browser" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Remove tag journey" }),
+    ).toBeVisible();
     await page.getByLabel("Article body").fill(originalBody);
 
     const insertImageButton = page.getByRole("button", {
