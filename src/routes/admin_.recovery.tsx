@@ -48,7 +48,6 @@ function Recover() {
       description={
         state === "success" ? m.sessions_revoked() : m.recovery_description()
       }
-      footerLink={{ href: "/admin/login", label: m.sign_in() }}
       showHeader={state !== "success"}
       showDescription={state === "ready"}
     >

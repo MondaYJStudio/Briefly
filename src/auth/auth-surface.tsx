@@ -1,7 +1,27 @@
-import { Input, Label, Surface } from "@heroui/react";
-import type { ReactNode } from "react";
+import { Dropdown, Input, Label } from "@heroui/react";
+import { type ReactNode, useEffect, useState } from "react";
+
+import { AdminIcon } from "../components/admin/icons";
 import { getLocale, locales, setLocale } from "../paraglide/runtime.js";
 import { m } from "../paraglide/messages.js";
+import styles from "./auth-surface.module.css";
+
+type AuthTheme = "light" | "dark";
+
+const ADMIN_THEME_KEY = "briefly-admin-theme";
+
+function readStoredTheme(): AuthTheme {
+  if (typeof window === "undefined") return "light";
+  try {
+    const stored = window.localStorage.getItem(ADMIN_THEME_KEY);
+    if (stored === "light" || stored === "dark") return stored;
+  } catch {
+    // localStorage unavailable — fall through to the media query.
+  }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
 
 export function AuthenticationSurface({
   title,
@@ -18,51 +38,107 @@ export function AuthenticationSurface({
   showHeader?: boolean;
   showDescription?: boolean;
 }>) {
+  const [theme, setTheme] = useState<AuthTheme>("light");
+  const locale = getLocale();
+
+  useEffect(() => {
+    setTheme(readStoredTheme());
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const previous = root.getAttribute("data-theme");
+    root.setAttribute("data-theme", theme);
+    return () => {
+      if (previous === null) root.removeAttribute("data-theme");
+      else root.setAttribute("data-theme", previous);
+    };
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((current) => {
+      const next = current === "light" ? "dark" : "light";
+      try {
+        window.localStorage.setItem(ADMIN_THEME_KEY, next);
+      } catch {
+        // Persisting the preference is best-effort.
+      }
+      return next;
+    });
+  }
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-4 py-6">
-      <div className="mb-3 flex w-full max-w-[23rem] justify-end">
-        <label className="text-xs text-default-500">
-          <span className="sr-only">{m.interface_language()}</span>
-          <select
-            aria-label={m.interface_language()}
-            className="rounded border border-default-200 bg-transparent px-2 py-1"
-            value={getLocale()}
-            onChange={(event) =>
-              setLocale(event.target.value as (typeof locales)[number])
-            }
-          >
-            <option value="en">English</option>
-            <option value="zh-CN">简体中文</option>
-          </select>
-        </label>
+    <main className={`briefly-theme ${styles.frame}`} data-theme={theme}>
+      <div className={styles.panel}>
+        <div className={styles.chrome}>
+          <div className={styles.brand}>
+            <span aria-hidden="true" className={styles.mark}>
+              B
+            </span>
+            <span>Briefly</span>
+          </div>
+          <div className={styles.controls}>
+            <button
+              type="button"
+              className={styles.iconButton}
+              aria-label={m.toggle_theme()}
+              aria-pressed={theme === "dark"}
+              onClick={toggleTheme}
+            >
+              <AdminIcon name={theme === "light" ? "moon" : "sun"} size={16} />
+            </button>
+            <Dropdown.Root>
+              <Dropdown.Trigger
+                className={styles.iconButton}
+                aria-label={m.interface_language()}
+              >
+                <AdminIcon name="globe" size={16} />
+              </Dropdown.Trigger>
+              <Dropdown.Popover placement="bottom end">
+                <Dropdown.Menu
+                  aria-label={m.interface_language()}
+                  selectionMode="single"
+                  selectedKeys={new Set([locale])}
+                  onSelectionChange={(keys) => {
+                    if (keys === "all") return;
+                    const next = keys.values().next().value;
+                    if (
+                      typeof next === "string" &&
+                      (locales as readonly string[]).includes(next)
+                    ) {
+                      setLocale(next as (typeof locales)[number]);
+                    }
+                  }}
+                >
+                  <Dropdown.Item id="en" textValue={m.switch_to_english()}>
+                    <Dropdown.ItemIndicator />
+                    {m.switch_to_english()}
+                  </Dropdown.Item>
+                  <Dropdown.Item id="zh-CN" textValue={m.switch_to_zh_cn()}>
+                    <Dropdown.ItemIndicator />
+                    {m.switch_to_zh_cn()}
+                  </Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown.Popover>
+            </Dropdown.Root>
+          </div>
+        </div>
+
+        <div className={styles.body}>
+          {showHeader ? (
+            <header>
+              <h1 className={styles.title}>{title}</h1>
+              {showDescription ? (
+                <p className={styles.description}>{description}</p>
+              ) : null}
+            </header>
+          ) : null}
+          {children}
+        </div>
       </div>
-      <div className="mb-6 flex items-center justify-center gap-2 text-lg font-semibold tracking-tight">
-        <span
-          aria-hidden="true"
-          className="grid size-8 place-items-center rounded-lg bg-foreground font-serif text-[1.1rem] font-bold text-background"
-        >
-          B
-        </span>
-        <span>Briefly</span>
-      </div>
-      <Surface
-        className="w-full max-w-[23rem] space-y-5 rounded-[0.875rem] border border-default-200 p-6 shadow-sm"
-        variant="secondary"
-      >
-        {showHeader ? (
-          <header>
-            <h1 className="text-[1.375rem] font-bold tracking-[-0.015em]">
-              {title}
-            </h1>
-            {showDescription ? (
-              <p className="mt-2 text-sm text-default-600">{description}</p>
-            ) : null}
-          </header>
-        ) : null}
-        {children}
-      </Surface>
+
       {footerLink ? (
-        <p className="mt-5 text-center text-xs text-default-500">
+        <p className={styles.footer}>
           Briefly ·{" "}
           <a className="authentication-link font-medium" href={footerLink.href}>
             {footerLink.label}

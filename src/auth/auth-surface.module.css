@@ -1,0 +1,141 @@
+@reference "tailwindcss";
+
+.frame {
+  position: relative;
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  overflow: hidden;
+  background: var(--background, oklch(0.995 0.002 264));
+}
+
+.frame::before {
+  content: "";
+  position: absolute;
+  inset: -20% -10% auto;
+  height: 55%;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      60% 80% at 50% 0%,
+      color-mix(in oklch, var(--primary, oklch(0.55 0.2 263)) 10%, transparent),
+      transparent 70%
+    );
+  opacity: 0.9;
+}
+
+.panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 24rem;
+  overflow: hidden;
+  border: 1px solid var(--border, oklch(0.9 0.006 264));
+  border-radius: var(--radius-l, 0.875rem);
+  background: var(--surface, oklch(1 0 0));
+  box-shadow: var(--shadow-m);
+}
+
+.chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--divider, oklch(0.915 0.005 264));
+}
+
+.brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--foreground, oklch(0.21 0.008 264));
+}
+
+.mark {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 0.45rem;
+  background: var(--foreground, oklch(0.21 0.008 264));
+  color: var(--background, oklch(0.995 0.002 264));
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.iconButton {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border, oklch(0.9 0.006 264));
+  border-radius: var(--radius-s, 0.5rem);
+  background: transparent;
+  color: var(--foreground-muted, oklch(0.46 0.012 264));
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.iconButton:hover {
+  background: var(--hover, oklch(0.955 0.004 264));
+  border-color: var(--border-strong, oklch(0.82 0.008 264));
+  color: var(--foreground, oklch(0.21 0.008 264));
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid var(--focus, oklch(0.63 0.17 256));
+  outline-offset: 2px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem 1.25rem 1.35rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--foreground, oklch(0.21 0.008 264));
+}
+
+.description {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--foreground-muted, oklch(0.46 0.012 264));
+}
+
+.footer {
+  position: relative;
+  z-index: 1;
+  margin-top: 1.25rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--foreground-faint, oklch(0.56 0.014 264));
+}
