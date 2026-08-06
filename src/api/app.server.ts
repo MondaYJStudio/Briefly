@@ -459,7 +459,7 @@ function createApi(getBindings: () => RuntimeBindings) {
           result = await purgeTrashedArticle(
             bindings.DB,
             params.articleId,
-            body.confirmationArticleId,
+            body.confirmationTitle,
           );
         } catch {
           return status(500, {
@@ -479,7 +479,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       {
         params: t.Object({ articleId: t.String({ format: "uuid" }) }),
         body: t.Object({
-          confirmationArticleId: t.String({ format: "uuid" }),
+          confirmationTitle: t.String(),
         }),
       },
     )
