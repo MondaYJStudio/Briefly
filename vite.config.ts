@@ -1,4 +1,5 @@
 import { cloudflare } from "@cloudflare/vite-plugin";
+import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -35,6 +36,13 @@ export default defineConfig(({ mode }) => {
               persistState: { path: ".output/playwright/state" },
             }
           : {}),
+      }),
+      paraglideVitePlugin({
+        project: "./project.inlang",
+        outdir: "./src/paraglide",
+        emitTsDeclarations: true,
+        strategy: ["cookie", "preferredLanguage", "baseLocale"],
+        urlPatterns: [],
       }),
       tailwindcss(),
       tanstackStart(),

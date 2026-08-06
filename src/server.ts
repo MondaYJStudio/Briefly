@@ -1,4 +1,5 @@
 import startHandler from "@tanstack/react-start/server-entry";
+import { paraglideMiddleware } from "./paraglide/server.js";
 
 import { checkRuntimeHealth } from "./env/health.server";
 import { logRequest, type LogCode } from "./env/logger.server";
@@ -195,7 +196,10 @@ const worker = {
       } else if (
         (request.method === "GET" || request.method === "HEAD") &&
         (requestUrl.pathname === "/admin" ||
-          requestUrl.pathname.startsWith("/admin/"))
+          requestUrl.pathname.startsWith("/admin/")) &&
+        !["/admin/login", "/admin/setup", "/admin/recovery"].includes(
+          requestUrl.pathname,
+        )
       ) {
         const { createAuth } = await import("./auth/auth.server");
         const applicationOrigin = applicationOriginForRequest(
@@ -220,8 +224,8 @@ const worker = {
           const redirectPath = (await installationIsInitialized(
             configuration.bindings.DB,
           ))
-            ? "/sign-in"
-            : "/setup";
+            ? "/admin/login"
+            : "/admin/setup";
           response = withRequestId(
             Response.redirect(new URL(redirectPath, applicationOrigin), 302),
             requestId,
@@ -255,4 +259,14 @@ const worker = {
   },
 } satisfies ExportedHandler<WorkerBindings>;
 
-export default worker;
+export default {
+  async fetch(
+    request: Request,
+    bindings: WorkerBindings,
+    context: ExecutionContext,
+  ) {
+    return paraglideMiddleware(request as globalThis.Request, () =>
+      worker.fetch(request as never, bindings, context),
+    );
+  },
+} satisfies ExportedHandler<WorkerBindings>;

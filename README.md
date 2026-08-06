@@ -120,7 +120,7 @@ Briefly requires two independent random values of at least 32 characters: `BETTE
 
 For self-hosting, click the Deploy to Cloudflare button near the top of this README. Cloudflare clones this public repository, asks for two secrets, provisions the D1 database and private R2 bucket, applies the committed D1 migrations, and deploys the Worker. Generate a different random value of at least 32 characters for each secret and keep the `SETUP_SECRET` available until setup is complete.
 
-After deployment succeeds, open the Worker URL shown by Cloudflare. Visiting `/admin` automatically opens `/setup` on an uninitialized installation. Enter the administrator email and password, then paste the same `SETUP_SECRET` from the deployment form. No `APP_ORIGIN` value is needed for the automatically assigned `workers.dev` address.
+After deployment succeeds, open the Worker URL shown by Cloudflare. Visiting `/admin` automatically opens `/admin/setup` on an uninitialized installation. Enter the administrator email and password, then paste the same `SETUP_SECRET` from the deployment form. No `APP_ORIGIN` value is needed for the automatically assigned `workers.dev` address.
 
 The button requires this repository (or a fork of it) to be publicly readable by Cloudflare. Maintainers using a fixed custom domain should instead configure the `production` placeholders in `wrangler.jsonc` and follow the protected GitHub Actions release process in [OPERATIONS.md](OPERATIONS.md). That workflow builds first, applies pending migrations, deploys only after migration success, and finishes with a read-only `GET /health` probe.
 

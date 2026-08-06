@@ -8,11 +8,13 @@ import { type FormEvent, useState } from "react";
 export function AccountDrawer({
   open,
   onOpenChange,
+  email,
   onSignOut,
   signOutState,
 }: Readonly<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  email: string;
   onSignOut: () => void;
   signOutState: "ready" | "submitting" | "error";
 }>) {
@@ -35,7 +37,7 @@ export function AccountDrawer({
         }),
       });
       if (response.ok) {
-        globalThis.location.replace("/sign-in");
+        globalThis.location.replace("/admin/login");
       } else {
         setPasswordState("error");
       }
@@ -83,7 +85,7 @@ export function AccountDrawer({
                 >
                   Sign-in email
                 </h2>
-                <SettingsEmailField />
+                <SettingsEmailField email={email} />
               </div>
 
               <Form className="card card-pad stack" onSubmit={changePassword}>
@@ -208,7 +210,7 @@ export function AccountDrawer({
   );
 }
 
-function SettingsEmailField() {
+function SettingsEmailField({ email }: Readonly<{ email: string }>) {
   return (
     <div
       style={{
@@ -222,7 +224,7 @@ function SettingsEmailField() {
         fullWidth
         id="adminEmail"
         type="email"
-        value="Administrator"
+        value={email}
         readOnly
         aria-describedby="admin-email-note"
       />

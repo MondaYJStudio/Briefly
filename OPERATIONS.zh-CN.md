@@ -67,7 +67,7 @@ Briefly 处于 0.x 生命周期。发布说明必须明确指出任何破坏性 
 
 在部署接收第一个请求前，将 `BETTER_AUTH_SECRET` 和 `SETUP_SECRET` 配置为两个相互独立的 Cloudflare Secret。每个值至少 32 个字符，并应由密码学安全的密码生成器生成。生产环境使用 `pnpm exec wrangler secret put <NAME> --env production` 写入；不要把它们放进 `wrangler.jsonc`、GitHub 变量、日志、URL 或已提交的 `.dev.vars`。
 
-全新安装通过 `/setup` 认领。仅当 D1 安装标记仍为未初始化且请求提供正确 setup secret 时，初始化才会成功。D1 约束与原子认领会阻止并发请求创建第二个 Better Auth 用户。初始化成功后，初始化入口和 Better Auth 邮箱注册都会永久关闭；setup secret 不会存入 D1。认证身份保持私有，也不会被复用为公开署名。
+全新安装通过 `/admin/setup` 认领。仅当 D1 安装标记仍为未初始化且请求提供正确 setup secret 时，初始化才会成功。D1 约束与原子认领会阻止并发请求创建第二个 Better Auth 用户。初始化成功后，初始化入口和 Better Auth 邮箱注册都会永久关闭；setup secret 不会存入 D1。认证身份保持私有，也不会被复用为公开署名。
 
 唯一管理员的密码长度为 12–128 个字符，建议使用密码管理器生成。未知邮箱和错误密码返回完全相同的登录失败响应。
 
@@ -79,7 +79,7 @@ Briefly 处于 0.x 生命周期。发布说明必须明确指出任何破坏性 
 
 无论成功还是失败，每个请求都会计数。超限请求返回 `429` 和 `Retry-After`；无法取得客户端 IP 时，请求共享一个后备桶。后续认证请求会清理已过期的计数器。
 
-Better Auth 将可撤销 session 存在 D1 中。记住的 session 固定有效 7 天；使用满 24 小时后会续回 7 天，受保护的 Elysia 操作会透传续期 cookie。生产 HTTPS 源上的 session cookie 带有 HttpOnly、SameSite=Lax、路径 `/` 和 Secure 属性。退出会删除当前 D1 session，因此重放已丢弃的 cookie 无法再次授权。在 `/admin` 修改密码会撤销全部管理员 session，包括提交改密的当前 session，并要求重新登录。`/admin` 会为导航体验把匿名浏览器重定向到 `/sign-in`，但每个私有服务端操作仍必须独立解析并授权 Better Auth session。
+Better Auth 将可撤销 session 存在 D1 中。记住的 session 固定有效 7 天；使用满 24 小时后会续回 7 天，受保护的 Elysia 操作会透传续期 cookie。生产 HTTPS 源上的 session cookie 带有 HttpOnly、SameSite=Lax、路径 `/` 和 Secure 属性。退出会删除当前 D1 session，因此重放已丢弃的 cookie 无法再次授权。在 `/admin` 修改密码会撤销全部管理员 session，包括提交改密的当前 session，并要求重新登录。`/admin` 会为导航体验把匿名浏览器重定向到 `/admin/login`，但每个私有服务端操作仍必须独立解析并授权 Better Auth session。
 
 ## 管理员紧急恢复
 
@@ -88,8 +88,8 @@ Better Auth 将可撤销 session 存在 D1 中。记住的 session 固定有效 
 仅在现有管理员无法登录时执行以下短时流程：
 
 1. 生成新的高熵值，然后运行 `pnpm exec wrangler secret put RECOVERY_SECRET --env production`。仅在 Wrangler 的交互提示中输入该值；如果 Wrangler 提示需要新 Worker 版本，则完成部署。
-2. 打开规范生产来源下的 `/recover`，提交临时恢复 secret 和一个 12–128 字符的新密码。该表单及 `POST /api/recover` 只会重置已经存在的唯一管理员，不能初始化空安装或添加身份。
-3. 收到成功响应后，确认持有旧 cookie 的浏览器访问 `/admin` 会被重定向到 `/sign-in`，旧密码登录失败且新密码可以登录。恢复只会在删除 D1 中全部 session 后报告成功。
+2. 打开规范生产来源下的 `/admin/recovery`，提交临时恢复 secret 和一个 12–128 字符的新密码。该表单及 `POST /api/recover` 只会重置已经存在的唯一管理员，不能初始化空安装或添加身份。
+3. 收到成功响应后，确认持有旧 cookie 的浏览器访问 `/admin` 会被重定向到 `/admin/login`，旧密码登录失败且新密码可以登录。恢复只会在删除 D1 中全部 session 后报告成功。
 4. 立即运行 `pnpm exec wrangler secret delete RECOVERY_SECRET --env production` 并确认变更。如果仍需再次尝试，应生成新值进行轮换，不得复用旧值。
 
 恢复按每个客户端固定 15 分钟窗口最多接受 5 个请求，每个请求都会计数。超限客户端会收到带 `Retry-After` 的 `429`，必须等待所指示的窗口；等待期间不要继续保留临时 secret。恢复关闭、secret 错误、管理员不存在和密码输入无效都会返回相同的通用拒绝响应。
