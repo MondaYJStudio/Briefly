@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
-import { Route as ZhCNRouteImport } from './routes/zh-CN'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminArticlesRouteImport } from './routes/admin/articles'
 import { Route as AdminMediaRouteImport } from './routes/admin/media'
@@ -34,11 +33,6 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ZhCNRoute = ZhCNRouteImport.update({
-  id: '/zh-CN',
-  path: '/zh-CN',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -110,7 +104,6 @@ const MediaPrivateAssetIdRoute = MediaPrivateAssetIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/zh-CN': typeof ZhCNRoute
   '/admin/articles': typeof AdminArticlesRouteWithChildren
   '/admin/media': typeof AdminMediaRoute
   '/admin/trash': typeof AdminTrashRoute
@@ -127,7 +120,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/zh-CN': typeof ZhCNRoute
   '/admin/media': typeof AdminMediaRoute
   '/admin/trash': typeof AdminTrashRoute
   '/admin/login': typeof AdminLoginRoute
@@ -145,7 +137,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/zh-CN': typeof ZhCNRoute
   '/admin/articles': typeof AdminArticlesRouteWithChildren
   '/admin/media': typeof AdminMediaRoute
   '/admin/trash': typeof AdminTrashRoute
@@ -165,7 +156,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
-    | '/zh-CN'
     | '/admin/articles'
     | '/admin/media'
     | '/admin/trash'
@@ -182,7 +172,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/zh-CN'
     | '/admin/media'
     | '/admin/trash'
     | '/admin/login'
@@ -199,7 +188,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
-    | '/zh-CN'
     | '/admin/articles'
     | '/admin/media'
     | '/admin/trash'
@@ -218,7 +206,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
-  ZhCNRoute: typeof ZhCNRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminRecoveryRoute: typeof AdminRecoveryRoute
   AdminSetupRoute: typeof AdminSetupRoute
@@ -242,13 +229,6 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/zh-CN': {
-      id: '/zh-CN'
-      path: '/zh-CN'
-      fullPath: '/zh-CN'
-      preLoaderRoute: typeof ZhCNRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -378,7 +358,6 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
-  ZhCNRoute: ZhCNRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminRecoveryRoute: AdminRecoveryRoute,
   AdminSetupRoute: AdminSetupRoute,

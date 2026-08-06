@@ -31,7 +31,7 @@
     }
   },
   "scripts": {
-    "paraglide:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy cookie preferredLanguage baseLocale --emit-ts-declarations --no-emit-git-ignore",
+    "paraglide:compile": "node --experimental-strip-types ./scripts/compile-paraglide.mjs",
     "dev": "CLOUDFLARE_ENV=local vite dev",
     "build": "vite build && node scripts/verify-client-boundary.mjs",
     "build:production": "CLOUDFLARE_ENV=production vite build && node scripts/verify-client-boundary.mjs",
