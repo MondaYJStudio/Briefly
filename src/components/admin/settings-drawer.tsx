@@ -17,6 +17,7 @@ import {
   useState,
 } from "react";
 
+import { m } from "../../paraglide/messages.js";
 import { getApiClient } from "../../routes/api.$";
 import {
   BYLINE_NAME_MAXIMUM_LENGTH,
@@ -28,6 +29,7 @@ import {
 import { AdminIcon } from "./icons";
 import { SettingsField } from "./fields";
 import { LANGUAGE_OPTIONS } from "./language-options";
+import styles from "./settings-drawer.module.css";
 
 interface SettingsDrawerProps {
   open: boolean;
@@ -36,26 +38,43 @@ interface SettingsDrawerProps {
   onSettingsChange: (settings: SiteSettings) => void;
 }
 
-type SettingsState = "loading" | "ready" | "submitting" | "saved" | "failed";
+type SettingsState =
+  | "loading"
+  | "ready"
+  | "submitting"
+  | "saved"
+  | "failed"
+  | "load-failed";
+
+function localizeIssue(path: string, message: string): string {
+  switch (path) {
+    case "siteName":
+      return m.enter_site_name();
+    case "defaultByline.name":
+      return m.enter_default_byline_name();
+    case "defaultByline.url":
+      return m.invalid_byline_url();
+    case "defaultLanguage":
+      return m.invalid_default_language();
+    default:
+      return message;
+  }
+}
 
 function LoadingState() {
   return (
-    <div className="stack" role="status" aria-label="Loading settings">
-      <div className="card card-pad">
-        <div className="skeleton" style={{ width: "8rem", height: "0.9rem" }} />
-        <div className="skeleton mt-4" style={{ height: "2.5rem" }} />
-        <div className="skeleton mt-4" style={{ height: "5rem" }} />
+    <div className={styles.stack} role="status" aria-label={m.loading_settings()}>
+      <div className={styles.card}>
+        <div className={`${styles.skeleton} ${styles.skeletonTitle}`} />
+        <div className={`${styles.skeleton} ${styles.skeletonInput} ${styles.mt4}`} />
+        <div className={`${styles.skeleton} ${styles.skeletonArea} ${styles.mt4}`} />
       </div>
-      <div className="card card-pad">
+      <div className={styles.card}>
+        <div className={`${styles.skeleton} ${styles.skeletonWideTitle}`} />
+        <div className={`${styles.skeleton} ${styles.skeletonInput} ${styles.mt4}`} />
+        <div className={`${styles.skeleton} ${styles.skeletonInput} ${styles.mt4}`} />
         <div
-          className="skeleton"
-          style={{ width: "10rem", height: "0.9rem" }}
-        />
-        <div className="skeleton mt-4" style={{ height: "2.5rem" }} />
-        <div className="skeleton mt-4" style={{ height: "2.5rem" }} />
-        <div
-          className="skeleton mt-4"
-          style={{ width: "60%", height: "2.5rem" }}
+          className={`${styles.skeleton} ${styles.skeletonPartial} ${styles.mt4}`}
         />
       </div>
     </div>
@@ -63,7 +82,7 @@ function LoadingState() {
 }
 
 function SettingsCard({ children }: Readonly<{ children: ReactNode }>) {
-  return <section className="card card-pad">{children}</section>;
+  return <section className={styles.card}>{children}</section>;
 }
 
 export function SettingsDrawer({
@@ -93,7 +112,7 @@ export function SettingsDrawer({
         }
       })
       .catch(() => {
-        if (active) setState("failed");
+        if (active) setState("load-failed");
       });
     return () => {
       active = false;
@@ -103,7 +122,13 @@ export function SettingsDrawer({
   }, [open]);
 
   const issueByPath = useMemo(
-    () => new Map(issues.map((issue) => [issue.path, issue.message])),
+    () =>
+      new Map(
+        issues.map((issue) => [
+          issue.path,
+          localizeIssue(issue.path, issue.message),
+        ]),
+      ),
     [issues],
   );
 
@@ -123,7 +148,7 @@ export function SettingsDrawer({
         const value = response.error?.value;
         const nextIssues = value && "issues" in value ? value.issues : [];
         setIssues(nextIssues);
-        setState("failed");
+        setState(nextIssues.length > 0 ? "ready" : "failed");
         return;
       }
       onSettingsChange(response.data);
@@ -158,62 +183,83 @@ export function SettingsDrawer({
   return (
     <Drawer.Backdrop isOpen={open} onOpenChange={onOpenChange}>
       <Drawer.Content placement="right" className="briefly-drawer-wide">
-        <Drawer.Dialog aria-label="Settings">
+        <Drawer.Dialog aria-label={m.settings_menu()}>
           <Drawer.Header>
-            <div className="briefly-drawer-head">
+            <div className={styles.head}>
               <div>
                 <Drawer.Heading>
-                  <strong>Settings</strong>
+                  <strong>{m.settings_menu()}</strong>
                 </Drawer.Heading>
-                <p className="small faint" style={{ marginTop: 2 }}>
-                  Public content defaults — articles inherit these unless they
-                  override them.
+                <p className={`small faint ${styles.description}`}>
+                  {m.settings_drawer_description()}
                 </p>
               </div>
-              <Drawer.CloseTrigger aria-label="Close settings" />
+              <Drawer.CloseTrigger aria-label={m.close_settings()} />
             </div>
           </Drawer.Header>
-          <Drawer.Body style={{ padding: "var(--space-5)" }}>
-            {state === "loading" || !settings ? (
-              state === "loading" ? (
-                <LoadingState />
-              ) : (
-                <Alert status="danger" role="alert">
-                  <Alert.Content>
-                    <Alert.Title>Unable to load Site Settings</Alert.Title>
-                    <Alert.Description>
-                      Refresh the page to try again.
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert>
-              )
+          <Drawer.Body className={styles.body}>
+            {state === "loading" ? (
+              <LoadingState />
+            ) : state === "load-failed" || !settings ? (
+              <Alert status="danger" role="alert">
+                <Alert.Content>
+                  <Alert.Title>{m.unable_load_settings()}</Alert.Title>
+                  <Alert.Description>
+                    {m.unable_load_settings_description()}
+                  </Alert.Description>
+                </Alert.Content>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => {
+                    setState("loading");
+                    setIssues([]);
+                    void getApiClient()
+                      .admin["site-settings"].get()
+                      .then((response) => {
+                        if (response.status !== 200 || !response.data)
+                          throw new Error("unavailable");
+                        onSettingsChange(response.data);
+                        setState("ready");
+                      })
+                      .catch(() => setState("load-failed"));
+                  }}
+                >
+                  {m.retry()}
+                </Button>
+              </Alert>
             ) : (
               <Form
-                className="stack"
+                className={`${styles.stack}${disabled ? ` ${styles.formDisabled}` : ""}`}
                 onSubmit={save}
-                aria-label="Site settings"
+                aria-label={m.site_settings_form()}
                 aria-disabled={disabled}
               >
                 {hasValidation ? (
                   <Alert status="danger" role="alert">
                     <Alert.Content>
                       <Alert.Title>
-                        {issues.length} field{issues.length === 1 ? "" : "s"}{" "}
-                        need attention
+                        {issues.length === 1
+                          ? m.settings_field_needs_attention()
+                          : m.settings_fields_need_attention({
+                              count: issues.length,
+                            })}
                       </Alert.Title>
                       <Alert.Description>
-                        Nothing was saved. Fix the highlighted fields and save
-                        again.
+                        {m.settings_fields_need_attention_description()}
                       </Alert.Description>
                     </Alert.Content>
                   </Alert>
                 ) : state === "failed" ? (
-                  <Alert status="danger" role="alert">
+                  <Alert
+                    status="danger"
+                    role="alert"
+                    className={styles.retryInAlert}
+                  >
                     <Alert.Content>
-                      <Alert.Title>Couldn’t save settings</Alert.Title>
+                      <Alert.Title>{m.couldnt_save_settings()}</Alert.Title>
                       <Alert.Description>
-                        The request failed. Your edits are still in the form —
-                        retry to send them again.
+                        {m.couldnt_save_settings_description()}
                       </Alert.Description>
                     </Alert.Content>
                     <Button
@@ -221,26 +267,25 @@ export function SettingsDrawer({
                       variant="secondary"
                       onPress={() => void persistSettings()}
                     >
-                      Retry
+                      {m.retry()}
                     </Button>
                   </Alert>
                 ) : state === "saved" ? (
                   <Alert status="success" role="status">
                     <Alert.Content>
-                      <Alert.Title>Settings saved</Alert.Title>
+                      <Alert.Title>{m.settings_saved()}</Alert.Title>
                       <Alert.Description>
-                        New defaults apply to articles that inherit them.
-                        Articles with overrides are unchanged.
+                        {m.settings_saved_description()}
                       </Alert.Description>
                     </Alert.Content>
                   </Alert>
                 ) : null}
 
                 <SettingsCard>
-                  <h2 className="settings-section-title">Site information</h2>
-                  <div className="field-stack">
+                  <h2 className={styles.sectionTitle}>{m.site_information()}</h2>
+                  <div className={styles.fieldStack}>
                     <SettingsField
-                      label="Site name"
+                      label={m.site_name()}
                       htmlFor="siteName"
                       issues={
                         issueByPath.has("siteName")
@@ -267,9 +312,9 @@ export function SettingsDrawer({
                       />
                     </SettingsField>
                     <SettingsField
-                      label="Site description"
+                      label={m.site_description()}
                       htmlFor="siteDescription"
-                      optional="optional"
+                      optional={m.optional()}
                     >
                       <TextArea
                         fullWidth
@@ -289,16 +334,15 @@ export function SettingsDrawer({
                 </SettingsCard>
 
                 <SettingsCard>
-                  <h2 className="settings-section-title">
-                    Default public identity
+                  <h2 className={styles.sectionTitle}>
+                    {m.default_public_identity()}
                   </h2>
-                  <p className="small muted settings-section-description">
-                    Shown alongside published content. Articles may override any
-                    of these per article.
+                  <p className={`small muted ${styles.sectionDescription}`}>
+                    {m.default_public_identity_description()}
                   </p>
-                  <div className="field-stack">
+                  <div className={styles.fieldStack}>
                     <SettingsField
-                      label="Default byline name"
+                      label={m.default_byline_name()}
                       htmlFor="defaultBylineName"
                       issues={
                         issueByPath.has("defaultByline.name")
@@ -331,9 +375,9 @@ export function SettingsDrawer({
                       />
                     </SettingsField>
                     <SettingsField
-                      label="Byline link"
+                      label={m.byline_link()}
                       htmlFor="defaultBylineUrl"
-                      optional="optional"
+                      optional={m.optional()}
                       issues={
                         issueByPath.has("defaultByline.url")
                           ? [issueByPath.get("defaultByline.url")!]
@@ -365,7 +409,7 @@ export function SettingsDrawer({
                       />
                     </SettingsField>
                     <SettingsField
-                      label="Default language"
+                      label={m.default_language()}
                       htmlFor="defaultLanguage"
                       issues={
                         issueByPath.has("defaultLanguage")
@@ -392,21 +436,21 @@ export function SettingsDrawer({
                           });
                         }}
                       >
-                        <Select.Trigger className="briefly-language-trigger">
+                        <Select.Trigger className={styles.languageTrigger}>
                           <Select.Value />
                           <Select.Indicator />
                         </Select.Trigger>
                         <Select.Popover>
-                          <ListBox aria-label="Default language options">
+                          <ListBox aria-label={m.default_language_options()}>
                             {languageOptions.map((language) => (
                               <ListBox.Item
                                 key={language.id}
                                 id={language.id}
-                                className="briefly-language-option"
+                                className={styles.languageOption}
                                 textValue={`${language.label} (${language.detail})`}
                               >
                                 <span>{language.label}</span>
-                                <span className="briefly-select-detail mono">
+                                <span className={styles.languageDetail}>
                                   {language.detail}
                                 </span>
                               </ListBox.Item>
@@ -418,27 +462,27 @@ export function SettingsDrawer({
                   </div>
                 </SettingsCard>
 
-                <div className="alert alert-default" role="note">
+                <div className={styles.note} role="note">
                   <AdminIcon name="alert" />
-                  <div className="alert-body">
-                    These values describe <strong>public content</strong>. They
-                    are unrelated to the administrator sign-in email in Account.
-                  </div>
+                  <div>{m.public_content_note()}</div>
                 </div>
-                <div className="row settings-actions">
+                <div className={styles.actions}>
                   {state === "submitting" ? (
-                    <span className="save-state" role="status">
+                    <span className={styles.saveState} role="status">
                       <Spinner size="sm" />
-                      Saving…
+                      {m.saving()}
                     </span>
                   ) : state === "saved" ? (
-                    <span className="save-state is-ok" role="status">
+                    <span
+                      className={`${styles.saveState} ${styles.saveStateOk}`}
+                      role="status"
+                    >
                       <AdminIcon name="check" />
-                      All changes saved · just now
+                      {m.all_changes_saved()}
                     </span>
                   ) : null}
                   <Button type="submit" isPending={disabled}>
-                    {disabled ? "Saving…" : "Save changes"}
+                    {disabled ? m.saving() : m.save_changes()}
                   </Button>
                 </div>
               </Form>
