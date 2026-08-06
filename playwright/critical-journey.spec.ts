@@ -192,7 +192,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page.goto("/admin/login");
     await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "Emergency recovery" }),
+      page.getByRole("link", { name: "Reset password" }),
     ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "First-run setup" }),
@@ -203,7 +203,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
 
     await page.goto("/admin/recovery");
     await expect(
-      page.getByRole("heading", { name: "Emergency recovery" }),
+      page.getByRole("heading", { name: "Reset password" }),
     ).toBeVisible();
     await expect(page.getByLabel("Recovery Secret")).toHaveAttribute(
       "placeholder",
