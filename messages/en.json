@@ -244,7 +244,7 @@
   "trash_page_description": "Restore or permanently delete trashed articles.",
   "trash_page_title": "Trash",
   "trash_purge_article": "Permanently purge {title}",
-  "trash_purge_cancel": "Cancel — keep Article",
+  "trash_purge_cancel": "Cancel",
   "trash_purge_confirm": "Delete permanently",
   "trash_purge_error_description": "Delete did not finish. The Article is still in Trash. You can retry.",
   "trash_purge_error_title": "Unable to permanently purge Article",

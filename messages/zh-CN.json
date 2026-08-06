@@ -244,7 +244,7 @@
   "trash_page_description": "恢复或永久删除已移入的文章。",
   "trash_page_title": "回收站",
   "trash_purge_article": "永久清除 {title}",
-  "trash_purge_cancel": "取消 — 保留文章",
+  "trash_purge_cancel": "取消",
   "trash_purge_confirm": "永久删除",
   "trash_purge_error_description": "删除未完成。文章仍在回收站中。可重试。",
   "trash_purge_error_title": "无法永久清除文章",
