@@ -597,9 +597,6 @@ html[data-theme="dark"],
   color: var(--foreground-faint);
   white-space: nowrap;
 }
-.rail-toggle {
-  display: none !important;
-}
 .save-state {
   display: inline-flex;
   align-items: center;
@@ -880,177 +877,9 @@ html[data-theme="dark"],
   border-radius: 4px;
 }
 
-/* Right settings rail */
-.rail {
-  border-left: 1px solid var(--divider);
-  background: var(--surface);
-  overflow-y: auto;
-  min-height: 0;
-}
-.rail-tabs {
-  padding: var(--space-3) var(--space-4) 0;
-}
-.rail-section {
-  padding: var(--space-5) var(--space-4);
-  border-bottom: 1px solid var(--divider);
-}
-.rail-section > h3 {
-  font-size: var(--text-tiny);
-  font-weight: 650;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--foreground-faint);
-  margin-bottom: var(--space-4);
-}
-.rail-section .field-stack > * + * {
-  margin-top: var(--space-4);
-}
-.pub-detail {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-2) var(--space-3);
-  margin: 0;
-  font-size: var(--text-tiny);
-}
-.pub-detail dt {
-  color: var(--foreground-faint);
-}
-.pub-detail dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-  color: var(--foreground-muted);
-}
-.inherit-note {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  font-size: var(--text-tiny);
-  color: var(--foreground-muted);
-  background: var(--content2);
-  border-radius: var(--radius-s);
-  padding: var(--space-2) var(--space-3);
-  margin-top: var(--space-2);
-}
-.inherit-note .val {
-  font-weight: 550;
-  color: var(--foreground);
-}
-.cover-box {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-m);
-  overflow: hidden;
-}
-.cover-box img {
-  width: 100%;
-  aspect-ratio: 16/9;
-  object-fit: cover;
-  background: var(--content2);
-  display: block;
-}
-.cover-box .cover-actions {
-  display: flex;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-top: 1px solid var(--divider);
-}
-.cover-drop {
-  border: 1.5px dashed var(--border-strong);
-  border-radius: var(--radius-m);
-  padding: var(--space-6);
-  text-align: center;
-  color: var(--foreground-muted);
-  font-size: var(--text-tiny);
-}
-.tag-input {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-.tag-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  background: var(--content2);
-  border: 1px solid var(--border);
-  font-size: var(--text-tiny);
-  font-weight: 500;
-  padding: 3px var(--space-2);
-  border-radius: var(--radius-full);
-}
-.tag-chip button {
-  color: var(--foreground-faint);
-  display: inline-flex;
-  background: none;
-  border: 0;
-  cursor: pointer;
-  padding: 0;
-}
-.tag-chip button:hover {
-  color: var(--danger-strong);
-}
-
-/* Publication history */
-.pub-item {
-  display: flex;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--divider);
-}
-.pub-item:last-child {
-  border-bottom: 0;
-}
-.pub-num {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: var(--radius-s);
-  background: var(--content2);
-  color: var(--foreground-muted);
-  display: grid;
-  place-items: center;
-  font-family: var(--font-mono);
-  font-size: var(--text-tiny);
-  font-weight: 600;
-  flex: none;
-}
-.pub-item.is-live .pub-num {
-  background: var(--success-soft-bg);
-  color: var(--success-strong);
-}
-
-/* Danger zone */
-.danger-zone {
-  border: 1.5px solid var(--danger);
-  border-radius: var(--radius-l);
-  overflow: hidden;
-}
-.danger-zone-head {
-  padding: var(--space-3) var(--space-4);
-  background: var(--danger-soft-bg);
-  color: var(--danger-strong);
-  font-size: var(--text-small);
-  font-weight: 650;
-}
-.danger-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-}
-.danger-row + .danger-row {
-  border-top: 1px solid var(--divider);
-}
-.danger-row .danger-copy {
-  font-size: var(--text-tiny);
-  color: var(--foreground-muted);
-}
-.danger-row .danger-copy strong {
-  display: block;
-  color: var(--foreground);
-  font-size: var(--text-small);
-}
+/* ============ Right settings rail geometry moved to CSS Modules ============ */
+/* See editor-view.module.css for the Settings rail, Basic/Advanced switch,
+   Slug/Tags/Cover fields, Publication history rows, and Danger zone. */
 
 /* ============ Media library / picker geometry moved to CSS Modules ============ */
 /* Portal-rendered overlay sizing stays global below. */
@@ -1297,32 +1126,6 @@ html[data-theme="dark"],
 @media (max-width: 1024px) {
   .editor-body {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .rail {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 140;
-    width: min(24rem, 92vw);
-    transform: translateX(100%);
-    transition: transform var(--dur-med) var(--ease-out);
-    box-shadow: var(--shadow-l);
-    border-left: 1px solid var(--border);
-  }
-  .rail.is-open {
-    transform: translateX(0);
-  }
-  .rail-close {
-    display: inline-flex !important;
-  }
-  .rail-toggle {
-    display: inline-flex !important;
-  }
-}
-@media (min-width: 1025px) {
-  .rail-close {
-    display: none !important;
   }
 }
 

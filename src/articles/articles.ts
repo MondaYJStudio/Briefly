@@ -29,6 +29,8 @@ export interface ArticleDraft {
   version: number;
   title: string;
   slug: string | null;
+  /** When false, Slug follows Title; when true, Title changes leave Slug alone. */
+  slugIsManual: boolean;
   summary: string | null;
   tags: string[];
   byline: Byline | null;
@@ -98,6 +100,7 @@ export interface ArticleDraftUpdate {
   version: number;
   title: string;
   slug: string | null;
+  slugIsManual: boolean;
   summary: string | null;
   tags: string[];
   byline: Byline | null;

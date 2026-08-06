@@ -131,6 +131,9 @@ export const articleDraft = sqliteTable(
     title: text("title").notNull().default(""),
     slug: text("slug"),
     slugKey: text("slug_key"),
+    slugIsManual: integer("slug_is_manual", { mode: "boolean" })
+      .notNull()
+      .default(true),
     summary: text("summary"),
     tags: text("tags", { mode: "json" }).$type<string[]>().notNull(),
     byline: text("byline", { mode: "json" }).$type<{
