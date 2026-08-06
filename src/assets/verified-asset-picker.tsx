@@ -1,5 +1,5 @@
 import { Button, Input, Label, Spinner } from "@heroui/react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import type { ReadyAsset } from "./assets";
 import { AdminIcon } from "../components/admin/icons";
@@ -40,8 +40,19 @@ export function VerifiedAssetPicker({
   const uploadInputId = `${baseId}-upload-input`;
   const [sourceTab, setSourceTab] = useState<"library" | "upload">("library");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
   const selected = assets.find(({ id }) => id === selectedAssetId) ?? null;
   const locale = getLocale();
+
+  useEffect(() => {
+    if (!uploadFile) {
+      setUploadPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(uploadFile);
+    setUploadPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [uploadFile]);
 
   async function submitUpload() {
     if (!uploadFile) return;
@@ -92,6 +103,17 @@ export function VerifiedAssetPicker({
             accept="image/jpeg,image/png,image/webp,image/avif"
             onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
           />
+          {uploadPreviewUrl ? (
+            <div className={styles.uploadPreview}>
+              <img
+                src={uploadPreviewUrl}
+                alt={m.selected_upload_preview()}
+              />
+              {uploadFile ? (
+                <p className={styles.uploadPreviewName}>{uploadFile.name}</p>
+              ) : null}
+            </div>
+          ) : null}
           <p className={styles.uploadHint}>{m.upload_format_limit()}</p>
           <Button
             type="button"
@@ -159,27 +181,32 @@ export function VerifiedAssetPicker({
 
           {selected ? (
             <div className={styles.summary} aria-label={m.selected_asset()}>
-              <img
-                className={styles.summaryMini}
-                src={`/media/private/${selected.id}`}
-                alt=""
-              />
-              <div className={styles.summaryGrow}>
-                <div className={styles.summaryName}>
-                  {selected.originalFilename}
-                </div>
-                <div className={styles.summaryMeta}>
-                  {m.asset_picker_summary_meta({
-                    format: selected.mimeType
-                      .replace("image/", "")
-                      .toUpperCase(),
-                    width: selected.width,
-                    height: selected.height,
-                    size: selected.byteSize.toLocaleString(locale),
+              <div className={styles.summaryPreview}>
+                <img
+                  src={`/media/private/${selected.id}`}
+                  alt={m.preview_of_filename({
+                    filename: selected.originalFilename,
                   })}
-                </div>
+                />
               </div>
-              <StatusChip variant="primary">{m.selected()}</StatusChip>
+              <div className={styles.summaryMetaRow}>
+                <div className={styles.summaryGrow}>
+                  <div className={styles.summaryName}>
+                    {selected.originalFilename}
+                  </div>
+                  <div className={styles.summaryMeta}>
+                    {m.asset_picker_summary_meta({
+                      format: selected.mimeType
+                        .replace("image/", "")
+                        .toUpperCase(),
+                      width: selected.width,
+                      height: selected.height,
+                      size: selected.byteSize.toLocaleString(locale),
+                    })}
+                  </div>
+                </div>
+                <StatusChip variant="primary">{m.selected()}</StatusChip>
+              </div>
             </div>
           ) : null}
 

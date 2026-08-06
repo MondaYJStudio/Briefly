@@ -106,14 +106,31 @@ export function AssetMediaLibrary() {
   const [state, setState] = useState<MediaLibraryState>("loading");
   const [issues, setIssues] = useState<string[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploadFileName, setUploadFileName] = useState<string | null>(null);
+  const [uploadFile, setUploadFileState] = useState<File | null>(null);
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
   const [uploadDragging, setUploadDragging] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const lastFocusRef = useRef<HTMLElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const locale = getLocale();
   const selected = assets.find((asset) => asset.id === selectedAssetId) ?? null;
   const selectedIsReferenced = selected ? assetHasReferences(selected) : false;
   const selectedPresentation = selected ? cleanupPresentation(selected) : null;
+  const uploadFileName = uploadFile?.name ?? null;
+
+  useEffect(() => {
+    if (!uploadFile) {
+      setUploadPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(uploadFile);
+    setUploadPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [uploadFile]);
+
+  useEffect(() => {
+    if (!selected) setLightboxOpen(false);
+  }, [selected]);
 
   useEffect(() => {
     let active = true;
@@ -142,6 +159,23 @@ export function AssetMediaLibrary() {
     setAssets(response.data.assets);
   }
 
+  function syncUploadInput(file: File | null) {
+    const input = uploadInputRef.current;
+    if (!input) return;
+    if (!file) {
+      input.value = "";
+      return;
+    }
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+  }
+
+  function clearUploadSelection() {
+    setUploadFileState(null);
+    syncUploadInput(null);
+  }
+
   function openUpload() {
     setUploadOpen(true);
   }
@@ -149,28 +183,18 @@ export function AssetMediaLibrary() {
   function handleUploadOpenChange(open: boolean) {
     setUploadOpen(open);
     if (!open) {
-      setUploadFileName(null);
+      clearUploadSelection();
       setUploadDragging(false);
-      if (uploadInputRef.current) uploadInputRef.current.value = "";
     }
   }
 
   function setUploadFile(file: File | null) {
-    const input = uploadInputRef.current;
-    if (!input) return;
-    if (!file) {
-      input.value = "";
-      setUploadFileName(null);
-      return;
-    }
-    const transfer = new DataTransfer();
-    transfer.items.add(file);
-    input.files = transfer.files;
-    setUploadFileName(file.name);
+    setUploadFileState(file);
+    syncUploadInput(file);
   }
 
   function onUploadInputChange(event: ChangeEvent<HTMLInputElement>) {
-    setUploadFileName(event.target.files?.[0]?.name ?? null);
+    setUploadFileState(event.target.files?.[0] ?? null);
   }
 
   function onUploadDragEnter(event: DragEvent<HTMLLabelElement>) {
@@ -224,7 +248,7 @@ export function AssetMediaLibrary() {
         setSelectedAssetId(response.data.id);
         setState("uploaded");
         setUploadOpen(false);
-        setUploadFileName(null);
+        clearUploadSelection();
         form.reset();
         return;
       }
@@ -358,14 +382,14 @@ export function AssetMediaLibrary() {
             {[70, 60, 75, 65].map((width) => (
               <li key={width} aria-hidden="true">
                 <div className={styles.cell}>
-                  <div className={`skeleton ${styles.skeletonThumb}`} />
+                  <div className={`${styles.skeleton} ${styles.skeletonThumb}`} />
                   <div className={styles.cellMeta}>
                     <div
-                      className="skeleton"
+                      className={styles.skeleton}
                       style={{ width: `${width}%`, height: "0.75rem" }}
                     />
                     <div
-                      className="skeleton mt-2"
+                      className={`${styles.skeleton} ${styles.skeletonGap}`}
                       style={{ width: "50%", height: "0.7rem" }}
                     />
                   </div>
@@ -455,16 +479,32 @@ export function AssetMediaLibrary() {
                     onDragLeave={onUploadDragLeave}
                     onDrop={onUploadDrop}
                   >
-                    <AdminIcon name="upload" size={24} />
-                    <p className={styles.dropzoneTitle}>
-                      {m.choose_verified_image()}
-                    </p>
-                    <p className={styles.dropzoneHint}>
-                      {m.accepted_image_formats_short()}
-                    </p>
-                    {uploadFileName ? (
-                      <p className={styles.dropzoneFile}>{uploadFileName}</p>
-                    ) : null}
+                    {uploadPreviewUrl ? (
+                      <>
+                        <div className={styles.dropzonePreview}>
+                          <img
+                            src={uploadPreviewUrl}
+                            alt={m.selected_upload_preview()}
+                          />
+                        </div>
+                        {uploadFileName ? (
+                          <p className={styles.dropzoneFile}>{uploadFileName}</p>
+                        ) : null}
+                        <p className={styles.dropzoneHint}>
+                          {m.choose_verified_image()}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <AdminIcon name="upload" size={24} />
+                        <p className={styles.dropzoneTitle}>
+                          {m.choose_verified_image()}
+                        </p>
+                        <p className={styles.dropzoneHint}>
+                          {m.accepted_image_formats_short()}
+                        </p>
+                      </>
+                    )}
                     <input
                       ref={uploadInputRef}
                       className={styles.dropzoneInput}
@@ -473,6 +513,7 @@ export function AssetMediaLibrary() {
                       type="file"
                       accept="image/jpeg,image/png,image/webp,image/avif"
                       required
+                      aria-label={m.upload_verified_image()}
                       onChange={onUploadInputChange}
                     />
                   </label>
@@ -512,20 +553,27 @@ export function AssetMediaLibrary() {
               <Drawer.Body className={styles.drawerBody}>
                 {selected ? (
                   <>
-                    <div className={styles.hero}>
-                      {selectedPresentation?.showPreview ? (
+                    {selectedPresentation?.showPreview ? (
+                      <button
+                        type="button"
+                        className={`${styles.hero} ${styles.heroPreview}`}
+                        aria-label={m.open_full_image_preview({
+                          filename: selected.originalFilename,
+                        })}
+                        onClick={() => setLightboxOpen(true)}
+                      >
                         <img
                           src={`/media/private/${selected.id}`}
                           alt={m.preview_of_filename({
                             filename: selected.originalFilename,
                           })}
                         />
-                      ) : (
-                        <div className={styles.heroEmpty}>
-                          <p>{m.preview_unavailable_cleanup_pending()}</p>
-                        </div>
-                      )}
-                    </div>
+                      </button>
+                    ) : (
+                      <div className={`${styles.hero} ${styles.heroEmpty}`}>
+                        <p>{m.preview_unavailable_cleanup_pending()}</p>
+                      </div>
+                    )}
 
                     <dl className={styles.metaDl}>
                       <dt>{m.meta_file()}</dt>
@@ -689,6 +737,59 @@ export function AssetMediaLibrary() {
             </Drawer.Dialog>
           </Drawer.Content>
         </Drawer.Backdrop>
+
+        <Modal.Backdrop
+          className={styles.galleryBackdrop}
+          isOpen={lightboxOpen && selected !== null}
+          onOpenChange={setLightboxOpen}
+        >
+          <Modal.Container className={styles.galleryContainer} placement="center">
+            <Modal.Dialog
+              className={styles.galleryDialog}
+              aria-label={
+                selected
+                  ? m.preview_of_filename({
+                      filename: selected.originalFilename,
+                    })
+                  : m.asset_details()
+              }
+            >
+              <Modal.CloseTrigger
+                className={styles.galleryClose}
+                aria-label={m.close_full_image_preview()}
+              />
+              <div className={styles.galleryStage}>
+                {selected && selectedPresentation?.showPreview ? (
+                  <img
+                    className={styles.galleryImage}
+                    src={`/media/private/${selected.id}`}
+                    alt={m.preview_of_filename({
+                      filename: selected.originalFilename,
+                    })}
+                  />
+                ) : null}
+              </div>
+              {selected ? (
+                <footer className={styles.galleryCaption}>
+                  <div className={styles.galleryFilename}>
+                    {selected.originalFilename}
+                  </div>
+                  <div className={styles.galleryMeta}>
+                    {m.asset_picker_summary_meta({
+                      format: selected.mimeType
+                        .replace("image/", "")
+                        .toUpperCase(),
+                      width: selected.width,
+                      height: selected.height,
+                      size: selected.byteSize.toLocaleString(locale),
+                    })}
+                  </div>
+                  <p className={styles.galleryHint}>{m.gallery_close_hint()}</p>
+                </footer>
+              ) : null}
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       </section>
     </main>
   );
