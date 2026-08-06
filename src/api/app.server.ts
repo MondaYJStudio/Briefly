@@ -15,6 +15,7 @@ import {
 } from "../articles/article-trash.server";
 import {
   listArticlePublicationHistory,
+  projectAdminArticles,
   restoreArticlePublication,
 } from "../articles/publication-history.server";
 import {
@@ -372,7 +373,12 @@ function createApi(getBindings: () => RuntimeBindings) {
           code: "AUTHENTICATION_REQUIRED" as const,
         });
 
-      return { articles: await listArticles(bindings.DB) };
+      return {
+        articles: await projectAdminArticles(
+          bindings.DB,
+          await listArticles(bindings.DB),
+        ),
+      };
     })
     .get("/admin/trash/articles", async ({ request, set, status }) => {
       const bindings = getBindings();

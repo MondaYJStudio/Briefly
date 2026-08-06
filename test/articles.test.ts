@@ -111,7 +111,19 @@ describe("Article Draft administration", () => {
       headers: { cookie },
     });
     expect(listed.status).toBe(200);
-    expect(await listed.json()).toEqual({ articles: [expected] });
+    expect(await listed.json()).toEqual({
+      articles: [
+        expect.objectContaining({
+          id: created.id,
+          lifecycleProjection: "draft",
+          draft: expect.objectContaining({
+            version: 2,
+            title: "第一篇文章",
+            slug: "café-札记",
+          }),
+        }),
+      ],
+    });
   }, 15_000);
 
   it("persists a supported text-rich document with metadata in one versioned save", async () => {
