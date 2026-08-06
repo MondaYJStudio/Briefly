@@ -1465,9 +1465,8 @@ function HistoryPanel({
             </ol>
           ) : null}
           <p className="small faint">
-            Restoring permanently replaces the current Draft with a new Draft
-            Version; the public Current Publication stays unchanged until you
-            republish deliberately.
+            Restoring replaces the current Draft. The live Publication stays until
+            you publish again.
           </p>
         </div>
       </section>
