@@ -1607,11 +1607,6 @@ export function PreviewDrawer({
                       {preview.metadata.language}
                     </p>
                   </header>
-                  {preview.coverHtml ? (
-                    <div
-                      dangerouslySetInnerHTML={{ __html: preview.coverHtml }}
-                    />
-                  ) : null}
                   <div dangerouslySetInnerHTML={{ __html: preview.html }} />
                 </article>
               </div>
