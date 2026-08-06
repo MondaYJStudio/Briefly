@@ -132,7 +132,6 @@ function Recover() {
             {m.reset_password()}
           </Button>
           <p className="text-center text-sm text-default-500">
-            {m.remembered()}{" "}
             <a className="authentication-link font-medium" href="/admin/login">
               {m.back_to_sign_in()}
             </a>

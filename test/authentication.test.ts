@@ -970,7 +970,7 @@ describe("sole Administrator authentication", () => {
     );
     const recoveryHtml = await recoveryResponse.text();
     expect(recoveryResponse.status).toBe(200);
-    expect(recoveryHtml).toContain("Emergency recovery");
+    expect(recoveryHtml).toContain("Reset password");
     expect(recoveryHtml).toContain("Recovery Secret");
     expect(recoveryHtml).toContain('name="recoverySecret"');
     expect(recoveryHtml).toContain('name="newPassword"');
@@ -984,7 +984,7 @@ describe("sole Administrator authentication", () => {
     expect(preferredResponse.status).toBe(200);
     const preferredHtml = await preferredResponse.text();
     expect(preferredHtml).toContain('<html lang="zh-CN"');
-    expect(preferredHtml).toContain("管理员在此登录");
+    expect(preferredHtml).toContain(">登录<");
 
     const cookieResponse = await SELF.fetch("http://briefly.test/admin/login", {
       headers: {
@@ -994,7 +994,7 @@ describe("sole Administrator authentication", () => {
     });
     const cookieHtml = await cookieResponse.text();
     expect(cookieHtml).toContain('<html lang="en"');
-    expect(cookieHtml).toContain("The single administrator signs in here");
+    expect(cookieHtml).toContain(">Sign in<");
   });
 
   it("does not retain the previous authentication page paths", async () => {

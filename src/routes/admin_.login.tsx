@@ -69,6 +69,7 @@ function SignIn() {
     <AuthenticationSurface
       title={m.sign_in()}
       description={m.admin_description()}
+      showDescription={false}
       footerLink={
         setupAvailable ? { href: "/admin/setup", label: m.setup() } : undefined
       }
@@ -124,7 +125,6 @@ function SignIn() {
           {m.sign_in()}
         </Button>
         <p className="text-center text-sm text-default-500">
-          {m.lost_access()}{" "}
           <a className="authentication-link font-medium" href="/admin/recovery">
             {m.recovery_link()}
           </a>
