@@ -337,7 +337,7 @@
 /* ============ Index-First opening ============ */
 
 .public-site .intro {
-  max-width: var(--measure);
+  width: 100%;
   padding-block-start: var(--space-12);
   padding-block-end: var(--space-10);
 }

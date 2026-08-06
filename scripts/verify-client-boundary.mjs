@@ -10,9 +10,10 @@ const forbiddenMarkers = [
   "runtime_metadata",
   "RUNTIME_CONFIGURATION_INVALID",
   "BETTER_AUTH_SECRET",
-  "SETUP_SECRET",
-  "RECOVERY_SECRET",
 ];
+
+// SETUP_SECRET and RECOVERY_SECRET are intentionally shown as field labels.
+// Their values remain server bindings and must never be injected into the client.
 
 async function filesBelow(directory) {
   const entries = await readdir(directory, { withFileTypes: true });

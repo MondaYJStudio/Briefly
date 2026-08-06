@@ -37,6 +37,19 @@ interface PublishCommand {
   expectedCurrentPublicationId: string | null;
 }
 
+test("the home introduction uses the full content width", async ({ page }) => {
+  await page.goto("/");
+  const introduction = page.getByRole("region", { name: "About this site" });
+  await expect(introduction).toBeVisible();
+
+  const widths = await introduction.evaluate((element) => ({
+    introduction: element.getBoundingClientRect().width,
+    content: element.parentElement?.getBoundingClientRect().width ?? 0,
+  }));
+
+  expect(widths.introduction).toBe(widths.content);
+});
+
 test("a first-time Administrator publishes, revises, and withdraws an Asset-backed Article", async ({
   browser,
   page,
@@ -67,15 +80,48 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     }
   });
 
+  await test.step("show the restored sign-in and recovery surfaces", async () => {
+    await page.goto("/sign-in");
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Emergency recovery" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "First-run setup" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Briefly · First-run setup", { exact: true }),
+    ).toBeVisible();
+
+    await page.goto("/recover");
+    await expect(
+      page.getByRole("heading", { name: "Emergency recovery" }),
+    ).toBeVisible();
+    await expect(page.getByLabel("Recovery Secret")).toHaveAttribute(
+      "placeholder",
+      "Enter recovery secret",
+    );
+    await expect(page.getByRole("link", { name: "Set code" })).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Back to sign in" }),
+    ).toBeVisible();
+  });
+
   await test.step("initialize the sole Administrator through the visible setup flow", async () => {
     await page.goto("/setup");
     await expect(
-      page.getByRole("heading", { name: "Initialize Briefly" }),
+      page.getByRole("heading", { name: "First-run setup" }),
     ).toBeVisible();
-    await page.getByLabel("Setup secret").fill(setupSecret);
-    await page.getByLabel("Administrator email").fill(administratorEmail);
+    await expect(page.getByText("Briefly", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Get code" })).toHaveCount(0);
+    await expect(page.getByLabel("Setup code")).toHaveAttribute(
+      "placeholder",
+      "Enter setup code",
+    );
+    await page.getByLabel("Setup code").fill(setupSecret);
+    await page.getByLabel("Admin email").fill(administratorEmail);
     await page.getByLabel("Password").fill(administratorPassword);
-    await page.getByRole("button", { name: "Initialize" }).click();
+    await page.getByRole("button", { name: "Initialize Briefly" }).click();
     await expect(
       page.getByText("Initialization complete", { exact: true }),
     ).toBeVisible();

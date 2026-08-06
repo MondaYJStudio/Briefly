@@ -1509,19 +1509,19 @@ html[data-theme="dark"],
   flex: 1;
   min-width: 0;
 }
-.mt-2 {
+.briefly-theme .mt-2 {
   margin-top: var(--space-2);
 }
-.mt-4 {
+.briefly-theme .mt-4 {
   margin-top: var(--space-4);
 }
-.mt-6 {
+.briefly-theme .mt-6 {
   margin-top: var(--space-6);
 }
-.mb-4 {
+.briefly-theme .mb-4 {
   margin-bottom: var(--space-4);
 }
-.mb-6 {
+.briefly-theme .mb-6 {
   margin-bottom: var(--space-6);
 }
 .kbd {

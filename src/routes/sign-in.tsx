@@ -10,7 +10,9 @@ import {
 export const Route = createFileRoute("/sign-in")({ component: SignIn });
 
 function SignIn() {
-  const [state, setState] = useState<"ready" | "submitting" | "error">("ready");
+  const [state, setState] = useState<
+    "ready" | "submitting" | "error" | "offline"
+  >("ready");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -32,22 +34,34 @@ function SignIn() {
         setState("error");
       }
     } catch {
-      setState("error");
+      setState("offline");
     }
   }
 
   return (
     <AuthenticationSurface
       title="Sign in"
-      description="Use the sole Administrator credentials configured during initialization."
+      description="The single administrator signs in here. Readers never see this page."
+      footerLink={{ href: "/setup", label: "First-run setup" }}
     >
       <Form className="space-y-5" onSubmit={submit}>
         {state === "error" ? (
           <Alert status="danger" role="alert">
             <Alert.Content>
-              <Alert.Title>Unable to sign in</Alert.Title>
+              <Alert.Title>Incorrect email or password</Alert.Title>
               <Alert.Description>
-                The credentials were not accepted. Check them and try again.
+                Try again. This message stays the same whether the email exists
+                or not.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : state === "offline" ? (
+          <Alert status="warning" role="alert">
+            <Alert.Content>
+              <Alert.Title>You appear to be offline</Alert.Title>
+              <Alert.Description>
+                Signing in needs a connection to your Briefly server. Your input
+                is kept.
               </Alert.Description>
             </Alert.Content>
           </Alert>
@@ -57,6 +71,7 @@ function SignIn() {
           label="Email"
           type="email"
           autoComplete="username"
+          placeholder="you@example.com"
         />
         <AuthenticationField
           id="password"
@@ -65,10 +80,22 @@ function SignIn() {
           autoComplete="current-password"
           minLength={12}
           maxLength={128}
+          placeholder="••••••••••••"
         />
-        <Button fullWidth type="submit" isPending={state === "submitting"}>
+        <Button
+          fullWidth
+          type="submit"
+          isPending={state === "submitting"}
+          isDisabled={state === "offline"}
+        >
           Sign in
         </Button>
+        <p className="text-center text-sm text-default-500">
+          Lost access?{" "}
+          <a className="authentication-link font-medium" href="/recover">
+            Emergency recovery
+          </a>
+        </p>
       </Form>
     </AuthenticationSurface>
   );

@@ -6,6 +6,7 @@ import {
   AuthenticationField,
   AuthenticationSurface,
 } from "../auth/auth-surface";
+import { cloudflareWorkerSettingsHref } from "../auth/authentication-presentation";
 
 export const Route = createFileRoute("/setup")({ component: Setup });
 
@@ -13,6 +14,10 @@ type SetupState = "checking" | "ready" | "submitting" | "success" | "error";
 
 function Setup() {
   const [state, setState] = useState<SetupState>("checking");
+  const cloudflareSettingsHref = cloudflareWorkerSettingsHref({
+    appEnvironment: import.meta.env.PROD ? "production" : "local",
+    workerName: import.meta.env.BRIEFLY_WORKER_NAME,
+  });
 
   useEffect(() => {
     let active = true;
@@ -58,8 +63,13 @@ function Setup() {
 
   return (
     <AuthenticationSurface
-      title="Initialize Briefly"
-      description="Claim this fresh installation with the setup secret configured by the deployment operator. This can be done only once."
+      title={state === "success" ? "Briefly is ready" : "First-run setup"}
+      description={
+        state === "success"
+          ? "The admin account was created. The one-time setup code is now permanently disabled."
+          : "Create the single administrator for this site."
+      }
+      footerLink={{ href: "/sign-in", label: "Sign in" }}
     >
       {state === "checking" ? (
         <div className="flex items-center gap-3" role="status">
@@ -94,15 +104,30 @@ function Setup() {
           ) : null}
           <AuthenticationField
             id="setupSecret"
-            label="Setup secret"
+            label="Setup code"
             type="password"
             autoComplete="off"
+            placeholder="Enter setup code"
+            monospace
+            labelEnd={
+              cloudflareSettingsHref ? (
+                <a
+                  className="authentication-link text-xs font-medium"
+                  href={cloudflareSettingsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Get code
+                </a>
+              ) : null
+            }
           />
           <AuthenticationField
             id="email"
-            label="Administrator email"
+            label="Admin email"
             type="email"
             autoComplete="username"
+            placeholder="you@example.com"
           />
           <AuthenticationField
             id="password"
@@ -111,13 +136,10 @@ function Setup() {
             autoComplete="new-password"
             minLength={12}
             maxLength={128}
+            helperText="Minimum 12 characters. This signs in the only admin account."
           />
-          <p className="text-sm text-default-500">
-            Use at least 12 characters. A password manager-generated password is
-            recommended.
-          </p>
           <Button fullWidth type="submit" isPending={state === "submitting"}>
-            Initialize
+            Initialize Briefly
           </Button>
         </Form>
       )}

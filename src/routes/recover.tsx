@@ -6,6 +6,7 @@ import {
   AuthenticationField,
   AuthenticationSurface,
 } from "../auth/auth-surface";
+import { cloudflareWorkerSettingsHref } from "../auth/authentication-presentation";
 
 export const Route = createFileRoute("/recover")({ component: Recover });
 
@@ -13,6 +14,10 @@ type RecoveryState = "ready" | "submitting" | "success" | "error";
 
 function Recover() {
   const [state, setState] = useState<RecoveryState>("ready");
+  const cloudflareSettingsHref = cloudflareWorkerSettingsHref({
+    appEnvironment: import.meta.env.PROD ? "production" : "local",
+    workerName: import.meta.env.BRIEFLY_WORKER_NAME,
+  });
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,8 +41,13 @@ function Recover() {
 
   return (
     <AuthenticationSurface
-      title="Recover Administrator"
-      description="This emergency reset replaces the existing Administrator password and revokes every Administrator session. A fresh sign-in is required."
+      title={state === "success" ? "Password reset" : "Emergency recovery"}
+      description={
+        state === "success"
+          ? "All existing sessions have been revoked. Sign in again with the new password."
+          : "Locked out? Reset the admin password with the Recovery Secret from your deployment environment."
+      }
+      footerLink={{ href: "/sign-in", label: "Sign in" }}
     >
       {state === "success" ? (
         <div className="space-y-4">
@@ -45,8 +55,8 @@ function Recover() {
             <Alert.Content>
               <Alert.Title>Recovery complete</Alert.Title>
               <Alert.Description>
-                Sign in with the new password, then remove or rotate the
-                temporary recovery secret immediately.
+                Sign in with the new password, then remove or rotate
+                RECOVERY_SECRET immediately.
               </Alert.Description>
             </Alert.Content>
           </Alert>
@@ -59,19 +69,33 @@ function Recover() {
           {state === "error" ? (
             <Alert status="danger" role="alert">
               <Alert.Content>
-                <Alert.Title>Recovery failed</Alert.Title>
+                <Alert.Title>Recovery Secret rejected</Alert.Title>
                 <Alert.Description>
-                  The request was not accepted. Check the supplied values or try
-                  again later.
+                  Check the value in your deployment environment. Nothing was
+                  changed.
                 </Alert.Description>
               </Alert.Content>
             </Alert>
           ) : null}
           <AuthenticationField
             id="recoverySecret"
-            label="Temporary recovery secret"
+            label="Recovery Secret"
             type="password"
             autoComplete="off"
+            placeholder="Enter recovery secret"
+            monospace
+            labelEnd={
+              cloudflareSettingsHref ? (
+                <a
+                  className="authentication-link text-xs font-medium"
+                  href={cloudflareSettingsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Set code
+                </a>
+              ) : null
+            }
           />
           <AuthenticationField
             id="newPassword"
@@ -80,14 +104,17 @@ function Recover() {
             autoComplete="new-password"
             minLength={12}
             maxLength={128}
+            helperText="Minimum 12 characters."
           />
-          <p className="text-sm text-default-500">
-            Use at least 12 characters. Success signs out every existing
-            Administrator session, including sessions on other devices.
-          </p>
           <Button fullWidth type="submit" isPending={state === "submitting"}>
-            Reset password and revoke sessions
+            Reset password
           </Button>
+          <p className="text-center text-sm text-default-500">
+            Remembered it?{" "}
+            <a className="authentication-link font-medium" href="/sign-in">
+              Back to sign in
+            </a>
+          </p>
         </Form>
       )}
     </AuthenticationSurface>
