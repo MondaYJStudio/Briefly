@@ -7,10 +7,7 @@ import type {
 } from "./articles";
 import { purgeConfirmationMatches } from "./article-trash";
 
-export {
-  expectedPurgeConfirmation,
-  purgeConfirmationMatches,
-} from "./article-trash";
+export { purgeConfirmationMatches } from "./article-trash";
 
 const persistedTrashTransition = z.object({
   id: z.string().uuid(),
@@ -136,23 +133,7 @@ export async function purgeTrashedArticle(
   articleId: string,
   confirmationTitle: string,
 ): Promise<PurgeTrashedArticleResult> {
-  const draft = await database
-    .prepare(
-      `SELECT article_draft.title
-       FROM article
-       JOIN article_draft ON article_draft.article_id = article.id
-       WHERE article.id = ? AND article.trashed_at IS NOT NULL`,
-    )
-    .bind(articleId)
-    .first<{ title: string }>();
-  if (!draft) return { ok: false, reason: "not-found" };
-  if (
-    !purgeConfirmationMatches({
-      articleId,
-      title: draft.title,
-      confirmationTitle,
-    })
-  ) {
+  if (!purgeConfirmationMatches({ confirmationTitle })) {
     return { ok: false, reason: "confirmation-required" };
   }
 

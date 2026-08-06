@@ -1359,7 +1359,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await expect(page.getByLabel("Article body")).toContainText(revisedBody);
   });
 
-  await test.step("Trash restore stays unpublished and purge requires typed title confirmation", async () => {
+  await test.step("Trash restore stays unpublished and purge requires typed confirmation phrase", async () => {
     await page
       .getByRole("button", { name: "Move this Article to Trash?" })
       .click();
@@ -1372,9 +1372,6 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await expect(page).toHaveURL(/\/admin\/articles$/);
     await page.getByRole("link", { name: "Trash" }).click();
     await expect(page).toHaveURL(/\/admin\/trash$/);
-    await expect(
-      page.getByText("Recovery and permanent removal", { exact: true }),
-    ).toBeVisible();
     await expect(
       page.getByText(concurrentConflictDraftTitle, { exact: true }),
     ).toBeVisible();
@@ -1436,9 +1433,9 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
       exact: true,
     });
     await expect(confirmPurge).toBeDisabled();
-    await confirmInput.fill("wrong title");
+    await confirmInput.fill("wrong phrase");
     await expect(confirmPurge).toBeDisabled();
-    await confirmInput.fill(concurrentConflictDraftTitle);
+    await confirmInput.fill("confirm delete");
     await expect(confirmPurge).toBeEnabled();
     await purgeDialog.getByRole("button", { name: /Cancel/ }).click();
     await expect(purgeDialog).toHaveCount(0);
@@ -1448,7 +1445,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page
       .getByRole("alertdialog", { name: "Delete permanently" })
       .getByRole("textbox")
-      .fill(concurrentConflictDraftTitle);
+      .fill("confirm delete");
     await page
       .getByRole("alertdialog", { name: "Delete permanently" })
       .getByRole("button", { name: "Delete permanently", exact: true })

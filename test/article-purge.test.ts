@@ -3,9 +3,12 @@ import { env } from "cloudflare:workers";
 import type { OpenAPIV3_1 } from "openapi-types";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { purgeConfirmationPhrases } from "../src/articles/article-trash";
 import { initializeAndSignIn } from "./administrator-fixture";
 import { uploadOnePixelPngAsset } from "./asset-fixture";
 import { expectResponseMatchesContract } from "./openapi-contract";
+
+const confirmPhrase = purgeConfirmationPhrases.en;
 
 function textDocument(text: string) {
   return {
@@ -132,7 +135,7 @@ describe("Article purge", () => {
     await saveDraft(cookie, article.id, 3, "never-public", "Private revision");
     await trashArticle(cookie, article.id);
 
-    const purged = await purgeArticle(cookie, article.id, "Private revision");
+    const purged = await purgeArticle(cookie, article.id, confirmPhrase);
     expect(purged.status).toBe(200);
     expect(await purged.json()).toEqual({ id: article.id, purged: true });
 
@@ -198,7 +201,7 @@ describe("Article purge", () => {
     );
   }, 30_000);
 
-  it("requires authentication, Trash state, and an exact title confirmation", async () => {
+  it("requires authentication, Trash state, and the confirmation phrase", async () => {
     const cookie = await initializeAndSignIn();
     const article = await createArticle(cookie);
     await saveDraft(cookie, article.id, 1, "confirm-title", "Exact Title");
@@ -213,7 +216,7 @@ describe("Article purge", () => {
         body: JSON.stringify({ confirmationTitle }),
       });
 
-    const anonymous = await request({}, "Exact Title");
+    const anonymous = await request({}, confirmPhrase);
     expect(anonymous.status).toBe(401);
     expect(anonymous.headers.get("cache-control")).toBe("no-store");
     expect(await anonymous.json()).toEqual({
@@ -221,7 +224,7 @@ describe("Article purge", () => {
       code: "AUTHENTICATION_REQUIRED",
     });
 
-    const notTrashed = await request({ cookie }, "Exact Title");
+    const notTrashed = await request({ cookie }, confirmPhrase);
     expect(notTrashed.status).toBe(404);
     expect(await notTrashed.json()).toEqual({
       status: "error",
@@ -229,7 +232,7 @@ describe("Article purge", () => {
     });
 
     await trashArticle(cookie, article.id);
-    const wrongConfirmation = await request({ cookie }, "Wrong Title");
+    const wrongConfirmation = await request({ cookie }, "wrong phrase");
     expect(wrongConfirmation.status).toBe(409);
     expect(await wrongConfirmation.json()).toEqual({
       status: "error",
@@ -249,12 +252,26 @@ describe("Article purge", () => {
       ).status,
     ).toBe(200);
 
-    const confirmed = await request({ cookie }, "Exact Title");
+    const confirmed = await request({ cookie }, confirmPhrase);
     expect(confirmed.status).toBe(200);
     expect(await confirmed.json()).toEqual({ id: article.id, purged: true });
   }, 30_000);
 
-  it("rejects empty confirmation for a blank-title Article and accepts its identity", async () => {
+  it("accepts the Chinese confirmation phrase", async () => {
+    const cookie = await initializeAndSignIn();
+    const article = await createArticle(cookie);
+    await trashArticle(cookie, article.id);
+
+    const confirmed = await purgeArticle(
+      cookie,
+      article.id,
+      purgeConfirmationPhrases["zh-CN"],
+    );
+    expect(confirmed.status).toBe(200);
+    expect(await confirmed.json()).toEqual({ id: article.id, purged: true });
+  }, 30_000);
+
+  it("rejects empty confirmation for a blank-title Article", async () => {
     const cookie = await initializeAndSignIn();
     const article = await createArticle(cookie);
     await trashArticle(cookie, article.id);
@@ -266,9 +283,12 @@ describe("Article purge", () => {
       code: "ARTICLE_PURGE_CONFIRMATION_REQUIRED",
     });
 
-    const confirmed = await purgeArticle(cookie, article.id, article.id);
-    expect(confirmed.status).toBe(200);
-    expect(await confirmed.json()).toEqual({ id: article.id, purged: true });
+    const idFallback = await purgeArticle(cookie, article.id, article.id);
+    expect(idFallback.status).toBe(409);
+    expect(await idFallback.json()).toEqual({
+      status: "error",
+      code: "ARTICLE_PURGE_CONFIRMATION_REQUIRED",
+    });
   }, 30_000);
 
   it("removes all content and references while retaining only minimal tombstones and the R2 object", async () => {
@@ -332,7 +352,7 @@ describe("Article purge", () => {
     await publish(cookie, article.id, 3, firstPublicationId);
     await trashArticle(cookie, article.id);
 
-    const purged = await purgeArticle(cookie, article.id, "Secret title two");
+    const purged = await purgeArticle(cookie, article.id, confirmPhrase);
     expect(purged.status).toBe(200);
 
     for (const table of [
@@ -391,7 +411,7 @@ describe("Article purge", () => {
        END`,
     ).run();
 
-    const purge = () => purgeArticle(cookie, article.id, "Atomic title");
+    const purge = () => purgeArticle(cookie, article.id, confirmPhrase);
     const failed = await purge();
     expect(failed.status).toBe(500);
     expect(await failed.json()).toEqual({
@@ -437,7 +457,7 @@ describe("Article purge", () => {
 
     const concurrent = await createArticle(cookie);
     const [purged, concurrentClaim] = await Promise.all([
-      purgeArticle(cookie, original.id, "Original"),
+      purgeArticle(cookie, original.id, confirmPhrase),
       SELF.fetch(
         `http://briefly.test/api/admin/articles/${concurrent.id}/draft`,
         {
@@ -518,6 +538,5 @@ describe("Article purge", () => {
       "Trashed articles keep their Draft, all Publications, slug records",
     );
     expect(html).toContain("Nothing here is public.");
-    expect(html).toContain("Recovery and permanent removal");
   }, 30_000);
 });

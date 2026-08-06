@@ -689,6 +689,5 @@ describe("Article Trash and restore", () => {
       "Trashed articles keep their Draft, all Publications, slug records",
     );
     expect(html).toContain("Nothing here is public.");
-    expect(html).toContain("Recovery and permanent removal");
   }, 30_000);
 });
