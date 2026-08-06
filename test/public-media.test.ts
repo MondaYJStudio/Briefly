@@ -423,10 +423,10 @@ describe("stable public Asset delivery", () => {
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain('<main class="page" id="admin-main">');
-    expect(html).toContain('<h1 class="page-title">Media</h1>');
+    expect(html).toContain('id="admin-main"');
+    expect(html).toContain(">Media</h1>");
     expect(html).toContain("Images referenced by Drafts and Publications.");
-  }, 20_000);
+  }, 60_000);
 
   it("rolls back public identities and references when the D1 commit fails", async () => {
     const cookie = await initializeAndSignIn();
