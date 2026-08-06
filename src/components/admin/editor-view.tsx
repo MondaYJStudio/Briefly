@@ -6,6 +6,8 @@ import {
   Dropdown,
   Form,
   Input,
+  ListBox,
+  Select,
   Separator,
   Spinner,
   TextArea,
@@ -17,6 +19,7 @@ import type { ArticlePublicationHistoryEntry } from "../../articles/articles";
 import type { SiteSettings } from "../../site-settings/site-settings";
 import { SettingsField } from "./fields";
 import { AdminIcon } from "./icons";
+import { LANGUAGE_OPTIONS } from "./language-options";
 import {
   publicationIssuesForSurface,
   type PublicationIssueSurface,
@@ -798,21 +801,47 @@ function EditorRail({
                 />
               </SettingsField>
               <SettingsField
-                label="Language override (BCP 47, optional)"
+                label="Language override"
                 htmlFor="articleLanguage"
+                optional="optional"
                 issues={issueMessages("language")}
               >
-                <Input
+                <Select
                   fullWidth
-                  className="font-mono"
                   id="articleLanguage"
-                  value={selected.draft.language ?? ""}
-                  onChange={(event) =>
+                  aria-label="Language override"
+                  selectedKey={selected.draft.language ?? undefined}
+                  onSelectionChange={(key) =>
                     workspace.updateDraft({
-                      language: event.target.value || null,
+                      language: key === null || key === "" ? null : String(key),
                     })
                   }
-                />
+                >
+                  <Select.Trigger className="briefly-language-trigger">
+                    <Select.Value />
+                    <Select.Indicator />
+                  </Select.Trigger>
+                  <Select.Popover>
+                    <ListBox aria-label="Language override options">
+                      <ListBox.Item id="" textValue="Inherit default language">
+                        Inherit default language
+                      </ListBox.Item>
+                      {LANGUAGE_OPTIONS.map((language) => (
+                        <ListBox.Item
+                          key={language.id}
+                          id={language.id}
+                          className="briefly-language-option"
+                          textValue={`${language.label} (${language.detail})`}
+                        >
+                          <span>{language.label}</span>
+                          <span className="briefly-select-detail mono">
+                            {language.detail}
+                          </span>
+                        </ListBox.Item>
+                      ))}
+                    </ListBox>
+                  </Select.Popover>
+                </Select>
               </SettingsField>
               {siteSettings ? (
                 <p className="inherit-note">
