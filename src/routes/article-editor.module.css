@@ -1,0 +1,79 @@
+@reference "tailwindcss";
+
+/* ============ Formatting toolbar ============ */
+.fmtBar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  @apply flex flex-wrap items-center;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  margin: 0 auto var(--space-6);
+  max-width: fit-content;
+  background: var(--content1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-m);
+}
+
+.fmtBar :global(button[aria-pressed="true"]),
+.fmtBar :global(button.is-pressed) {
+  background: var(--content2) !important;
+  color: var(--foreground) !important;
+}
+
+.fmtSep {
+  width: 1px;
+  height: 1.25rem;
+  background: var(--divider);
+  margin: 0 var(--space-1);
+}
+
+.fmtStyleTrigger {
+  min-height: 2rem;
+  @apply inline-flex items-center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.fmtStyleTrigger:hover,
+.fmtStyleTrigger[data-pressed] {
+  background: var(--hover);
+}
+
+.fmtStyleTrigger:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.heading2Sample {
+  font-size: 1.05rem;
+}
+
+.heading4Sample {
+  font-size: 0.85rem;
+}
+
+.issueList {
+  @apply list-disc pl-5 text-sm;
+  color: var(--danger-strong);
+}
+
+@media (max-width: 860px) {
+  .fmtBar {
+    max-width: 100%;
+  }
+
+  .fmtBar :global(button[aria-label]),
+  .fmtStyleTrigger {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+}

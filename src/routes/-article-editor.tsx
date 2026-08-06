@@ -32,6 +32,7 @@ import { AdminIcon } from "../components/admin/icons";
 import { publicationIssuesForSurface } from "../components/admin/publication-issues";
 import { m } from "../paraglide/messages.js";
 import { getApiClient } from "./api.$";
+import styles from "./article-editor.module.css";
 
 export interface ArticleEditorProps {
   title: string;
@@ -152,7 +153,11 @@ export function ArticleEditor({
 
   return (
     <div className="article-editor">
-      <div className="fmt-bar" role="toolbar" aria-label="Text formatting">
+      <div
+        className={styles.fmtBar}
+        role="toolbar"
+        aria-label="Text formatting"
+      >
         {/* Undo/Redo */}
         <Button
           isIconOnly
@@ -176,12 +181,12 @@ export function ArticleEditor({
         >
           <AdminIcon name="redo" size={16} />
         </Button>
-        <span className="fmt-sep" aria-hidden="true" />
+        <span className={styles.fmtSep} aria-hidden="true" />
 
         {/* Paragraph style dropdown */}
         <Dropdown.Root>
           <Dropdown.Trigger
-            className="fmt-style-trigger"
+            className={styles.fmtStyleTrigger}
             aria-label="Paragraph style"
           >
             {activeEditor.isActive("heading", { level: 2 })
@@ -223,18 +228,18 @@ export function ArticleEditor({
                 Paragraph
               </Dropdown.Item>
               <Dropdown.Item id="h2" textValue="Heading 2">
-                <strong style={{ fontSize: "1.05rem" }}>Heading 2</strong>
+                <strong className={styles.heading2Sample}>Heading 2</strong>
               </Dropdown.Item>
               <Dropdown.Item id="h3" textValue="Heading 3">
                 <strong>Heading 3</strong>
               </Dropdown.Item>
               <Dropdown.Item id="h4" textValue="Heading 4">
-                <strong style={{ fontSize: "0.85rem" }}>Heading 4</strong>
+                <strong className={styles.heading4Sample}>Heading 4</strong>
               </Dropdown.Item>
             </Dropdown.Menu>
           </Dropdown.Popover>
         </Dropdown.Root>
-        <span className="fmt-sep" aria-hidden="true" />
+        <span className={styles.fmtSep} aria-hidden="true" />
 
         {/* Inline formatting */}
         <Button
@@ -296,7 +301,7 @@ export function ArticleEditor({
         >
           <AdminIcon name="link" size={16} />
         </Button>
-        <span className="fmt-sep" aria-hidden="true" />
+        <span className={styles.fmtSep} aria-hidden="true" />
 
         {/* Lists and blocks */}
         <Button
@@ -367,7 +372,7 @@ export function ArticleEditor({
         >
           <AdminIcon name="break" size={16} />
         </Button>
-        <span className="fmt-sep" aria-hidden="true" />
+        <span className={styles.fmtSep} aria-hidden="true" />
         <Button
           isIconOnly
           size="sm"
@@ -552,11 +557,7 @@ function PublicationGuidance({
 }: Readonly<{ issues: PublicationIssue[] }>) {
   if (issues.length === 0) return null;
   return (
-    <ul
-      className="list-disc pl-5 text-sm"
-      role="alert"
-      style={{ color: "var(--danger-strong)" }}
-    >
+    <ul className={styles.issueList} role="alert">
       {issues.map((issue) => (
         <li key={`${issue.code}:${issue.path}`}>{issue.message}</li>
       ))}

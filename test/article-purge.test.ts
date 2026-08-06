@@ -534,9 +534,7 @@ describe("Article purge", () => {
     expect(response.status).toBe(200);
     expect(html).toContain('id="admin-main"');
     expect(html).toContain("Trash");
-    expect(html).toContain(
-      "Trashed articles keep their Draft, all Publications, slug records",
-    );
-    expect(html).toContain("Nothing here is public.");
+    expect(html).toContain("Restore or permanently delete trashed articles.");
+    expect(html).toContain("Loading Trash");
   }, 30_000);
 });

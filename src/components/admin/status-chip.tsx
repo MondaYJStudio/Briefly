@@ -1,9 +1,18 @@
 import type { ReactNode } from "react";
 
 import { AdminIcon, type AdminIconName } from "./icons";
+import styles from "./status-chip.module.css";
 
 type StatusChipVariant =
   "default" | "primary" | "success" | "warning" | "danger";
+
+const variantClass: Record<StatusChipVariant, string> = {
+  default: styles.chipDefault,
+  primary: styles.chipPrimary,
+  success: styles.chipSuccess,
+  warning: styles.chipWarning,
+  danger: styles.chipDanger,
+};
 
 export function StatusChip({
   variant = "default",
@@ -17,8 +26,8 @@ export function StatusChip({
   children: ReactNode;
 }>) {
   return (
-    <span className={`chip chip-${variant}`}>
-      {dot ? <span className="dot" aria-hidden="true" /> : null}
+    <span className={`${styles.chip} ${variantClass[variant]}`}>
+      {dot ? <span className={styles.dot} aria-hidden="true" /> : null}
       {icon ? <AdminIcon name={icon} size={12} strokeWidth={2.2} /> : null}
       {children}
     </span>

@@ -6,6 +6,7 @@ import {
   AuthenticationField,
   AuthenticationSurface,
 } from "../auth/auth-surface";
+import authStyles from "../auth/auth-surface.module.css";
 import { m } from "../paraglide/messages.js";
 
 export const Route = createFileRoute("/admin_/login")({
@@ -125,7 +126,10 @@ function SignIn() {
           {m.sign_in()}
         </Button>
         <p className="text-center text-sm text-default-500">
-          <a className="authentication-link font-medium" href="/admin/recovery">
+          <a
+            className={`${authStyles.link} font-medium`}
+            href="/admin/recovery"
+          >
             {m.recovery_link()}
           </a>
         </p>

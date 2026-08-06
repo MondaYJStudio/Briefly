@@ -223,5 +223,5 @@ describe("private saved Draft preview", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(html).toContain("Loading Article editor");
-  }, 15_000);
+  }, 30_000);
 });

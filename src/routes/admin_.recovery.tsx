@@ -6,6 +6,7 @@ import {
   AuthenticationField,
   AuthenticationSurface,
 } from "../auth/auth-surface";
+import authStyles from "../auth/auth-surface.module.css";
 import { cloudflareWorkerSettingsHref } from "../auth/authentication-presentation";
 import { m } from "../paraglide/messages.js";
 
@@ -53,8 +54,8 @@ function Recover() {
     >
       {state === "success" ? (
         <div>
-          <div className="authentication-empty" role="status">
-            <div className="authentication-empty-icon" aria-hidden="true">
+          <div className={authStyles.empty} role="status">
+            <div className={authStyles.emptyIcon} aria-hidden="true">
               <svg
                 width="24"
                 height="24"
@@ -106,7 +107,7 @@ function Recover() {
             labelEnd={
               state === "ready" && cloudflareSettingsHref ? (
                 <a
-                  className="authentication-link text-xs font-medium"
+                  className={`${authStyles.link} text-xs font-medium`}
                   href={cloudflareSettingsHref}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -132,7 +133,7 @@ function Recover() {
             {m.reset_password()}
           </Button>
           <p className="text-center text-sm text-default-500">
-            <a className="authentication-link font-medium" href="/admin/login">
+            <a className={`${authStyles.link} font-medium`} href="/admin/login">
               {m.back_to_sign_in()}
             </a>
           </p>

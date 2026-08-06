@@ -205,12 +205,11 @@
   padding: var(--space-4);
   border-radius: var(--radius-l);
   border: 1px solid oklch(1 0 0 / 0.08);
-  background:
-    radial-gradient(
-      120% 90% at 50% 40%,
-      oklch(0.3 0.01 264 / 0.4),
-      oklch(0.17 0.008 264 / 0.95)
-    );
+  background: radial-gradient(
+    120% 90% at 50% 40%,
+    oklch(0.3 0.01 264 / 0.4),
+    oklch(0.17 0.008 264 / 0.95)
+  );
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -277,7 +276,9 @@
 
 .heroPreview:hover,
 .heroPreview:focus-visible {
-  box-shadow: 0 0 0 2px oklch(1 0 0 / 0.22), var(--shadow-m);
+  box-shadow:
+    0 0 0 2px oklch(1 0 0 / 0.22),
+    var(--shadow-m);
   outline: none;
 }
 
@@ -321,12 +322,11 @@
   padding: 0;
   overflow: hidden;
   color: oklch(0.96 0.005 264);
-  background:
-    linear-gradient(
-      180deg,
-      oklch(0.18 0.01 264) 0%,
-      oklch(0.12 0.008 264) 100%
-    ) !important;
+  background: linear-gradient(
+    180deg,
+    oklch(0.18 0.01 264) 0%,
+    oklch(0.12 0.008 264) 100%
+  ) !important;
   border: 1px solid oklch(1 0 0 / 0.08) !important;
   border-radius: 1.25rem !important;
   box-shadow:
@@ -371,12 +371,11 @@
   place-items: center;
   min-height: min(68dvh, 40rem);
   padding: var(--space-10) var(--space-8) var(--space-6);
-  background:
-    radial-gradient(
-      70% 55% at 50% 42%,
-      oklch(0.32 0.012 264 / 0.45),
-      transparent 70%
-    );
+  background: radial-gradient(
+    70% 55% at 50% 42%,
+    oklch(0.32 0.012 264 / 0.45),
+    transparent 70%
+  );
 }
 
 .galleryImage {

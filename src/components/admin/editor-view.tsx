@@ -20,7 +20,10 @@ import type {
   ArticleCoverUsage,
   ArticlePublicationHistoryEntry,
 } from "../../articles/articles";
-import { slugAfterManualEdit, slugAfterReset } from "../../articles/slug-follow";
+import {
+  slugAfterManualEdit,
+  slugAfterReset,
+} from "../../articles/slug-follow";
 import { commitTagChipInput } from "../../articles/tag-chips";
 import type { AssetLibraryEntry, ReadyAsset } from "../../assets/assets";
 import {
@@ -49,7 +52,7 @@ const ArticleEditor = lazy(async () => {
 
 function ArticleEditorFallback() {
   return (
-    <div className="card card-pad" role="status">
+    <div className={`${styles.card} ${styles.cardPad}`} role="status">
       Loading the text-rich editor…
     </div>
   );
@@ -116,9 +119,9 @@ export function EditorView({
   }
 
   return (
-    <main className="editor-main" id="admin-main">
+    <main className={styles.editorMain} id="admin-main">
       {/* ===== Top bar ===== */}
-      <header className="editor-topbar">
+      <header className={styles.editorTopbar}>
         <Button
           isIconOnly
           size="sm"
@@ -130,11 +133,11 @@ export function EditorView({
         >
           <AdminIcon name="back" size={18} />
         </Button>
-        <div className="title-wrap">
-          <span className="doc-title">
+        <div className={styles.titleWrap}>
+          <span className={styles.docTitle}>
             {selected.draft.title || "Untitled Article"}
           </span>
-          <span className="hide-m">
+          <span className={styles.hideM}>
             {workspace.hasUnsavedChanges ||
             (hasCurrentPublication &&
               workspace.historyHasUnpublishedChanges) ? (
@@ -158,7 +161,7 @@ export function EditorView({
         </div>
         <EditorSaveState workspace={workspace} />
         <Button
-          className="hide-m"
+          className={styles.hideM}
           size="sm"
           type="button"
           variant="outline"
@@ -179,18 +182,7 @@ export function EditorView({
         <Dropdown.Root>
           <Dropdown.Trigger
             aria-label="More article actions"
-            style={{
-              width: "2rem",
-              height: "2rem",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "var(--radius-s)",
-              background: "none",
-              border: 0,
-              cursor: "pointer",
-              color: "var(--foreground-muted)",
-            }}
+            className={styles.moreTrigger}
           >
             <AdminIcon name="more" size={18} />
           </Dropdown.Trigger>
@@ -249,9 +241,9 @@ export function EditorView({
       </header>
 
       {/* ===== Body: canvas + rail ===== */}
-      <div className="editor-body">
-        <div className="editor-scroll" id="canvas">
-          <div className="editor-canvas">
+      <div className={styles.editorBody}>
+        <div className={styles.editorScroll} id="canvas">
+          <div className={styles.editorCanvas}>
             <WorkspaceAlerts workspace={workspace} />
             <Form
               onSubmit={(event) => {
@@ -262,19 +254,19 @@ export function EditorView({
               <fieldset
                 aria-busy={editorLocked}
                 disabled={editorLocked}
-                style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}
+                className={styles.fieldsetReset}
               >
                 {workspace.restoreState === "restoring" ? (
-                  <p className="small muted editor-pending-state" role="status">
+                  <p className={styles.pendingState} role="status">
                     Restoring Publication… Draft editing is temporarily paused.
                   </p>
                 ) : workspace.trashActionState === "trashing" ? (
-                  <p className="small muted editor-pending-state" role="status">
+                  <p className={styles.pendingState} role="status">
                     Moving Article to Trash… Draft editing is temporarily
                     paused.
                   </p>
                 ) : workspace.trashActionState === "restoring" ? (
-                  <p className="small muted editor-pending-state" role="status">
+                  <p className={styles.pendingState} role="status">
                     Restoring Article from Trash… Draft editing is temporarily
                     paused.
                   </p>
@@ -464,7 +456,7 @@ function EditorSaveState({
     tone = "";
     text = "Saving…";
     compactText = text;
-    icon = <Spinner aria-hidden="true" style={{ width: 12, height: 12 }} />;
+    icon = <Spinner aria-hidden="true" className={styles.spinner} />;
   } else if (state === "dirty") {
     tone = "";
     text = "Unsaved changes";
@@ -502,10 +494,13 @@ function EditorSaveState({
     icon = <AdminIcon name="clock" size={14} strokeWidth={2.2} />;
   }
   return (
-    <span className={`save-state${tone ? ` ${tone}` : ""}`} role="status">
+    <span
+      className={`${styles.saveState}${tone === "is-error" ? ` ${styles.isError}` : tone === "is-warn" ? ` ${styles.isWarn}` : tone === "is-ok" ? ` ${styles.isOk}` : ""}`}
+      role="status"
+    >
       {icon}
-      <span className="save-state-full">{text}</span>
-      <span className="save-state-compact">{compactText}</span>
+      <span className={styles.saveStateFull}>{text}</span>
+      <span className={styles.saveStateCompact}>{compactText}</span>
     </span>
   );
 }
@@ -573,12 +568,11 @@ function EditorRail({
       className={`${styles.rail}${railOpen ? ` ${styles.railOpen}` : ""}`}
       aria-label={m.article_settings()}
     >
-      <div className={`${styles.railTabs} row-between`}>
+      <div className={`${styles.railTabs} ${styles.rowBetween}`}>
         <div
           className={styles.tabsLineList}
           role="tablist"
           aria-label={m.rail_settings_sections()}
-          style={{ borderBottom: 0 }}
         >
           {(
             [
@@ -618,8 +612,8 @@ function EditorRail({
           {/* ---- Publish ---- */}
           <section className={styles.railSection}>
             <h3>Publish</h3>
-            <div className="field-stack">
-              <div className="row" style={{ gap: "var(--space-2)" }}>
+            <div className={styles.fieldStack}>
+              <div className={styles.rowGap2}>
                 {changesPending ? (
                   <StatusChip variant="warning" icon="alert">
                     Changes pending
@@ -691,7 +685,7 @@ function EditorRail({
                   ? "Republish saved Draft"
                   : "Publish saved Draft"}
               </Button>
-              <p className="small faint">
+              <p className={`small faint ${styles.previewMeta}`}>
                 Publishing is available only for a server-confirmed Draft
                 Version. Republishing creates a new immutable Publication;
                 earlier history is preserved.
@@ -735,7 +729,7 @@ function EditorRail({
               role="tabpanel"
               aria-label={m.rail_tab_basic()}
             >
-              <div className="field-stack">
+              <div className={styles.fieldStack}>
                 <SettingsField
                   label={m.title_label()}
                   htmlFor="articleTitleRail"
@@ -784,7 +778,7 @@ function EditorRail({
               role="tabpanel"
               aria-label={m.rail_tab_advanced()}
             >
-              <div className="field-stack">
+              <div className={styles.fieldStack}>
                 <SettingsField
                   label={m.advanced_slug_label()}
                   htmlFor="articleSlug"
@@ -1074,7 +1068,7 @@ function TagsField({
           }}
         />
       </div>
-      <p className="small faint">{m.tags_hint()}</p>
+      <p className={`small faint ${styles.previewMeta}`}>{m.tags_hint()}</p>
     </SettingsField>
   );
 }
@@ -1327,13 +1321,16 @@ function HistoryPanel({
     <div role="tabpanel" aria-label={m.rail_tab_history()}>
       <section className={`${styles.railSection} ${styles.railSectionFlush}`}>
         <h3>Publication history</h3>
-        <div className="field-stack">
+        <div className={styles.fieldStack}>
           {historyHasUnpublishedChanges && historyState === "ready" ? (
-            <div className="alert alert-warning" role="status">
+            <div
+              className={`${styles.alert} ${styles.alertWarning}`}
+              role="status"
+            >
               <AdminIcon name="alert" strokeWidth={2.2} />
               <div>
-                <div className="alert-title">Unpublished changes</div>
-                <div className="alert-body">
+                <div className={styles.alertTitle}>Unpublished changes</div>
+                <div className={styles.alertBody}>
                   The Draft is ahead of the Current Publication.
                 </div>
               </div>
@@ -1359,11 +1356,8 @@ function HistoryPanel({
               </Alert.Content>
             </Alert>
           ) : historyState === "ready" && publicationHistory.length === 0 ? (
-            <div
-              className="empty"
-              style={{ padding: "var(--space-8) var(--space-4)" }}
-            >
-              <div className="empty-icon">
+            <div className={styles.empty}>
+              <div className={styles.emptyIcon}>
                 <AdminIcon name="history" size={24} />
               </div>
               <h3>No Publications yet</h3>
@@ -1420,7 +1414,7 @@ function HistoryPanel({
           {publicationHistory.length > 0 ? (
             <ol
               aria-label="Retained Publications"
-              style={{ listStyle: "none", margin: 0, padding: 0 }}
+              className={styles.issueListReset}
             >
               {publicationHistory.map((publication) => (
                 <li
@@ -1430,8 +1424,8 @@ function HistoryPanel({
                   <span className={styles.pubNum}>
                     #{publication.publicationNumber}
                   </span>
-                  <div className="grow">
-                    <div className="row" style={{ gap: "var(--space-2)" }}>
+                  <div className={styles.grow}>
+                    <div className={styles.rowGap2}>
                       <strong className="small">{publication.title}</strong>
                       {publication.isCurrent ? (
                         <StatusChip variant="success" dot>
@@ -1440,10 +1434,10 @@ function HistoryPanel({
                       ) : null}
                     </div>
                     <p className="small faint mono">/{publication.slug}</p>
-                    <p className="small faint">
+                    <p className={`small faint ${styles.previewMeta}`}>
                       {new Date(publication.publishedAt).toLocaleString()}
                     </p>
-                    <div className="row mt-2" style={{ gap: "var(--space-2)" }}>
+                    <div className={`${styles.rowGap2} ${styles.actionTop}`}>
                       <Button
                         size="sm"
                         type="button"
@@ -1464,9 +1458,9 @@ function HistoryPanel({
               ))}
             </ol>
           ) : null}
-          <p className="small faint">
-            Restoring replaces the current Draft. The live Publication stays until
-            you publish again.
+          <p className={`small faint ${styles.previewMeta}`}>
+            Restoring replaces the current Draft. The live Publication stays
+            until you publish again.
           </p>
         </div>
       </section>
@@ -1543,7 +1537,7 @@ export function PreviewDrawer({
                 <Drawer.Heading>
                   <strong>Draft preview</strong>
                 </Drawer.Heading>
-                <p className="small faint" style={{ marginTop: 2 }}>
+                <p className={`small faint ${styles.previewMeta}`}>
                   Renders the server-confirmed Draft only — never unsaved
                   keystrokes.
                 </p>
@@ -1551,9 +1545,9 @@ export function PreviewDrawer({
               <Drawer.CloseTrigger aria-label="Close preview" />
             </div>
           </Drawer.Header>
-          <Drawer.Body style={{ padding: "var(--space-5)" }}>
+          <Drawer.Body className={styles.previewBody}>
             {previewState === "loading" || previewState === "idle" ? (
-              <div className="row" role="status">
+              <div className={styles.row} role="status">
                 <Spinner aria-label="Loading saved Draft preview" />
                 <span className="small muted">
                   Rendering saved Draft preview…
@@ -1591,25 +1585,20 @@ export function PreviewDrawer({
                 </Alert.Content>
               </Alert>
             ) : preview ? (
-              <div className="stack">
+              <div className={styles.stack}>
                 <p className="small muted" role="status">
                   Showing saved Draft Version {preview.draftVersion} with
                   Renderer Version {preview.rendererVersion}.
                 </p>
                 <article
-                  className="doc card card-pad"
+                  className={`doc ${styles.card} ${styles.cardPad}`}
                   lang={preview.metadata.language}
                   aria-labelledby="saved-draft-preview-title"
                 >
                   <header>
                     <h2
                       id="saved-draft-preview-title"
-                      style={{
-                        fontFamily: "var(--font-serif)",
-                        fontSize: "1.8rem",
-                        fontWeight: 700,
-                        letterSpacing: "-0.015em",
-                      }}
+                      className={styles.previewTitle}
                     >
                       {preview.metadata.title}
                     </h2>

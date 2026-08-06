@@ -114,14 +114,14 @@ export function TrashView({
         ) : null}
 
         {showPurgedOutcome ? (
-          <div className="card">
-            <div className="empty">
-              <div className="empty-icon is-success">
+          <div className={styles.card}>
+            <div className={styles.empty}>
+              <div className={`${styles.emptyIcon} ${styles.emptyIconSuccess}`}>
                 <AdminIcon name="check" size={24} />
               </div>
               <h3>{m.trash_purged_title()}</h3>
               <p>{m.trash_purged_description()}</p>
-              <div className="empty-actions">
+              <div className={styles.emptyActions}>
                 <Button
                   type="button"
                   variant="secondary"
@@ -135,14 +135,14 @@ export function TrashView({
         ) : trashViewState === "loading" ? (
           <TrashListSkeleton />
         ) : trashViewState === "error" ? (
-          <div className="card">
-            <div className="empty">
-              <div className="empty-icon is-danger">
+          <div className={styles.card}>
+            <div className={styles.empty}>
+              <div className={`${styles.emptyIcon} ${styles.emptyIconDanger}`}>
                 <AdminIcon name="alert" size={24} />
               </div>
               <h3>{m.trash_load_failed_title()}</h3>
               <p>{m.trash_load_failed_description()}</p>
-              <div className="empty-actions">
+              <div className={styles.emptyActions}>
                 <Button type="button" onPress={() => void reloadTrashView()}>
                   {m.trash_retry()}
                 </Button>
@@ -150,14 +150,14 @@ export function TrashView({
             </div>
           </div>
         ) : trashedArticles.length === 0 ? (
-          <div className="card">
-            <div className="empty">
-              <div className="empty-icon">
+          <div className={styles.card}>
+            <div className={styles.empty}>
+              <div className={styles.emptyIcon}>
                 <AdminIcon name="trash" size={24} />
               </div>
               <h3>{m.trash_empty_title()}</h3>
               <p>{m.trash_empty_description()}</p>
-              <div className="empty-actions">
+              <div className={styles.emptyActions}>
                 <Button
                   type="button"
                   variant="secondary"
@@ -169,7 +169,7 @@ export function TrashView({
             </div>
           </div>
         ) : (
-          <div className="card">
+          <div className={styles.card}>
             <ul className={styles.list} aria-label={m.trash_list_label()}>
               {trashedArticles.map((article) => {
                 const title = displayTitle(article);
@@ -311,12 +311,12 @@ export function TrashView({
               </AlertDialog.Heading>
             </AlertDialog.Header>
             <AlertDialog.Body>
-              <p className={`small ${styles.purgeWarning}`}>
+              <p className={styles.purgeWarning}>
                 {m.trash_purge_warning({
                   title: purgeTarget ? displayTitle(purgeTarget) : "",
                 })}
               </p>
-              <ul className={`small muted ${styles.purgePoints}`}>
+              <ul className={styles.purgePoints}>
                 <li>{m.trash_purge_point_content()}</li>
                 <li>{m.trash_purge_point_media()}</li>
                 <li>{m.trash_purge_point_tombstone()}</li>
@@ -371,7 +371,7 @@ const trashSkeletonRows = [
 function TrashListSkeleton() {
   return (
     <div
-      className="card"
+      className={styles.card}
       aria-busy="true"
       role="status"
       aria-label={m.trash_loading_label()}
@@ -382,11 +382,11 @@ function TrashListSkeleton() {
             <div className={styles.skeletonMain}>
               <div className={styles.skeletonTitleLine}>
                 <div
-                  className="skeleton"
+                  className={styles.skeleton}
                   style={{ width: row.title, height: "1rem" }}
                 />
                 <div
-                  className="skeleton"
+                  className={styles.skeleton}
                   style={{ width: "5.5rem", height: "1.25rem" }}
                 />
               </div>
@@ -394,7 +394,7 @@ function TrashListSkeleton() {
                 {row.meta.map((width) => (
                   <div
                     key={width}
-                    className="skeleton"
+                    className={styles.skeleton}
                     style={{ width, height: "0.75rem" }}
                   />
                 ))}
@@ -402,11 +402,11 @@ function TrashListSkeleton() {
             </div>
             <div className={styles.skeletonSide}>
               <div
-                className="skeleton"
+                className={styles.skeleton}
                 style={{ width: "4rem", height: "2rem" }}
               />
               <div
-                className="skeleton"
+                className={styles.skeleton}
                 style={{ width: "5.5rem", height: "2rem" }}
               />
             </div>

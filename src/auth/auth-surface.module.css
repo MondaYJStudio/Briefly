@@ -18,12 +18,15 @@
   inset: -20% -10% auto;
   height: 55%;
   pointer-events: none;
-  background:
-    radial-gradient(
-      60% 80% at 50% 0%,
-      color-mix(in oklch, var(--foreground, oklch(0.21 0.008 264)) 8%, transparent),
-      transparent 70%
-    );
+  background: radial-gradient(
+    60% 80% at 50% 0%,
+    color-mix(
+      in oklch,
+      var(--foreground, oklch(0.21 0.008 264)) 8%,
+      transparent
+    ),
+    transparent 70%
+  );
   opacity: 0.9;
 }
 
@@ -138,4 +141,47 @@
   text-align: center;
   font-size: 0.75rem;
   color: var(--foreground-faint, oklch(0.56 0.014 264));
+}
+
+.link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.empty {
+  display: grid;
+  justify-items: center;
+  padding: 1rem 0;
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 1rem;
+  place-items: center;
+  border-radius: 0.875rem;
+  background: color-mix(in oklch, var(--success) 15%, transparent);
+  color: var(--success-strong, var(--success));
+}
+
+.empty h1 {
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.empty p {
+  max-width: 26rem;
+  margin-top: 0.25rem;
+  color: var(--foreground-muted, var(--foreground));
+}
+
+.empty :global(button) {
+  margin-top: 1.25rem;
 }
