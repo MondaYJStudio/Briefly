@@ -44,23 +44,48 @@ function Recover() {
       title={state === "success" ? "Password reset" : "Emergency recovery"}
       description={
         state === "success"
-          ? "All existing sessions have been revoked. Sign in again with the new password."
+          ? "All existing sessions have been revoked — sign in again with the new password."
           : "Locked out? Reset the admin password with the Recovery Secret from your deployment environment."
       }
       footerLink={{ href: "/sign-in", label: "Sign in" }}
+      showHeader={state !== "success"}
+      showDescription={state === "ready"}
     >
       {state === "success" ? (
-        <div className="space-y-4">
-          <Alert status="success">
+        <div>
+          <div className="authentication-empty" role="status">
+            <div className="authentication-empty-icon" aria-hidden="true">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </div>
+            <h1>Password reset</h1>
+            <p>
+              All existing sessions have been revoked — sign in again with the
+              new password.
+            </p>
+          </div>
+          <Alert status="warning" role="note" className="mt-4 mb-5">
             <Alert.Content>
-              <Alert.Title>Recovery complete</Alert.Title>
               <Alert.Description>
-                Sign in with the new password, then remove or rotate
-                RECOVERY_SECRET immediately.
+                Rotate or remove RECOVERY_SECRET from your environment as soon
+                as possible — anyone holding it can reset this account.
               </Alert.Description>
             </Alert.Content>
           </Alert>
-          <Button onPress={() => globalThis.location.assign("/sign-in")}>
+          <Button
+            fullWidth
+            onPress={() => globalThis.location.assign("/sign-in")}
+          >
             Continue to sign in
           </Button>
         </div>
@@ -84,8 +109,9 @@ function Recover() {
             autoComplete="off"
             placeholder="Enter recovery secret"
             monospace
+            invalid={state === "error"}
             labelEnd={
-              cloudflareSettingsHref ? (
+              state === "ready" && cloudflareSettingsHref ? (
                 <a
                   className="authentication-link text-xs font-medium"
                   href={cloudflareSettingsHref}
@@ -104,7 +130,12 @@ function Recover() {
             autoComplete="new-password"
             minLength={12}
             maxLength={128}
-            helperText="Minimum 12 characters."
+            placeholder={
+              state === "error" ? "Minimum 12 characters" : undefined
+            }
+            helperText={
+              state === "ready" ? "Minimum 12 characters." : undefined
+            }
           />
           <Button fullWidth type="submit" isPending={state === "submitting"}>
             Reset password

@@ -50,6 +50,48 @@ test("the home introduction uses the full content width", async ({ page }) => {
   expect(widths.introduction).toBe(widths.content);
 });
 
+test("the recovery surface restores invalid and successful states", async ({
+  page,
+}) => {
+  await page.route("**/api/recover", async (route) => {
+    await route.fulfill({
+      status: 403,
+      body: JSON.stringify({ status: "error", code: "RECOVERY_DENIED" }),
+    });
+  });
+  await page.goto("/recover");
+  await page.getByLabel("Recovery Secret").fill("wrong-secret");
+  await page.getByLabel("New password").fill("a-valid-password");
+  await page.getByRole("button", { name: "Reset password" }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Recovery Secret rejected",
+  );
+  await expect(page.getByLabel("Recovery Secret")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(page.getByRole("link", { name: "Set code" })).toHaveCount(0);
+
+  await page.unroute("**/api/recover");
+  await page.route("**/api/recover", async (route) => {
+    await route.fulfill({
+      status: 200,
+      body: JSON.stringify({ status: "ok" }),
+    });
+  });
+  await page.getByLabel("Recovery Secret").fill("valid-secret");
+  await page.getByRole("button", { name: "Reset password" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Password reset" }),
+  ).toBeVisible();
+  await expect(page.getByRole("status")).toContainText(
+    "All existing sessions have been revoked",
+  );
+  await expect(page.getByRole("note")).toContainText(
+    "Rotate or remove RECOVERY_SECRET",
+  );
+});
+
 test("a first-time Administrator publishes, revises, and withdraws an Asset-backed Article", async ({
   browser,
   page,
@@ -123,7 +165,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page.getByLabel("Password").fill(administratorPassword);
     await page.getByRole("button", { name: "Initialize Briefly" }).click();
     await expect(
-      page.getByText("Initialization complete", { exact: true }),
+      page.getByRole("heading", { name: "Briefly is ready" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Continue to sign in" }).click();
     await expect(page).toHaveURL(/\/sign-in$/);
