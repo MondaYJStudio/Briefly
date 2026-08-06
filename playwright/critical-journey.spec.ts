@@ -50,6 +50,24 @@ test("the home introduction uses the full content width", async ({ page }) => {
   expect(widths.introduction).toBe(widths.content);
 });
 
+test("the sign-in page hides first-run setup after initialization", async ({
+  page,
+}) => {
+  await page.route("**/api/installation", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ initialized: true }),
+    });
+  });
+
+  await page.goto("/sign-in");
+
+  await expect(page.getByRole("link", { name: "First-run setup" })).toHaveCount(
+    0,
+  );
+});
+
 test("the recovery surface restores invalid and successful states", async ({
   page,
 }) => {
