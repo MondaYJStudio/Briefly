@@ -1,6 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { type CSSProperties, type ReactNode, useState } from "react";
 
+import { m } from "../../paraglide/messages.js";
+import { getLocale, setLocale, type Locale } from "../../paraglide/runtime.js";
+
 export type PublicTheme = "light" | "dark";
 
 export type PublicSiteShellVariant = "home" | "interior";
@@ -75,19 +78,17 @@ function MoonIcon() {
 export function PublicSiteShell({
   siteName,
   issueLine,
-  locale = "zh-CN",
   variant,
   children,
 }: Readonly<{
   siteName: string;
   issueLine?: string;
-  locale?: "en" | "zh-CN";
   variant: PublicSiteShellVariant;
   children: ReactNode;
 }>) {
   const [theme, setTheme] = useState<PublicTheme>(initialTheme);
   const dark = theme === "dark";
-  const english = locale === "en";
+  const locale = getLocale();
 
   function toggleTheme() {
     setTheme((current) => {
@@ -99,6 +100,11 @@ export function PublicSiteShell({
       }
       return next;
     });
+  }
+
+  function switchLocale(next: Locale) {
+    if (next === locale) return;
+    setLocale(next);
   }
 
   const name = (
@@ -129,41 +135,50 @@ export function PublicSiteShell({
           {variant === "home" ? (
             <nav
               className="masthead__nav"
-              aria-label={english ? "Main navigation" : "主导航"}
+              aria-label={m.public_main_navigation()}
             >
               <ul>
                 <li>
                   <a href="#index" aria-current="page">
-                    {english ? "Articles" : "文章"}
+                    {m.articles()}
                   </a>
                 </li>
                 <li>
-                  <a href="#how">{english ? "How it works" : "机制"}</a>
+                  <a href="#how">{m.public_how_it_works_nav()}</a>
                 </li>
                 <li>
-                  <a href="#console">{english ? "Console" : "管理"}</a>
+                  <a href="#console">{m.public_console_nav()}</a>
                 </li>
               </ul>
             </nav>
           ) : null}
-          <button
-            className="theme-toggle"
-            type="button"
-            aria-label={
-              dark
-                ? english
-                  ? "Switch to light mode"
-                  : "切换浅色模式"
-                : english
-                  ? "Switch to dark mode"
-                  : "切换深色模式"
-            }
-            aria-pressed={dark}
-            onClick={toggleTheme}
-          >
-            <SunIcon />
-            <MoonIcon />
-          </button>
+          <div className="masthead__controls">
+            <label className="locale-switch">
+              <span className="sr-only">{m.interface_language()}</span>
+              <select
+                value={locale}
+                aria-label={m.interface_language()}
+                onChange={(event) =>
+                  switchLocale(event.target.value as Locale)
+                }
+              >
+                <option value="en">{m.switch_to_english()}</option>
+                <option value="zh-CN">{m.switch_to_zh_cn()}</option>
+              </select>
+            </label>
+            <button
+              className="theme-toggle"
+              type="button"
+              aria-label={
+                dark ? m.public_switch_to_light() : m.public_switch_to_dark()
+              }
+              aria-pressed={dark}
+              onClick={toggleTheme}
+            >
+              <SunIcon />
+              <MoonIcon />
+            </button>
+          </div>
         </header>
         <hr className="masthead__rule" aria-hidden="true" />
 
@@ -171,7 +186,7 @@ export function PublicSiteShell({
 
         <footer className="colophon reveal" style={revealStyle(5)}>
           <p>
-            Powered by{" "}
+            {m.public_powered_by()}{" "}
             <a href="https://github.com/MondaYJStudio/Briefly">Briefly</a>
           </p>
         </footer>
