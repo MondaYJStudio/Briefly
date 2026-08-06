@@ -114,15 +114,25 @@ Non-secret runtime values and binding names are declared in `wrangler.jsonc`:
 - `DB` — the D1 binding
 - `MEDIA_BUCKET` — the private R2 binding
 
-Briefly requires two independent random values of at least 32 characters: `BETTER_AUTH_SECRET` is the permanent authentication secret, while `SETUP_SECRET` is entered once on the First-run setup page. For local development, put them in an ignored `.dev.vars` copied from `.dev.vars.example`. Production values belong in Cloudflare Secrets; never add them to `wrangler.jsonc`, committed environment files, logs, or client code.
+Briefly requires `BETTER_AUTH_SECRET` (at least 32 characters, permanent authentication secret) and `SETUP_SECRET` (any non-empty value, entered once on the First-run setup page). For local development, put them in an ignored `.dev.vars` copied from `.dev.vars.example` (uncomment `SETUP_SECRET` there). On one-click Deploy, `BETTER_AUTH_SECRET` is collected as an encrypted Worker secret and `SETUP_SECRET` as a visible Worker var so you can copy it into setup. Maintainer production values belong in Cloudflare Secrets; never commit real secrets to `wrangler.jsonc`, environment files, logs, or client code.
 
 ## Cloudflare deployment
 
-For self-hosting, click the Deploy to Cloudflare button near the top of this README. Cloudflare clones this public repository, asks for two secrets, provisions the D1 database and private R2 bucket, applies the committed D1 migrations, and deploys the Worker. Generate a different random value of at least 32 characters for each secret and keep the `SETUP_SECRET` available until setup is complete.
+For self-hosting, click the Deploy to Cloudflare button near the top of this README. Cloudflare clones this public repository, asks for `BETTER_AUTH_SECRET` (encrypted, at least 32 characters) and `SETUP_SECRET` (visible var, any non-empty value), provisions the D1 database and private R2 bucket, applies the committed D1 migrations, and deploys the Worker. Keep `SETUP_SECRET` available until setup is complete, and paste that same value into the First-run setup page.
 
 After deployment succeeds, open the Worker URL shown by Cloudflare. Visiting `/admin` automatically opens `/admin/setup` on an uninitialized installation. Enter the administrator email and password, then paste the same `SETUP_SECRET` from the deployment form. No `APP_ORIGIN` value is needed for the automatically assigned `workers.dev` address.
 
 The button requires this repository (or a fork of it) to be publicly readable by Cloudflare. Maintainers using a fixed custom domain should instead configure the `production` placeholders in `wrangler.jsonc` and follow the protected GitHub Actions release process in [OPERATIONS.md](OPERATIONS.md). That workflow builds first, applies pending migrations, deploys only after migration success, and finishes with a read-only `GET /health` probe.
+
+### Updating an existing self-hosted install
+
+The Deploy to Cloudflare button is a first-time installer. It creates its own Git repository on your account and provisions new D1/R2 resources. It is the wrong tool once that install already exists.
+
+If you already forked this repository yourself and never used the button: connect that fork in the Cloudflare dashboard (Workers → your Worker → Settings → Builds), or deploy from a local checkout with Wrangler. Create or reuse the D1 database and private R2 bucket, put the real `database_id` and bucket name into `wrangler.jsonc`, set the two secrets, then run `pnpm build && pnpm deploy`. Do not expect the README button to attach to an existing fork or an existing database.
+
+If the button already created your install: keep using that repository. Merge or sync upstream into it and push the production branch so Workers Builds runs `pnpm build`, then `pnpm deploy`. Or, from a local checkout of that same repository (with the real `database_id` already written into `wrangler.jsonc`), sign in to Cloudflare and run `pnpm build && pnpm deploy`.
+
+`pnpm deploy` is `pnpm db:migrate:deploy && wrangler deploy`. Wrangler applies only pending migrations against the existing `DB` binding and skips anything already recorded in the D1 ledger, so an existing database is safe to re-deploy. If the Worker deploy fails after a successful migration, the previous Worker remains the live application.
 
 Drizzle schema files are the source of truth, and Drizzle Kit generates the ordered SQL and metadata committed under `src/db/migrations`. Wrangler is the sole migration executor and owns D1's migration ledger. Production schema push is unsupported, and the Worker never runs migrations during initialization, requests, or health checks. See the operations runbook for expand-contract migration rules, 0.x release compatibility, and failure diagnosis.
 

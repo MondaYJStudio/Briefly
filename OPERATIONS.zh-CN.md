@@ -65,7 +65,7 @@ Briefly 处于 0.x 生命周期。发布说明必须明确指出任何破坏性 
 
 ## 管理员初始化与认证
 
-在部署接收第一个请求前，将 `BETTER_AUTH_SECRET` 和 `SETUP_SECRET` 配置为两个相互独立的 Cloudflare Secret。每个值至少 32 个字符，并应由密码学安全的密码生成器生成。生产环境使用 `pnpm exec wrangler secret put <NAME> --env production` 写入；不要把它们放进 `wrangler.jsonc`、GitHub 变量、日志、URL 或已提交的 `.dev.vars`。
+在部署接收第一个请求前，将 `BETTER_AUTH_SECRET`（至少 32 个字符）和 `SETUP_SECRET`（任意非空值）配置为相互独立的 Cloudflare 配置项。`BETTER_AUTH_SECRET` 建议用密码学安全的密码生成器生成。生产环境使用 `pnpm exec wrangler secret put <NAME> --env production` 写入（一键部署的 `SETUP_SECRET` 也可作为可见 Worker 变量）；不要把真实值放进已提交的 `wrangler.jsonc`、GitHub 变量、日志、URL 或已提交的 `.dev.vars`。
 
 全新安装通过 `/admin/setup` 认领。仅当 D1 安装标记仍为未初始化且请求提供正确 setup secret 时，初始化才会成功。D1 约束与原子认领会阻止并发请求创建第二个 Better Auth 用户。初始化成功后，初始化入口和 Better Auth 邮箱注册都会永久关闭；setup secret 不会存入 D1。认证身份保持私有，也不会被复用为公开署名。
 
@@ -83,7 +83,7 @@ Better Auth 将可撤销 session 存在 D1 中。记住的 session 固定有效 
 
 ## 管理员紧急恢复
 
-只有部署运维人员有意配置独立的 `RECOVERY_SECRET` 时，恢复功能才会开启。它绝不会回退使用 `SETUP_SECRET`、`BETTER_AUTH_SECRET`、session 或已存储数据；Worker 只从运行时配置读取该值。此 secret 至少 32 个字符，必须与其他 secret 相互独立，且不得出现在 URL、命令历史参数、日志或已提交文件中。
+只有部署运维人员有意配置独立的 `RECOVERY_SECRET` 时，恢复功能才会开启。它绝不会回退使用 `SETUP_SECRET`、`BETTER_AUTH_SECRET`、session 或已存储数据；Worker 只从运行时配置读取该值。此 secret 可为任意非空字符串，必须与其他 secret 相互独立，且不得出现在 URL、命令历史参数、日志或已提交文件中。
 
 仅在现有管理员无法登录时执行以下短时流程：
 

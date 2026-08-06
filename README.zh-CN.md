@@ -114,15 +114,25 @@ pnpm build
 - `DB` — D1 绑定
 - `MEDIA_BUCKET` — 私有 R2 绑定
 
-Briefly 需要两个彼此独立、至少 32 个字符的随机值：`BETTER_AUTH_SECRET` 是长期使用的认证密钥，`SETUP_SECRET` 只在首次设置页面填写一次。本地开发时，把它们写入由 `.dev.vars.example` 复制而来的、已忽略的 `.dev.vars`；生产值属于 Cloudflare Secrets。不得将这些值写入 `wrangler.jsonc`、已提交的环境文件、日志或客户端代码。
+Briefly 需要 `BETTER_AUTH_SECRET`（至少 32 个字符，长期认证密钥）和 `SETUP_SECRET`（任意非空值，只在首次设置页填写一次）。本地开发时，把它们写入由 `.dev.vars.example` 复制而来的、已忽略的 `.dev.vars`（并取消注释其中的 `SETUP_SECRET`）。一键部署时，`BETTER_AUTH_SECRET` 作为加密 Worker Secret 收集，`SETUP_SECRET` 作为可见的 Worker 变量，方便复制到首次设置页。维护者生产值属于 Cloudflare Secrets；不得把真实密钥提交进 `wrangler.jsonc`、环境文件、日志或客户端代码。
 
 ## Cloudflare 部署
 
-自托管时，点击本页顶部的 Deploy to Cloudflare 按钮即可。Cloudflare 会克隆这个公开仓库，要求填写两个密钥，自动创建 D1 数据库和私有 R2 存储桶，执行已提交的 D1 迁移，然后部署 Worker。请为两个密钥分别生成至少 32 个字符的随机值，并暂时保留 `SETUP_SECRET`，直到首次设置完成。
+自托管时，点击本页顶部的 Deploy to Cloudflare 按钮即可。Cloudflare 会克隆这个公开仓库，要求填写加密的 `BETTER_AUTH_SECRET`（至少 32 个字符）与可见的 `SETUP_SECRET`（任意非空值），自动创建 D1 数据库和私有 R2 存储桶，执行已提交的 D1 迁移，然后部署 Worker。请暂时保留 `SETUP_SECRET`，并在首次设置页粘贴同一个值。
 
 部署成功后，直接打开 Cloudflare 显示的 Worker 地址。第一次访问 `/admin` 会自动进入 `/admin/setup`；填写管理员邮箱和密码，再粘贴部署表单中的同一个 `SETUP_SECRET`。使用 Cloudflare 自动分配的 `workers.dev` 地址时，无需填写 `APP_ORIGIN`。
 
 一键部署要求 Cloudflare 能公开读取本仓库（或你的公开 fork）。使用固定自定义域名的项目维护者应配置 `wrangler.jsonc` 中的 `production` 占位值，并按 [OPERATIONS.zh-CN.md](OPERATIONS.zh-CN.md) 走受保护的 GitHub Actions 发布流程：先构建、再迁移，迁移成功后部署，最后执行只读 `GET /health` 探测。
+
+### 更新已有的自托管安装
+
+Deploy to Cloudflare 按钮只适合**首次安装**：它会在你的账号下新建一个 Git 仓库，并创建新的 D1/R2。安装已经存在之后，不要再用这个按钮来「更新」。
+
+如果你是自己先 fork 了本仓库、从未用过该按钮：请在 Cloudflare 控制台把该 fork 接到 Worker（Workers → 你的 Worker → Settings → Builds），或在本地用 Wrangler 部署。自行创建或复用 D1 与私有 R2，把真实的 `database_id` 和桶名写进 `wrangler.jsonc`，配置好两个密钥，然后执行 `pnpm build && pnpm deploy`。README 上的按钮不会挂到你已有的 fork，也不会复用已有数据库。
+
+如果当初就是用按钮装上的：继续用它创建的那个仓库。把上游变更合并或同步进去，再推生产分支，Workers Builds 会先跑 `pnpm build`，再跑 `pnpm deploy`。也可以在同一仓库的本地检出中（`wrangler.jsonc` 已写入真实 `database_id`），登录 Cloudflare 后执行 `pnpm build && pnpm deploy`。
+
+`pnpm deploy` 即 `pnpm db:migrate:deploy && wrangler deploy`。Wrangler 只对已有 `DB` 绑定应用尚未执行的迁移，并跳过 D1 账本里已记录的迁移，因此数据库已存在时可以安全重复部署。若迁移成功但 Worker 部署失败，旧 Worker 仍继续提供服务。
 
 Drizzle schema 文件是数据库结构的事实来源；Drizzle Kit 生成提交在 `src/db/migrations` 下的有序 SQL 与元数据。Wrangler 是唯一的迁移执行器并拥有 D1 迁移账本。项目不支持生产 schema push，Worker 也不会在初始化、请求处理或健康检查期间执行迁移。扩展—收缩迁移规则、0.x 发布兼容要求和故障诊断见运维手册。
 

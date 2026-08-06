@@ -61,8 +61,8 @@ const runtimeBindingsSchema = z
     BETTER_AUTH_SECRET: z.string().min(32),
     DB: z.custom<D1Database>(isD1Database),
     MEDIA_BUCKET: z.custom<R2Bucket>(isR2Bucket),
-    RECOVERY_SECRET: z.string().min(32).optional(),
-    SETUP_SECRET: z.string().min(32),
+    RECOVERY_SECRET: z.string().min(1).optional(),
+    SETUP_SECRET: z.string().min(1),
   })
   .superRefine((bindings, context) => {
     if (bindings.APP_ORIGIN && URL.canParse(bindings.APP_ORIGIN)) {

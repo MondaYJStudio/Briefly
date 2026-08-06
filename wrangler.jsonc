@@ -11,6 +11,7 @@
   "workers_dev": true,
   "vars": {
     "APP_ENV": "production",
+    "SETUP_SECRET": "replace-with-an-independent-random-secret",
   },
   "d1_databases": [
     {

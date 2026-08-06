@@ -184,7 +184,7 @@ function validateProductionWorkflow() {
   const scripts = packageScripts();
   assert.equal(
     scripts["build:production"],
-    "CLOUDFLARE_ENV=production vite build && node scripts/verify-client-boundary.mjs",
+    "CLOUDFLARE_ENV=production vite build && node scripts/verify-client-boundary.mjs && node scripts/verify-admin-css-contraction.mjs",
   );
   assert.equal(
     scripts["db:migrate:production"],
@@ -212,7 +212,7 @@ function validatePublicDeployTemplate() {
   assert.equal(scripts.dev, "CLOUDFLARE_ENV=local vite dev");
   assert.equal(
     scripts.build,
-    "vite build && node scripts/verify-client-boundary.mjs",
+    "vite build && node scripts/verify-client-boundary.mjs && node scripts/verify-admin-css-contraction.mjs",
   );
 
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
@@ -225,7 +225,10 @@ function validatePublicDeployTemplate() {
 
   const wrangler = readJsonc(WRANGLER_CONFIGURATION);
   assert.equal(wrangler.workers_dev, true);
-  assert.deepEqual(wrangler.vars, { APP_ENV: "production" });
+  assert.deepEqual(wrangler.vars, {
+    APP_ENV: "production",
+    SETUP_SECRET: "replace-with-an-independent-random-secret",
+  });
   assert.equal(wrangler.d1_databases?.[0]?.binding, "DB");
   assert.equal(wrangler.d1_databases?.[0]?.database_name, "briefly");
   assert.equal(wrangler.r2_buckets?.[0]?.binding, "MEDIA_BUCKET");
@@ -234,10 +237,19 @@ function validatePublicDeployTemplate() {
     APP_ENV: "local",
     APP_ORIGIN: "http://localhost:3000",
   });
+  assert.equal(
+    wrangler.env?.production?.vars?.SETUP_SECRET,
+    undefined,
+    "Production must not bake SETUP_SECRET into committed env vars",
+  );
 
   const secretTemplate = readFileSync(".dev.vars.example", "utf8");
   assert.match(secretTemplate, /^BETTER_AUTH_SECRET=/mu);
-  assert.match(secretTemplate, /^SETUP_SECRET=/mu);
+  assert.doesNotMatch(
+    secretTemplate,
+    /^SETUP_SECRET=/mu,
+    "SETUP_SECRET must stay a visible Worker var for one-click deploy, not an encrypted .dev.vars.example secret",
+  );
   assert.doesNotMatch(secretTemplate, /^APP_ORIGIN=/mu);
 
   const readme = readFileSync("README.md", "utf8");

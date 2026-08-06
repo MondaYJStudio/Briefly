@@ -26,7 +26,7 @@
         "description": "Generate a permanent random value of at least 32 characters. Do not reuse SETUP_SECRET."
       },
       "SETUP_SECRET": {
-        "description": "Generate a different random value of at least 32 characters, then paste it into Briefly's First-run setup page."
+        "description": "Any non-empty value you can remember long enough to paste into Briefly's First-run setup page. Visible Worker var, not an encrypted secret."
       }
     }
   },
