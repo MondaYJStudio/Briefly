@@ -507,7 +507,12 @@ describe("sole Administrator authentication", () => {
       "http://briefly.test/api/auth/sign-out",
       {
         method: "POST",
-        headers: { cookie, origin: "http://briefly.test" },
+        headers: {
+          cookie,
+          origin: "http://briefly.test",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({}),
       },
     );
     expect(signOutResponse.status).toBe(200);
@@ -895,7 +900,7 @@ describe("sole Administrator authentication", () => {
     const recoveryHtml = await recoveryResponse.text();
     expect(recoveryResponse.status).toBe(200);
     expect(recoveryHtml).toContain("Emergency recovery");
-    expect(recoveryHtml).toContain("RECOVERY_SECRET");
+    expect(recoveryHtml).toContain("Recovery Secret");
     expect(recoveryHtml).toContain('name="recoverySecret"');
     expect(recoveryHtml).toContain('name="newPassword"');
   }, 30_000);
