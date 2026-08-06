@@ -209,7 +209,7 @@ function canonicalIssues(issues: PhasedIssue[]): PublicationIssue[] {
 function invalidPersistedField(field: string): PhasedIssue {
   return issue(
     "persisted",
-    "INVALID",
+    "PERSISTED_FIELD_INVALID",
     `draft.${field}`,
     `The saved Draft ${field} is invalid.`,
   );
@@ -405,7 +405,7 @@ async function resolveMetadata(
         issues.push(
           issue(
             "metadata",
-            "INVALID",
+            "BYLINE_INVALID",
             "draft.byline",
             "A valid Byline is required for publication.",
           ),
@@ -419,7 +419,7 @@ async function resolveMetadata(
         issues.push(
           issue(
             "metadata",
-            "INVALID",
+            "LANGUAGE_INVALID",
             "draft.language",
             "A valid language is required for publication.",
           ),
@@ -442,59 +442,59 @@ const workflowIssueForRendererDiagnostic: Record<
   { code: PublicationIssueCode; message: string }
 > = {
   ASSET_NOT_RESOLVED: {
-    code: "UNAVAILABLE",
+    code: "ASSET_NOT_RESOLVED",
     message: "A referenced Asset is unavailable for publication.",
   },
   FIGURE_ALT_REQUIRED: {
-    code: "REQUIRED",
+    code: "FIGURE_ALT_REQUIRED",
     message: "Alternative text is required for this figure.",
   },
   INVALID_ASSET_IDENTITY: {
-    code: "INVALID",
+    code: "INVALID_ASSET_IDENTITY",
     message: "The saved Draft contains an invalid Asset identity.",
   },
   INVALID_ASSET_RESOLUTION: {
-    code: "UNSAFE",
+    code: "INVALID_ASSET_RESOLUTION",
     message: "A referenced Asset has unsafe delivery facts.",
   },
   INVALID_COVER: {
-    code: "INVALID",
+    code: "INVALID_COVER",
     message: "The saved Draft cover is invalid.",
   },
   INVALID_DOCUMENT: {
-    code: "INVALID",
+    code: "INVALID_DOCUMENT",
     message: "The saved Draft Document is invalid.",
   },
   INVALID_DOCUMENT_STRUCTURE: {
-    code: "INVALID",
+    code: "INVALID_DOCUMENT_STRUCTURE",
     message: "The saved Draft Document structure is invalid.",
   },
   INVALID_HEADING_LEVEL: {
-    code: "INVALID",
+    code: "INVALID_HEADING_LEVEL",
     message: "The saved Draft contains an invalid heading level.",
   },
   INVALID_NODE_ATTRIBUTES: {
-    code: "INVALID",
+    code: "INVALID_NODE_ATTRIBUTES",
     message: "The saved Draft contains invalid Document attributes.",
   },
   INVALID_PROVIDER_IDENTIFIER: {
-    code: "INVALID",
+    code: "INVALID_PROVIDER_IDENTIFIER",
     message: "The saved Draft contains an invalid video identifier.",
   },
   UNSAFE_LINK: {
-    code: "UNSAFE",
+    code: "UNSAFE_LINK",
     message: "The saved Draft contains an unsafe link.",
   },
   UNSUPPORTED_DOCUMENT_SCHEMA_VERSION: {
-    code: "UNSUPPORTED",
+    code: "UNSUPPORTED_DOCUMENT_SCHEMA_VERSION",
     message: "The saved Draft uses an unsupported Document Schema Version.",
   },
   UNSUPPORTED_MARK: {
-    code: "UNSUPPORTED",
+    code: "UNSUPPORTED_MARK",
     message: "The saved Draft contains an unsupported Document mark.",
   },
   UNSUPPORTED_NODE: {
-    code: "UNSUPPORTED",
+    code: "UNSUPPORTED_NODE",
     message: "The saved Draft contains an unsupported Document node.",
   },
 };
@@ -538,7 +538,7 @@ async function prepareSavedDraft(
     readiness.push(
       issue(
         "metadata",
-        "REQUIRED",
+        "TITLE_REQUIRED",
         "draft.title",
         "A title is required for publication.",
       ),
@@ -548,7 +548,7 @@ async function prepareSavedDraft(
     readiness.push(
       issue(
         "metadata",
-        "REQUIRED",
+        "SLUG_REQUIRED",
         "draft.slug",
         "A slug is required for publication.",
       ),
@@ -558,7 +558,7 @@ async function prepareSavedDraft(
     readiness.push(
       issue(
         "metadata",
-        "REQUIRED",
+        "BODY_REQUIRED",
         "draft.document.doc",
         "Substantive body content is required for publication.",
       ),

@@ -10,6 +10,7 @@ import {
 
 import { assetHasReferences, type AssetLibraryEntry } from "./assets";
 import { AdminIcon } from "../components/admin/icons";
+import { localizeServerIssueMessage } from "../components/admin/publication-issues";
 import { StatusChip } from "../components/admin/status-chip";
 import { getLocale } from "../paraglide/runtime.js";
 import { m } from "../paraglide/messages.js";
@@ -248,7 +249,7 @@ export function AssetMediaLibrary() {
 
       const error = response.error?.value;
       if (error && "issues" in error) {
-        setIssues(error.issues.map((issue) => issue.message));
+        setIssues(error.issues.map((issue) => localizeServerIssueMessage(issue.message)));
         setState("invalid");
       } else {
         setState("error");

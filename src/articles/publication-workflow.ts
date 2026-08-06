@@ -1,12 +1,37 @@
 import type { Byline } from "../site-settings/site-settings";
 import type { PublicArticle } from "./articles";
 
+/**
+ * Stable Publication Issue codes. Specific codes are preferred for client
+ * localization; the five coarse codes remain accepted for older fixtures and
+ * deliberate UI mocks.
+ */
 export const PUBLICATION_ISSUE_CODES = [
   "REQUIRED",
   "INVALID",
   "UNSUPPORTED",
   "UNSAFE",
   "UNAVAILABLE",
+  "TITLE_REQUIRED",
+  "SLUG_REQUIRED",
+  "BODY_REQUIRED",
+  "BYLINE_INVALID",
+  "LANGUAGE_INVALID",
+  "PERSISTED_FIELD_INVALID",
+  "ASSET_NOT_RESOLVED",
+  "FIGURE_ALT_REQUIRED",
+  "INVALID_ASSET_IDENTITY",
+  "INVALID_ASSET_RESOLUTION",
+  "INVALID_COVER",
+  "INVALID_DOCUMENT",
+  "INVALID_DOCUMENT_STRUCTURE",
+  "INVALID_HEADING_LEVEL",
+  "INVALID_NODE_ATTRIBUTES",
+  "INVALID_PROVIDER_IDENTIFIER",
+  "UNSAFE_LINK",
+  "UNSUPPORTED_DOCUMENT_SCHEMA_VERSION",
+  "UNSUPPORTED_MARK",
+  "UNSUPPORTED_NODE",
 ] as const;
 
 export type PublicationIssueCode = (typeof PUBLICATION_ISSUE_CODES)[number];

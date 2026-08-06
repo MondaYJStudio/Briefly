@@ -38,6 +38,8 @@ import { SettingsField } from "./fields";
 import { AdminIcon } from "./icons";
 import { LANGUAGE_OPTIONS } from "./language-options";
 import {
+  localizePublicationIssue,
+  localizeRestorationIssue,
   publicationIssuesForSurface,
   type PublicationIssueSurface,
 } from "./publication-issues";
@@ -53,7 +55,7 @@ const ArticleEditor = lazy(async () => {
 function ArticleEditorFallback() {
   return (
     <div className={`${styles.card} ${styles.cardPad}`} role="status">
-      Loading the text-rich editor…
+      {m.loading_text_rich_editor()}
     </div>
   );
 }
@@ -127,7 +129,7 @@ export function EditorView({
           size="sm"
           type="button"
           variant="ghost"
-          aria-label="Back to Articles"
+          aria-label={m.back_to_articles()}
           isDisabled={lifecycleActionPending}
           onPress={onBack}
         >
@@ -135,26 +137,26 @@ export function EditorView({
         </Button>
         <div className={styles.titleWrap}>
           <span className={styles.docTitle}>
-            {selected.draft.title || "Untitled Article"}
+            {selected.draft.title || m.untitled_article()}
           </span>
           <span className={styles.hideM}>
             {workspace.hasUnsavedChanges ||
             (hasCurrentPublication &&
               workspace.historyHasUnpublishedChanges) ? (
               <StatusChip variant="warning" icon="alert">
-                Changes pending
+                {m.lifecycle_changes_pending()}
               </StatusChip>
             ) : checkingPublicationState ? (
               <StatusChip variant="default" icon="clock">
-                Checking live state
+                {m.checking_live_state()}
               </StatusChip>
             ) : hasCurrentPublication ? (
               <StatusChip variant="success" dot>
-                Published
+                {m.lifecycle_published()}
               </StatusChip>
             ) : (
               <StatusChip variant="default" dot>
-                Draft
+                {m.lifecycle_draft()}
               </StatusChip>
             )}
           </span>
@@ -168,7 +170,7 @@ export function EditorView({
           isDisabled={lifecycleActionPending}
           onPress={openPreview}
         >
-          Preview
+          {m.preview()}
         </Button>
         <Button
           size="sm"
@@ -177,18 +179,18 @@ export function EditorView({
           isPending={workspace.publishState === "publishing"}
           onPress={() => setPublishDialogOpen(true)}
         >
-          {hasCurrentPublication ? "Republish" : "Publish"}
+          {hasCurrentPublication ? m.republish() : m.publish()}
         </Button>
         <Dropdown.Root>
           <Dropdown.Trigger
-            aria-label="More article actions"
+            aria-label={m.more_article_actions()}
             className={styles.moreTrigger}
           >
             <AdminIcon name="more" size={18} />
           </Dropdown.Trigger>
           <Dropdown.Popover placement="bottom end">
             <Dropdown.Menu
-              aria-label="More article actions"
+              aria-label={m.more_article_actions()}
               onAction={(key) => {
                 if (key === "save") void workspace.persistCurrentDraft();
                 else if (key === "preview") openPreview();
@@ -198,29 +200,32 @@ export function EditorView({
             >
               <Dropdown.Item
                 id="save"
-                textValue="Save now"
+                textValue={m.save_now()}
                 isDisabled={lifecycleActionPending || state === "saving"}
               >
-                Save now
+                {m.save_now()}
               </Dropdown.Item>
-              <Dropdown.Item id="preview" textValue="Preview saved Draft">
-                Preview saved Draft
+              <Dropdown.Item
+                id="preview"
+                textValue={m.preview_saved_draft()}
+              >
+                {m.preview_saved_draft()}
               </Dropdown.Item>
               <Separator />
               <Dropdown.Item
                 id="unpublish"
-                textValue="Unpublish"
+                textValue={m.unpublish()}
                 isDisabled={workspace.unpublishActionDisabled}
               >
-                Unpublish…
+                {m.unpublish_ellipsis()}
               </Dropdown.Item>
               <Dropdown.Item
                 id="trash"
-                textValue="Move to Trash"
+                textValue={m.move_to_trash()}
                 className="text-danger"
                 isDisabled={workspace.trashActionDisabled}
               >
-                Move to Trash…
+                {m.move_to_trash_ellipsis()}
               </Dropdown.Item>
             </Dropdown.Menu>
           </Dropdown.Popover>
@@ -231,7 +236,7 @@ export function EditorView({
           size="sm"
           type="button"
           variant="ghost"
-          aria-label="Open article settings"
+          aria-label={m.open_article_settings()}
           aria-controls="article-settings-rail"
           aria-expanded={railOpen}
           onPress={() => setRailOpen(true)}
@@ -258,17 +263,15 @@ export function EditorView({
               >
                 {workspace.restoreState === "restoring" ? (
                   <p className={styles.pendingState} role="status">
-                    Restoring Publication… Draft editing is temporarily paused.
+                    {m.restoring_publication_paused()}
                   </p>
                 ) : workspace.trashActionState === "trashing" ? (
                   <p className={styles.pendingState} role="status">
-                    Moving Article to Trash… Draft editing is temporarily
-                    paused.
+                    {m.moving_to_trash_paused()}
                   </p>
                 ) : workspace.trashActionState === "restoring" ? (
                   <p className={styles.pendingState} role="status">
-                    Restoring Article from Trash… Draft editing is temporarily
-                    paused.
+                    {m.restoring_from_trash_paused()}
                   </p>
                 ) : null}
 
@@ -322,29 +325,28 @@ export function EditorView({
             <AlertDialog.Header>
               <AlertDialog.Heading>
                 {hasCurrentPublication
-                  ? "Republish saved Draft?"
-                  : "Publish saved Draft?"}
+                  ? m.republish_saved_draft_question()
+                  : m.publish_saved_draft_question()}
               </AlertDialog.Heading>
             </AlertDialog.Header>
             <AlertDialog.Body>
               {hasCurrentPublication ? (
                 <p>
-                  Republish saved Draft Version {selected.draft.version} as a
-                  new immutable Publication. Earlier Publications remain
-                  unchanged, and the Current Publication switches only after the
-                  new public read is available.
+                  {m.republish_saved_draft_body({
+                    version: selected.draft.version,
+                  })}
                 </p>
               ) : (
                 <p>
-                  Publish saved Draft Version {selected.draft.version} as a new
-                  immutable Publication. It will be immediately public after the
-                  Current Publication switches.
+                  {m.publish_saved_draft_body({
+                    version: selected.draft.version,
+                  })}
                 </p>
               )}
             </AlertDialog.Body>
             <AlertDialog.Footer>
               <Button type="button" variant="secondary" slot="close">
-                Cancel
+                {m.cancel()}
               </Button>
               <Button
                 type="button"
@@ -353,8 +355,8 @@ export function EditorView({
                 onPress={() => void workspace.publishDraft()}
               >
                 {hasCurrentPublication
-                  ? "Republish saved Draft"
-                  : "Publish saved Draft"}
+                  ? m.republish_saved_draft()
+                  : m.publish_saved_draft()}
               </Button>
             </AlertDialog.Footer>
           </AlertDialog.Dialog>
@@ -369,21 +371,16 @@ export function EditorView({
         <AlertDialog.Container>
           <AlertDialog.Dialog>
             <AlertDialog.Header>
-              <AlertDialog.Heading>Unpublish this Article?</AlertDialog.Heading>
+              <AlertDialog.Heading>
+                {m.unpublish_article_question()}
+              </AlertDialog.Heading>
             </AlertDialog.Header>
             <AlertDialog.Body>
-              <p>
-                Unpublish is reversible. It immediately removes the Current
-                Publication from the public list and makes public detail GET and
-                HEAD return 404. Draft and Publication history remain intact, so
-                you can edit and publish a new immutable Publication later. This
-                is not Trash or permanent purge, and previously published media
-                remains public.
-              </p>
+              <p>{m.unpublish_article_body()}</p>
             </AlertDialog.Body>
             <AlertDialog.Footer>
               <Button type="button" variant="secondary" slot="close">
-                Cancel
+                {m.cancel()}
               </Button>
               <Button
                 type="button"
@@ -392,7 +389,7 @@ export function EditorView({
                 isDisabled={workspace.unpublishActionDisabled}
                 onPress={() => void workspace.unpublishCurrentPublication()}
               >
-                Unpublish Article
+                {m.unpublish_article()}
               </Button>
             </AlertDialog.Footer>
           </AlertDialog.Dialog>
@@ -408,23 +405,21 @@ export function EditorView({
           <AlertDialog.Dialog>
             <AlertDialog.Header>
               <AlertDialog.Heading>
-                Move this Article to Trash?
+                {m.move_article_to_trash_question()}
               </AlertDialog.Heading>
             </AlertDialog.Header>
             <AlertDialog.Body>
               <p>
-                Move {selected.draft.title || "this Article"} to Trash? This
-                reversible action removes it from normal administration and
-                public Article list and detail endpoints immediately. If it is
-                public, its Current Publication is cleared. Its Draft, retained
-                Publications, slug claims, and Asset references stay intact.
-                Restoring it leaves it unpublished. This is not permanent purge,
-                and previously published media remains public.
+                {m.move_article_to_trash_body({
+                  title:
+                    selected.draft.title ||
+                    m.move_article_to_trash_title_fallback(),
+                })}
               </p>
             </AlertDialog.Body>
             <AlertDialog.Footer>
               <Button type="button" variant="secondary" slot="close">
-                Cancel
+                {m.cancel()}
               </Button>
               <Button
                 type="button"
@@ -433,7 +428,7 @@ export function EditorView({
                 isDisabled={workspace.trashActionDisabled}
                 onPress={() => void workspace.moveSelectedArticleToTrash()}
               >
-                Move Article to Trash
+                {m.move_article_to_trash()}
               </Button>
             </AlertDialog.Footer>
           </AlertDialog.Dialog>
@@ -450,47 +445,49 @@ function EditorSaveState({
   const { selected, state, serverConfirmed } = workspace;
   let tone = "is-ok";
   let icon: ReactNode = <AdminIcon name="check" size={14} strokeWidth={2.2} />;
-  let text = `Saved · Draft v${selected?.draft.version ?? 0}`;
-  let compactText = "Saved";
+  let text = m.save_state_saved_draft({
+    version: selected?.draft.version ?? 0,
+  });
+  let compactText = m.save_state_saved();
   if (state === "saving") {
     tone = "";
-    text = "Saving…";
+    text = m.save_state_saving();
     compactText = text;
     icon = <Spinner aria-hidden="true" className={styles.spinner} />;
   } else if (state === "dirty") {
     tone = "";
-    text = "Unsaved changes";
-    compactText = "Unsaved";
+    text = m.save_state_unsaved_changes();
+    compactText = m.save_state_unsaved();
     icon = <AdminIcon name="clock" size={14} strokeWidth={2.2} />;
   } else if (state === "failed") {
     tone = "is-error";
-    text = "Save failed";
-    compactText = "Failed";
+    text = m.save_state_failed();
+    compactText = m.save_state_failed_compact();
     icon = <AdminIcon name="alert" size={14} strokeWidth={2.2} />;
   } else if (state === "offline") {
     tone = "is-warn";
-    text = "Offline";
+    text = m.save_state_offline();
     compactText = text;
     icon = <AdminIcon name="offline" size={14} strokeWidth={2.2} />;
   } else if (state === "conflict") {
     tone = "is-warn";
-    text = "Conflict";
+    text = m.save_state_conflict();
     compactText = text;
     icon = <AdminIcon name="conflict" size={14} strokeWidth={2.2} />;
   } else if (state === "invalid") {
     tone = "is-error";
-    text = "Invalid";
+    text = m.save_state_invalid();
     compactText = text;
     icon = <AdminIcon name="alert" size={14} strokeWidth={2.2} />;
   } else if (state === "slug-conflict") {
     tone = "is-warn";
-    text = "Slug taken";
+    text = m.save_state_slug_taken();
     compactText = text;
     icon = <AdminIcon name="alert" size={14} strokeWidth={2.2} />;
   } else if (!serverConfirmed) {
     tone = "";
-    text = "Not confirmed";
-    compactText = "Pending";
+    text = m.save_state_not_confirmed();
+    compactText = m.save_state_pending();
     icon = <AdminIcon name="clock" size={14} strokeWidth={2.2} />;
   }
   return (
@@ -551,7 +548,7 @@ function EditorRail({
     (workspace.hasUnsavedChanges || historyHasUnpublishedChanges);
   const issueMessages = (surface: PublicationIssueSurface) =>
     publicationIssuesForSurface(workspace.publicationIssues, surface).map(
-      (issue) => issue.message,
+      (issue) => localizePublicationIssue(issue),
     );
   const unpublishDisabledReason =
     workspace.unpublishActionDisabled && !hasCurrentPublication
@@ -611,57 +608,65 @@ function EditorRail({
         <div role="tabpanel" aria-label={m.rail_tab_settings()}>
           {/* ---- Publish ---- */}
           <section className={styles.railSection}>
-            <h3>Publish</h3>
+            <h3>{m.rail_publish_heading()}</h3>
             <div className={styles.fieldStack}>
               <div className={styles.rowGap2}>
                 {changesPending ? (
                   <StatusChip variant="warning" icon="alert">
-                    Changes pending
+                    {m.lifecycle_changes_pending()}
                   </StatusChip>
                 ) : checkingPublicationState ? (
                   <StatusChip variant="default" icon="clock">
-                    Checking live state
+                    {m.checking_live_state()}
                   </StatusChip>
                 ) : hasCurrentPublication ? (
                   <StatusChip variant="success" dot>
-                    Published
+                    {m.lifecycle_published()}
                   </StatusChip>
                 ) : (
                   <StatusChip variant="default" dot>
-                    Draft
+                    {m.lifecycle_draft()}
                   </StatusChip>
                 )}
                 <span className="small muted">
                   {changesPending
-                    ? "The Draft is ahead; live content is unchanged."
+                    ? m.rail_draft_ahead()
                     : checkingPublicationState
-                      ? "Loading the Current Publication details."
+                      ? m.rail_loading_current_publication()
                       : hasCurrentPublication
-                        ? "Live from its Current Publication."
-                        : "Not public — nothing is live yet."}
+                        ? m.rail_live_from_current()
+                        : m.rail_not_public_yet()}
                 </span>
               </div>
               <dl className={styles.pubDetail}>
-                <dt>Draft</dt>
+                <dt>{m.rail_draft_label()}</dt>
                 <dd>
-                  v{selected.draft.version}
-                  {serverConfirmed ? " · saved" : " · not server-confirmed"}
+                  {serverConfirmed
+                    ? m.rail_draft_saved({ version: selected.draft.version })
+                    : m.rail_draft_not_confirmed({
+                        version: selected.draft.version,
+                      })}
                 </dd>
-                <dt>Live</dt>
+                <dt>{m.rail_live_label()}</dt>
                 <dd>
                   {currentPublication
-                    ? `Publication #${currentPublication.publicationNumber} · ${new Date(
-                        currentPublication.publishedAt,
-                      ).toLocaleDateString()}`
+                    ? m.rail_live_publication({
+                        number: currentPublication.publicationNumber,
+                        date: new Date(
+                          currentPublication.publishedAt,
+                        ).toLocaleDateString(),
+                      })
                     : checkingPublicationState
-                      ? "Loading…"
+                      ? m.rail_loading_ellipsis()
                       : hasCurrentPublication
-                        ? "Current Publication selected"
-                        : "None"}
+                        ? m.current_publication_selected()
+                        : m.rail_live_none()}
                 </dd>
-                <dt>Public slug</dt>
+                <dt>{m.rail_public_slug()}</dt>
                 <dd className="mono">
-                  {currentPublication ? `/${currentPublication.slug}` : "—"}
+                  {currentPublication
+                    ? `/${currentPublication.slug}`
+                    : m.rail_em_dash()}
                 </dd>
               </dl>
               <Button
@@ -672,7 +677,9 @@ function EditorRail({
                 isPending={workspace.previewState === "loading"}
                 onPress={onPreview}
               >
-                Preview saved Draft Version {selected.draft.version}
+                {m.preview_saved_draft_version({
+                  version: selected.draft.version,
+                })}
               </Button>
               <Button
                 fullWidth
@@ -682,13 +689,11 @@ function EditorRail({
                 onPress={onOpenPublishDialog}
               >
                 {hasCurrentPublication
-                  ? "Republish saved Draft"
-                  : "Publish saved Draft"}
+                  ? m.republish_saved_draft()
+                  : m.publish_saved_draft()}
               </Button>
               <p className={`small faint ${styles.previewMeta}`}>
-                Publishing is available only for a server-confirmed Draft
-                Version. Republishing creates a new immutable Publication;
-                earlier history is preserved.
+                {m.rail_publishing_footnote()}
               </p>
             </div>
           </section>
@@ -877,7 +882,7 @@ function EditorRail({
                 <SettingsField
                   label={m.language_override_label()}
                   htmlFor="articleLanguage"
-                  optional="optional"
+                  optional={m.optional()}
                   issues={issueMessages("language")}
                 >
                   <Select
@@ -1018,7 +1023,7 @@ function TagsField({
     <SettingsField
       label={m.tags_label()}
       htmlFor="articleTagsRail"
-      optional="optional"
+      optional={m.optional()}
     >
       <div className={styles.tagInput}>
         {tags.map((tag) => (
@@ -1320,7 +1325,7 @@ function HistoryPanel({
   return (
     <div role="tabpanel" aria-label={m.rail_tab_history()}>
       <section className={`${styles.railSection} ${styles.railSectionFlush}`}>
-        <h3>Publication history</h3>
+        <h3>{m.publication_history()}</h3>
         <div className={styles.fieldStack}>
           {historyHasUnpublishedChanges && historyState === "ready" ? (
             <div
@@ -1329,9 +1334,11 @@ function HistoryPanel({
             >
               <AdminIcon name="alert" strokeWidth={2.2} />
               <div>
-                <div className={styles.alertTitle}>Unpublished changes</div>
+                <div className={styles.alertTitle}>
+                  {m.unpublished_changes()}
+                </div>
                 <div className={styles.alertBody}>
-                  The Draft is ahead of the Current Publication.
+                  {m.unpublished_changes_description()}
                 </div>
               </div>
             </div>
@@ -1344,14 +1351,14 @@ function HistoryPanel({
             isPending={historyState === "loading"}
             onPress={() => void workspace.loadPublicationHistory()}
           >
-            Load retained Publications
+            {m.load_retained_publications()}
           </Button>
           {historyState === "error" ? (
             <Alert status="danger" role="alert">
               <Alert.Content>
-                <Alert.Title>Unable to load Publication History</Alert.Title>
+                <Alert.Title>{m.unable_load_publication_history()}</Alert.Title>
                 <Alert.Description>
-                  Please reload the history.
+                  {m.unable_load_publication_history_description()}
                 </Alert.Description>
               </Alert.Content>
             </Alert>
@@ -1360,39 +1367,39 @@ function HistoryPanel({
               <div className={styles.emptyIcon}>
                 <AdminIcon name="history" size={24} />
               </div>
-              <h3>No Publications yet</h3>
-              <p>This Article has no retained Publications yet.</p>
+              <h3>{m.no_publications_yet()}</h3>
+              <p>{m.no_publications_yet_description()}</p>
             </div>
           ) : null}
           {restoreState === "restored" ? (
             <Alert status="success" role="status">
               <Alert.Content>
-                <Alert.Title>Publication restored into the Draft</Alert.Title>
+                <Alert.Title>{m.publication_restored_into_draft()}</Alert.Title>
                 <Alert.Description>
-                  Draft Version advanced. Preview it privately, then publish
-                  only when it is ready to replace the Current Publication.
+                  {m.publication_restored_into_draft_description()}
                 </Alert.Description>
               </Alert.Content>
             </Alert>
           ) : restoreState === "conflict" ? (
             <Alert status="warning" role="alert">
               <Alert.Content>
-                <Alert.Title>Draft changed before restore</Alert.Title>
+                <Alert.Title>{m.draft_changed_before_restore()}</Alert.Title>
                 <Alert.Description>
-                  Reload the latest server-confirmed Draft and Publication
-                  History; no historical source was changed.
+                  {m.draft_changed_before_restore_description()}
                 </Alert.Description>
               </Alert.Content>
             </Alert>
           ) : restoreState === "invalid" ? (
             <Alert status="danger" role="alert">
               <Alert.Content>
-                <Alert.Title>Publication cannot be restored safely</Alert.Title>
+                <Alert.Title>
+                  {m.publication_cannot_restore_safely()}
+                </Alert.Title>
                 <Alert.Description>
                   <ul className="list-disc pl-5">
                     {restoreIssues.map((issue) => (
                       <li key={`${issue.code}:${issue.path}`}>
-                        {issue.path}: {issue.message}
+                        {localizeRestorationIssue(issue)}
                       </li>
                     ))}
                   </ul>
@@ -1402,10 +1409,9 @@ function HistoryPanel({
           ) : restoreState === "error" ? (
             <Alert status="danger" role="alert">
               <Alert.Content>
-                <Alert.Title>Unable to restore Publication</Alert.Title>
+                <Alert.Title>{m.unable_restore_publication()}</Alert.Title>
                 <Alert.Description>
-                  The current Draft and public output were not confirmed as
-                  changed. Reload and try again.
+                  {m.unable_restore_publication_description()}
                 </Alert.Description>
               </Alert.Content>
             </Alert>
@@ -1413,7 +1419,7 @@ function HistoryPanel({
 
           {publicationHistory.length > 0 ? (
             <ol
-              aria-label="Retained Publications"
+              aria-label={m.retained_publications()}
               className={styles.issueListReset}
             >
               {publicationHistory.map((publication) => (
@@ -1429,7 +1435,7 @@ function HistoryPanel({
                       <strong className="small">{publication.title}</strong>
                       {publication.isCurrent ? (
                         <StatusChip variant="success" dot>
-                          Live
+                          {m.live()}
                         </StatusChip>
                       ) : null}
                     </div>
@@ -1450,7 +1456,9 @@ function HistoryPanel({
                         isPending={restoreState === "restoring"}
                         onPress={() => setRestoreTarget(publication)}
                       >
-                        Restore Publication {publication.publicationNumber}
+                        {m.restore_publication({
+                          number: publication.publicationNumber,
+                        })}
                       </Button>
                     </div>
                   </div>
@@ -1459,8 +1467,7 @@ function HistoryPanel({
             </ol>
           ) : null}
           <p className={`small faint ${styles.previewMeta}`}>
-            Restoring replaces the current Draft. The live Publication stays
-            until you publish again.
+            {m.restore_replaces_draft_footnote()}
           </p>
         </div>
       </section>
@@ -1475,21 +1482,21 @@ function HistoryPanel({
           <AlertDialog.Dialog>
             <AlertDialog.Header>
               <AlertDialog.Heading>
-                Restore Publication {restoreTarget?.publicationNumber}?
+                {m.restore_publication_question({
+                  number: restoreTarget?.publicationNumber ?? "",
+                })}
               </AlertDialog.Heading>
             </AlertDialog.Header>
             <AlertDialog.Body>
               <p>
                 {historyHasUnpublishedChanges
-                  ? "This Article has unpublished Draft changes. Restoring this immutable source permanently replaces them with a new Draft Version."
-                  : "Restoring this immutable source replaces the current Draft with a new Draft Version."}{" "}
-                The selected Publication, Current Publication, public
-                timestamps, and anonymous output remain unchanged.
+                  ? m.restore_publication_body_with_changes()
+                  : m.restore_publication_body()}
               </p>
             </AlertDialog.Body>
             <AlertDialog.Footer>
               <Button type="button" variant="secondary" slot="close">
-                Cancel
+                {m.cancel()}
               </Button>
               <Button
                 type="button"
@@ -1501,7 +1508,7 @@ function HistoryPanel({
                   void workspace.restoreFromHistory(restoreTarget)
                 }
               >
-                Confirm and restore Publication
+                {m.confirm_and_restore_publication()}
               </Button>
             </AlertDialog.Footer>
           </AlertDialog.Dialog>
@@ -1528,49 +1535,48 @@ export function PreviewDrawer({
       <Drawer.Content
         placement="right"
         className="briefly-drawer-preview"
-        aria-label="Saved Draft Preview"
+        aria-label={m.saved_draft_preview()}
       >
-        <Drawer.Dialog aria-label="Saved Draft Preview">
+        <Drawer.Dialog aria-label={m.saved_draft_preview()}>
           <Drawer.Header>
             <div className="briefly-drawer-head">
               <div>
                 <Drawer.Heading>
-                  <strong>Draft preview</strong>
+                  <strong>{m.draft_preview()}</strong>
                 </Drawer.Heading>
                 <p className={`small faint ${styles.previewMeta}`}>
-                  Renders the server-confirmed Draft only — never unsaved
-                  keystrokes.
+                  {m.draft_preview_description()}
                 </p>
               </div>
-              <Drawer.CloseTrigger aria-label="Close preview" />
+              <Drawer.CloseTrigger aria-label={m.close_preview()} />
             </div>
           </Drawer.Header>
           <Drawer.Body className={styles.previewBody}>
             {previewState === "loading" || previewState === "idle" ? (
               <div className={styles.row} role="status">
-                <Spinner aria-label="Loading saved Draft preview" />
+                <Spinner aria-label={m.loading_saved_draft_preview()} />
                 <span className="small muted">
-                  Rendering saved Draft preview…
+                  {m.rendering_saved_draft_preview()}
                 </span>
               </div>
             ) : previewState === "conflict" ? (
               <Alert status="warning" role="alert">
                 <Alert.Content>
-                  <Alert.Title>Saved Draft Version changed</Alert.Title>
+                  <Alert.Title>{m.saved_draft_version_changed()}</Alert.Title>
                   <Alert.Description>
-                    Reload the Article before requesting another preview.
+                    {m.saved_draft_version_changed_description()}
                   </Alert.Description>
                 </Alert.Content>
               </Alert>
             ) : previewState === "invalid" ? (
               <Alert status="danger" role="alert">
                 <Alert.Content>
-                  <Alert.Title>Saved Draft cannot be previewed</Alert.Title>
+                  <Alert.Title>{m.saved_draft_cannot_preview()}</Alert.Title>
                   <Alert.Description>
                     <ul className="list-disc pl-5">
                       {previewIssues.map((issue) => (
                         <li key={`${issue.code}:${issue.path}`}>
-                          {issue.path}: {issue.message}
+                          {localizePublicationIssue(issue)}
                         </li>
                       ))}
                     </ul>
@@ -1580,15 +1586,21 @@ export function PreviewDrawer({
             ) : previewState === "error" ? (
               <Alert status="danger" role="alert">
                 <Alert.Content>
-                  <Alert.Title>Unable to load saved Draft preview</Alert.Title>
-                  <Alert.Description>Please try again.</Alert.Description>
+                  <Alert.Title>
+                    {m.unable_load_saved_draft_preview()}
+                  </Alert.Title>
+                  <Alert.Description>
+                    {m.please_try_again()}
+                  </Alert.Description>
                 </Alert.Content>
               </Alert>
             ) : preview ? (
               <div className={styles.stack}>
                 <p className="small muted" role="status">
-                  Showing saved Draft Version {preview.draftVersion} with
-                  Renderer Version {preview.rendererVersion}.
+                  {m.showing_saved_draft_preview({
+                    draftVersion: preview.draftVersion,
+                    rendererVersion: preview.rendererVersion,
+                  })}
                 </p>
                 <article
                   className={`doc ${styles.card} ${styles.cardPad}`}
@@ -1603,7 +1615,7 @@ export function PreviewDrawer({
                       {preview.metadata.title}
                     </h2>
                     <p className="small muted">
-                      By {preview.metadata.byline.name} ·{" "}
+                      {m.byline_by({ name: preview.metadata.byline.name })} ·{" "}
                       {preview.metadata.language}
                     </p>
                   </header>
