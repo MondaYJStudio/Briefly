@@ -1,26 +1,18 @@
-@reference "tailwindcss";
-
 .panel {
   color: var(--foreground);
 }
 
 .tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
   border-bottom: 1px solid var(--divider);
-  margin-bottom: var(--space-4);
 }
 
 .tab {
-  @apply inline-flex items-center border-0 bg-transparent;
-  gap: var(--space-2);
   padding: 0.5rem 0.75rem;
   font: inherit;
   font-weight: 550;
-  font-size: var(--text-small);
+
   color: var(--foreground-muted);
-  cursor: pointer;
+
   border-radius: var(--radius-m) var(--radius-m) 0 0;
 }
 
@@ -30,12 +22,9 @@
 }
 
 .grid {
-  display: grid;
   grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
-  gap: var(--space-3);
+
   list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
 .cell {
@@ -43,15 +32,13 @@
   border-radius: var(--radius-m);
   overflow: hidden;
   background: var(--content1);
-  cursor: pointer;
+
   transition:
     border-color var(--dur-fast) var(--ease-out),
     box-shadow var(--dur-fast) var(--ease-out);
-  text-align: left;
-  padding: 0;
+
   font: inherit;
   color: inherit;
-  width: 100%;
 }
 
 .cell:hover {
@@ -67,8 +54,7 @@
 .thumb {
   aspect-ratio: 4/3;
   background: var(--content2);
-  display: grid;
-  place-items: center;
+
   overflow: hidden;
 }
 
@@ -79,14 +65,10 @@
 }
 
 .cellMeta {
-  padding: var(--space-2) var(--space-3);
-  display: flex;
-  flex-direction: column;
   gap: 2px;
 }
 
 .filename {
-  font-size: var(--text-tiny);
   font-weight: 550;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -99,35 +81,25 @@
 }
 
 .empty {
-  @apply flex flex-col items-center text-center;
-  padding: var(--space-6);
-  gap: var(--space-3);
   color: var(--foreground-muted);
 }
 
 .summary {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-l);
   background: var(--content1);
 }
 
 .summaryPreview {
-  display: grid;
-  place-items: center;
   min-height: 9rem;
   max-height: 15rem;
-  padding: var(--space-4);
+
   border-radius: var(--radius-m);
-  background:
-    radial-gradient(
-      120% 90% at 50% 40%,
-      oklch(0.3 0.01 264 / 0.4),
-      oklch(0.17 0.008 264 / 0.95)
-    );
+  background: radial-gradient(
+    120% 90% at 50% 40%,
+    oklch(0.3 0.01 264 / 0.4),
+    oklch(0.17 0.008 264 / 0.95)
+  );
   overflow: hidden;
   box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.06);
 }
@@ -143,48 +115,34 @@
   box-shadow: 0 12px 28px -16px oklch(0 0 0 / 0.7);
 }
 
-.summaryMetaRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
 .summaryGrow {
-  min-width: 0;
   flex: 1;
 }
 
 .summaryName {
   overflow: hidden;
   font-weight: 600;
-  font-size: var(--text-small);
+
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .summaryMeta {
-  font-size: var(--text-small);
   color: var(--foreground-faint);
 }
 
 .uploadHint {
-  font-size: var(--text-small);
   color: var(--foreground-muted);
 }
 
 .uploadPreview {
-  display: grid;
-  place-items: center;
-  gap: var(--space-2);
-  padding: var(--space-4);
   border: 1px solid oklch(1 0 0 / 0.08);
   border-radius: var(--radius-l);
-  background:
-    radial-gradient(
-      120% 90% at 50% 40%,
-      oklch(0.3 0.01 264 / 0.4),
-      oklch(0.17 0.008 264 / 0.95)
-    );
+  background: radial-gradient(
+    120% 90% at 50% 40%,
+    oklch(0.3 0.01 264 / 0.4),
+    oklch(0.17 0.008 264 / 0.95)
+  );
   box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.06);
 }
 
@@ -200,11 +158,9 @@
 }
 
 .uploadPreviewName {
-  margin: 0;
-  font-size: var(--text-small);
   font-weight: 500;
   word-break: break-all;
-  text-align: center;
+
   color: oklch(0.92 0.005 264);
 }
 

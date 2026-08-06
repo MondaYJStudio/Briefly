@@ -54,8 +54,11 @@ function Recover() {
     >
       {state === "success" ? (
         <div>
-          <div className={authStyles.empty} role="status">
-            <div className={authStyles.emptyIcon} aria-hidden="true">
+          <div className={`${authStyles.empty} grid text-center`} role="status">
+            <div
+              className={`${authStyles.emptyIcon} grid place-items-center mb-4`}
+              aria-hidden="true"
+            >
               <svg
                 width="24"
                 height="24"

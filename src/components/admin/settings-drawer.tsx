@@ -39,12 +39,7 @@ interface SettingsDrawerProps {
 }
 
 type SettingsState =
-  | "loading"
-  | "ready"
-  | "submitting"
-  | "saved"
-  | "failed"
-  | "load-failed";
+  "loading" | "ready" | "submitting" | "saved" | "failed" | "load-failed";
 
 function localizeIssue(path: string, message: string): string {
   switch (path) {
@@ -63,18 +58,30 @@ function localizeIssue(path: string, message: string): string {
 
 function LoadingState() {
   return (
-    <div className={styles.stack} role="status" aria-label={m.loading_settings()}>
-      <div className={styles.card}>
+    <div
+      className={`flex flex-col gap-4`}
+      role="status"
+      aria-label={m.loading_settings()}
+    >
+      <div className={`${styles.card} p-5`}>
         <div className={`${styles.skeleton} ${styles.skeletonTitle}`} />
-        <div className={`${styles.skeleton} ${styles.skeletonInput} ${styles.mt4}`} />
-        <div className={`${styles.skeleton} ${styles.skeletonArea} ${styles.mt4}`} />
-      </div>
-      <div className={styles.card}>
-        <div className={`${styles.skeleton} ${styles.skeletonWideTitle}`} />
-        <div className={`${styles.skeleton} ${styles.skeletonInput} ${styles.mt4}`} />
-        <div className={`${styles.skeleton} ${styles.skeletonInput} ${styles.mt4}`} />
         <div
-          className={`${styles.skeleton} ${styles.skeletonPartial} ${styles.mt4}`}
+          className={`${styles.skeleton} ${styles.skeletonInput} mt-4`}
+        />
+        <div
+          className={`${styles.skeleton} ${styles.skeletonArea} mt-4`}
+        />
+      </div>
+      <div className={`${styles.card} p-5`}>
+        <div className={`${styles.skeleton} ${styles.skeletonWideTitle}`} />
+        <div
+          className={`${styles.skeleton} ${styles.skeletonInput} mt-4`}
+        />
+        <div
+          className={`${styles.skeleton} ${styles.skeletonInput} mt-4`}
+        />
+        <div
+          className={`${styles.skeleton} ${styles.skeletonPartial} mt-4`}
         />
       </div>
     </div>
@@ -82,7 +89,7 @@ function LoadingState() {
 }
 
 function SettingsCard({ children }: Readonly<{ children: ReactNode }>) {
-  return <section className={styles.card}>{children}</section>;
+  return <section className={`${styles.card} p-5`}>{children}</section>;
 }
 
 export function SettingsDrawer({
@@ -185,19 +192,21 @@ export function SettingsDrawer({
       <Drawer.Content placement="right" className="briefly-drawer-wide">
         <Drawer.Dialog aria-label={m.settings_menu()}>
           <Drawer.Header>
-            <div className={styles.head}>
+            <div
+              className={`flex w-full items-center justify-between gap-3`}
+            >
               <div>
                 <Drawer.Heading>
                   <strong>{m.settings_menu()}</strong>
                 </Drawer.Heading>
-                <p className={`small faint ${styles.description}`}>
+                <p className={`text-xs faint ${styles.description}`}>
                   {m.settings_drawer_description()}
                 </p>
               </div>
               <Drawer.CloseTrigger aria-label={m.close_settings()} />
             </div>
           </Drawer.Header>
-          <Drawer.Body className={styles.body}>
+          <Drawer.Body className={`p-5`}>
             {state === "loading" ? (
               <LoadingState />
             ) : state === "load-failed" || !settings ? (
@@ -230,7 +239,7 @@ export function SettingsDrawer({
               </Alert>
             ) : (
               <Form
-                className={`${styles.stack}${disabled ? ` ${styles.formDisabled}` : ""}`}
+                className={`flex flex-col gap-4${disabled ? ` ${styles.formDisabled}` : ""}`}
                 onSubmit={save}
                 aria-label={m.site_settings_form()}
                 aria-disabled={disabled}
@@ -282,8 +291,12 @@ export function SettingsDrawer({
                 ) : null}
 
                 <SettingsCard>
-                  <h2 className={styles.sectionTitle}>{m.site_information()}</h2>
-                  <div className={styles.fieldStack}>
+                  <h2
+                    className={`${styles.sectionTitle} text-base mt-0 mx-0 mb-5`}
+                  >
+                    {m.site_information()}
+                  </h2>
+                  <div className={`flex flex-col gap-5`}>
                     <SettingsField
                       label={m.site_name()}
                       htmlFor="siteName"
@@ -334,13 +347,17 @@ export function SettingsDrawer({
                 </SettingsCard>
 
                 <SettingsCard>
-                  <h2 className={styles.sectionTitle}>
+                  <h2
+                    className={`${styles.sectionTitle} text-base mt-0 mx-0 mb-5`}
+                  >
                     {m.default_public_identity()}
                   </h2>
-                  <p className={`small muted ${styles.sectionDescription}`}>
+                  <p
+                    className={`text-xs muted -mt-3 mx-0 mb-5`}
+                  >
                     {m.default_public_identity_description()}
                   </p>
-                  <div className={styles.fieldStack}>
+                  <div className={`flex flex-col gap-5`}>
                     <SettingsField
                       label={m.default_byline_name()}
                       htmlFor="defaultBylineName"
@@ -436,7 +453,9 @@ export function SettingsDrawer({
                           });
                         }}
                       >
-                        <Select.Trigger className={styles.languageTrigger}>
+                        <Select.Trigger
+                          className={`${styles.languageTrigger} py-2`}
+                        >
                           <Select.Value />
                           <Select.Indicator />
                         </Select.Trigger>
@@ -446,11 +465,13 @@ export function SettingsDrawer({
                               <ListBox.Item
                                 key={language.id}
                                 id={language.id}
-                                className={styles.languageOption}
+                                className={`flex w-full items-center justify-between gap-3`}
                                 textValue={`${language.label} (${language.detail})`}
                               >
                                 <span>{language.label}</span>
-                                <span className={styles.languageDetail}>
+                                <span
+                                  className={`${styles.languageDetail} text-xs`}
+                                >
                                   {language.detail}
                                 </span>
                               </ListBox.Item>
@@ -462,13 +483,21 @@ export function SettingsDrawer({
                   </div>
                 </SettingsCard>
 
-                <div className={styles.note} role="note">
+                <div
+                  className={`${styles.note} flex items-start text-sm gap-3 p-4`}
+                  role="note"
+                >
                   <AdminIcon name="alert" />
                   <div>{m.public_content_note()}</div>
                 </div>
-                <div className={styles.actions}>
+                <div
+                  className={`${styles.actions} flex flex-wrap items-center justify-end gap-3`}
+                >
                   {state === "submitting" ? (
-                    <span className={styles.saveState} role="status">
+                    <span
+                      className={`${styles.saveState} inline-flex items-center text-sm gap-2`}
+                      role="status"
+                    >
                       <Spinner size="sm" />
                       {m.saving()}
                     </span>

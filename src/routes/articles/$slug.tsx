@@ -64,12 +64,17 @@ function MetaSep() {
 function ArticleUnavailable() {
   return (
     <PublicSiteShell siteName="Briefly" variant="interior">
-      <main className="reading">
-        <section className="unavailable reveal" style={revealStyle(1)}>
-          <div className="section-head">
-            <h2>{m.public_article_unavailable()}</h2>
+      <main className="reading pb-16 w-full">
+        <section
+          className="unavailable reveal pt-12 pb-20"
+          style={revealStyle(1)}
+        >
+          <div className="section-head pb-5">
+            <h2 className="text-2xl tracking-tight">
+              {m.public_article_unavailable()}
+            </h2>
           </div>
-          <p>{m.public_article_unavailable_body()}</p>
+          <p className="text-base">{m.public_article_unavailable_body()}</p>
         </section>
       </main>
     </PublicSiteShell>
@@ -84,12 +89,20 @@ function ArticlePage() {
 
   return (
     <PublicSiteShell siteName={site.siteName} variant="interior">
-      <main className="reading">
+      <main className="reading pb-16 w-full">
         <article lang={article.language}>
-          <header className="article-header reveal" style={revealStyle(1)}>
-            <h1 className="article-header__title">{article.title}</h1>
-            <hr className="article-header__rule" aria-hidden="true" />
-            <p className="article-header__meta">
+          <header
+            className="article-header reveal pt-8 pb-8"
+            style={revealStyle(1)}
+          >
+            <h1 className="article-header__title text-2xl sm:text-4xl tracking-tight">
+              {article.title}
+            </h1>
+            <hr
+              className="article-header__rule block mt-5 w-10"
+              aria-hidden="true"
+            />
+            <p className="article-header__meta flex flex-wrap items-baseline gap-2 mt-4 text-sm">
               <span>
                 {article.byline.url ? (
                   <a
@@ -123,10 +136,13 @@ function ArticlePage() {
               ) : null}
               {article.tags.length > 0 ? (
                 <>
-                  <span className="article-header__meta-pipe" aria-hidden="true">
+                  <span
+                    className="article-header__meta-pipe px-1"
+                    aria-hidden="true"
+                  >
                     |
                   </span>
-                  <span className="article-header__tags">
+                  <span className="article-header__tags inline-flex flex-wrap items-baseline gap-2">
                     {article.tags.map((tag) => (
                       <span key={tag}>{tag}</span>
                     ))}
@@ -135,11 +151,13 @@ function ArticlePage() {
               ) : null}
             </p>
             {article.summary ? (
-              <p className="article-header__summary">{article.summary}</p>
+              <p className="article-header__summary mt-6 py-4 px-5 text-sm">
+                {article.summary}
+              </p>
             ) : null}
           </header>
           <div
-            className="article-body reveal"
+            className="article-body reveal pb-20 text-base"
             style={revealStyle(2)}
             // Publication HTML is authored by the sole Administrator and
             // rendered server-side into semantic markup at publish time.

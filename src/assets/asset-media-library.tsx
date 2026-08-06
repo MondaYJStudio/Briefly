@@ -249,7 +249,11 @@ export function AssetMediaLibrary() {
 
       const error = response.error?.value;
       if (error && "issues" in error) {
-        setIssues(error.issues.map((issue) => localizeServerIssueMessage(issue.message)));
+        setIssues(
+          error.issues.map((issue) =>
+            localizeServerIssueMessage(issue.message),
+          ),
+        );
         setState("invalid");
       } else {
         setState("error");
@@ -283,13 +287,22 @@ export function AssetMediaLibrary() {
   }
 
   return (
-    <main className={styles.page} id="admin-main">
-      <header className={styles.pageHead}>
+    <main
+      className={`flex min-w-0 flex-1 flex-col max-w-6xl w-full mx-auto pt-8 px-10 pb-16 max-[860px]:pt-5 max-[860px]:px-4 max-[860px]:pb-12`}
+      id="admin-main"
+    >
+      <header
+        className={`flex flex-wrap items-end justify-between mb-8 gap-4 max-[860px]:mb-5`}
+      >
         <div>
-          <h1 className={styles.pageTitle}>{m.media()}</h1>
-          <p className={styles.pageDesc}>{m.media_page_description()}</p>
+          <h1 className={`${styles.pageTitle} text-2xl`}>{m.media()}</h1>
+          <p className={`${styles.pageDesc} mt-2`}>
+            {m.media_page_description()}
+          </p>
         </div>
-        <div className={styles.pageActions}>
+        <div
+          className={`flex items-center max-[860px]:w-full gap-2`}
+        >
           <Button type="button" onPress={openUpload}>
             <AdminIcon name="upload" size={16} />
             {m.upload_image()}
@@ -298,9 +311,12 @@ export function AssetMediaLibrary() {
       </header>
 
       <section aria-label={m.media_library()}>
-        <div className={styles.rules} role="note">
+        <div
+          className={`${styles.rules} flex flex-wrap items-start text-sm mb-4 gap-3 py-3 px-4`}
+          role="note"
+        >
           <AdminIcon name="alert" strokeWidth={1.8} />
-          <div className={styles.rulesBody}>
+          <div className={`${styles.rulesBody} min-w-0`}>
             <strong>{m.media_accepted_label()}</strong>{" "}
             {m.media_accepted_rules()}{" "}
             <strong>{m.media_not_accepted_label()}</strong>{" "}
@@ -309,7 +325,11 @@ export function AssetMediaLibrary() {
         </div>
 
         {state === "error" ? (
-          <Alert className={styles.feedback} status="danger" role="alert">
+          <Alert
+            className={`mb-4`}
+            status="danger"
+            role="alert"
+          >
             <Alert.Content>
               <Alert.Title>{m.unable_to_manage_assets()}</Alert.Title>
               <Alert.Description>
@@ -318,13 +338,21 @@ export function AssetMediaLibrary() {
             </Alert.Content>
           </Alert>
         ) : state === "uploading" ? (
-          <Alert className={styles.feedback} status="default" role="status">
+          <Alert
+            className={`mb-4`}
+            status="default"
+            role="status"
+          >
             <Alert.Content>
               <Alert.Title>{m.uploading_and_verifying_image()}</Alert.Title>
             </Alert.Content>
           </Alert>
         ) : state === "invalid" ? (
-          <Alert className={styles.feedback} status="danger" role="alert">
+          <Alert
+            className={`mb-4`}
+            status="danger"
+            role="alert"
+          >
             <Alert.Content>
               <Alert.Title>{m.image_not_accepted()}</Alert.Title>
               <Alert.Description>
@@ -337,13 +365,21 @@ export function AssetMediaLibrary() {
             </Alert.Content>
           </Alert>
         ) : state === "uploaded" ? (
-          <Alert className={styles.feedback} status="success" role="status">
+          <Alert
+            className={`mb-4`}
+            status="success"
+            role="status"
+          >
             <Alert.Content>
               <Alert.Title>{m.asset_uploaded_and_selected()}</Alert.Title>
             </Alert.Content>
           </Alert>
         ) : state === "cleaned" ? (
-          <Alert className={styles.feedback} status="success" role="status">
+          <Alert
+            className={`mb-4`}
+            status="success"
+            role="status"
+          >
             <Alert.Content>
               <Alert.Title>{m.asset_cleanup_completed()}</Alert.Title>
               <Alert.Description>
@@ -352,7 +388,11 @@ export function AssetMediaLibrary() {
             </Alert.Content>
           </Alert>
         ) : state === "cleanup-blocked" ? (
-          <Alert className={styles.feedback} status="warning" role="alert">
+          <Alert
+            className={`mb-4`}
+            status="warning"
+            role="alert"
+          >
             <Alert.Content>
               <Alert.Title>{m.asset_became_referenced()}</Alert.Title>
               <Alert.Description>
@@ -361,7 +401,11 @@ export function AssetMediaLibrary() {
             </Alert.Content>
           </Alert>
         ) : state === "cleanup-failed" ? (
-          <Alert className={styles.feedback} status="danger" role="alert">
+          <Alert
+            className={`mb-4`}
+            status="danger"
+            role="alert"
+          >
             <Alert.Content>
               <Alert.Title>{m.asset_cleanup_needs_retry()}</Alert.Title>
               <Alert.Description>
@@ -372,20 +416,26 @@ export function AssetMediaLibrary() {
         ) : null}
 
         {state === "loading" ? (
-          <ul className={styles.grid} aria-busy="true" role="status">
+          <ul
+            className={`${styles.grid} grid gap-4 m-0 p-0`}
+            aria-busy="true"
+            role="status"
+          >
             {[70, 60, 75, 65].map((width) => (
               <li key={width} aria-hidden="true">
-                <div className={styles.cell}>
+                <div
+                  className={`${styles.cell} cursor-pointer text-left w-full p-0`}
+                >
                   <div
                     className={`${styles.skeleton} ${styles.skeletonThumb}`}
                   />
-                  <div className={styles.cellMeta}>
+                  <div className={`${styles.cellMeta} flex flex-col py-2 px-3`}>
                     <div
                       className={styles.skeleton}
                       style={{ width: `${width}%`, height: "0.75rem" }}
                     />
                     <div
-                      className={`${styles.skeleton} ${styles.skeletonGap}`}
+                      className={`${styles.skeleton} mt-2`}
                       style={{ width: "50%", height: "0.7rem" }}
                     />
                   </div>
@@ -395,13 +445,15 @@ export function AssetMediaLibrary() {
           </ul>
         ) : assets.length === 0 && state !== "error" ? (
           <div className={styles.card}>
-            <div className={styles.empty}>
-              <div className={styles.emptyIcon}>
+            <div
+              className={`flex flex-col items-center text-center py-10 px-6 gap-3`}
+            >
+              <div className={`${styles.emptyIcon} grid place-items-center`}>
                 <AdminIcon name="image" size={24} />
               </div>
               <h3>{m.no_images_yet()}</h3>
               <p>{m.no_images_yet_description()}</p>
-              <div className={styles.emptyActions}>
+              <div className={`mt-3`}>
                 <Button type="button" onPress={openUpload}>
                   {m.upload_your_first_image()}
                 </Button>
@@ -409,21 +461,24 @@ export function AssetMediaLibrary() {
             </div>
           </div>
         ) : (
-          <ul className={styles.grid} aria-label={m.managed_assets()}>
+          <ul
+            className={`${styles.grid} grid gap-4 m-0 p-0`}
+            aria-label={m.managed_assets()}
+          >
             {assets.map((asset) => {
               const presentation = cleanupPresentation(asset);
               const isSelected = selectedAssetId === asset.id;
               return (
                 <li key={asset.id}>
                   <button
-                    className={styles.cell}
+                    className={`${styles.cell} cursor-pointer text-left w-full p-0`}
                     type="button"
                     aria-pressed={isSelected}
                     onClick={(event) =>
                       selectAsset(asset.id, event.currentTarget)
                     }
                   >
-                    <span className={styles.thumb}>
+                    <span className={`${styles.thumb} grid place-items-center`}>
                       {presentation.showPreview ? (
                         <img
                           src={`/media/private/${asset.id}`}
@@ -434,8 +489,10 @@ export function AssetMediaLibrary() {
                         <AdminIcon name="image" size={24} />
                       )}
                     </span>
-                    <span className={styles.cellMeta}>
-                      <span className={styles.filename}>
+                    <span
+                      className={`${styles.cellMeta} flex flex-col py-2 px-3`}
+                    >
+                      <span className={`${styles.filename} text-xs`}>
                         {asset.originalFilename}
                       </span>
                       <span className={styles.fileMeta}>
@@ -445,7 +502,7 @@ export function AssetMediaLibrary() {
                           height: asset.height,
                         })}
                       </span>
-                      <span className={styles.cellStatus}>
+                      <span className={`mt-1`}>
                         {assetStatusChip(asset)}
                       </span>
                     </span>
@@ -463,7 +520,7 @@ export function AssetMediaLibrary() {
           <Modal.Container>
             <Modal.Dialog aria-label={m.upload_image()}>
               <Modal.Header>
-                <div className="briefly-drawer-head">
+                <div className="briefly-drawer-head flex items-center justify-between gap-3 w-full">
                   <Modal.Heading>{m.upload_image()}</Modal.Heading>
                   <Modal.CloseTrigger aria-label={m.close_upload_dialog()} />
                 </div>
@@ -471,7 +528,7 @@ export function AssetMediaLibrary() {
               <Form onSubmit={uploadImage}>
                 <Modal.Body>
                   <label
-                    className={`${styles.dropzone}${uploadDragging ? ` ${styles.dropzoneActive}` : ""}`}
+                    className={`${styles.dropzone} block text-center cursor-pointer p-6${uploadDragging ? ` ${styles.dropzoneActive}` : ""}`}
                     htmlFor="assetFile"
                     onDragEnter={onUploadDragEnter}
                     onDragOver={onUploadDragOver}
@@ -480,35 +537,37 @@ export function AssetMediaLibrary() {
                   >
                     {uploadPreviewUrl ? (
                       <>
-                        <div className={styles.dropzonePreview}>
+                        <div
+                          className={`${styles.dropzonePreview} grid place-items-center p-4 mt-4 mx-auto`}
+                        >
                           <img
                             src={uploadPreviewUrl}
                             alt={m.selected_upload_preview()}
                           />
                         </div>
                         {uploadFileName ? (
-                          <p className={styles.dropzoneFile}>
+                          <p className={`${styles.dropzoneFile} text-sm mt-3`}>
                             {uploadFileName}
                           </p>
                         ) : null}
-                        <p className={styles.dropzoneHint}>
+                        <p className={`${styles.dropzoneHint} text-sm`}>
                           {m.choose_verified_image()}
                         </p>
                       </>
                     ) : (
                       <>
                         <AdminIcon name="upload" size={24} />
-                        <p className={styles.dropzoneTitle}>
+                        <p className={`${styles.dropzoneTitle} text-sm mt-2`}>
                           {m.choose_verified_image()}
                         </p>
-                        <p className={styles.dropzoneHint}>
+                        <p className={`${styles.dropzoneHint} text-sm`}>
                           {m.accepted_image_formats_short()}
                         </p>
                       </>
                     )}
                     <input
                       ref={uploadInputRef}
-                      className={styles.dropzoneInput}
+                      className={`${styles.dropzoneInput} border-0 p-0`}
                       id="assetFile"
                       name="assetFile"
                       type="file"
@@ -518,7 +577,10 @@ export function AssetMediaLibrary() {
                       onChange={onUploadInputChange}
                     />
                   </label>
-                  <div className={styles.uploadLimits} role="note">
+                  <div
+                    className={`${styles.uploadLimits} flex items-start text-sm mt-4 gap-3 py-3 px-4`}
+                    role="note"
+                  >
                     <AdminIcon name="alert" strokeWidth={1.8} />
                     <div>{m.upload_limits_note()}</div>
                   </div>
@@ -544,20 +606,20 @@ export function AssetMediaLibrary() {
           <Drawer.Content placement="right" className="briefly-drawer-side">
             <Drawer.Dialog aria-label={m.asset_details()}>
               <Drawer.Header>
-                <div className="briefly-drawer-head">
+                <div className="briefly-drawer-head flex items-center justify-between gap-3 w-full">
                   <Drawer.Heading>
                     <strong>{m.asset()}</strong>
                   </Drawer.Heading>
                   <Drawer.CloseTrigger aria-label={m.close_asset_details()} />
                 </div>
               </Drawer.Header>
-              <Drawer.Body className={styles.drawerBody}>
+              <Drawer.Body className={`p-4`}>
                 {selected ? (
                   <>
                     {selectedPresentation?.showPreview ? (
                       <button
                         type="button"
-                        className={`${styles.hero} ${styles.heroPreview}`}
+                        className={`${styles.hero} block w-full p-0 ${styles.heroPreview} text-center`}
                         aria-label={m.open_full_image_preview({
                           filename: selected.originalFilename,
                         })}
@@ -571,12 +633,16 @@ export function AssetMediaLibrary() {
                         />
                       </button>
                     ) : (
-                      <div className={`${styles.hero} ${styles.heroEmpty}`}>
+                      <div
+                        className={`${styles.hero} block w-full p-0 ${styles.heroEmpty} grid place-items-center w-full text-sm p-8`}
+                      >
                         <p>{m.preview_unavailable_cleanup_pending()}</p>
                       </div>
                     )}
 
-                    <dl className={styles.metaDl}>
+                    <dl
+                      className={`${styles.metaDl} grid text-xs gap-y-2 gap-x-4 mt-4 mx-0 mb-0`}
+                    >
                       <dt>{m.meta_file()}</dt>
                       <dd className={styles.mono}>
                         {selected.originalFilename}
@@ -652,7 +718,10 @@ export function AssetMediaLibrary() {
                           </div>
                         )
                       ) : selectedIsReferenced ? (
-                        <div className={styles.detailAlert} role="note">
+                        <div
+                          className={`${styles.detailAlert} flex items-start text-sm mt-4 gap-3 py-3 px-4`}
+                          role="note"
+                        >
                           <AdminIcon name="alert" strokeWidth={1.8} />
                           <div>
                             <div className={styles.detailAlertTitle}>
@@ -682,7 +751,7 @@ export function AssetMediaLibrary() {
 
                       <AlertDialog.Root>
                         <Button
-                          className={styles.cleanupAction}
+                          className={`mt-4`}
                           fullWidth
                           type="button"
                           variant="danger-soft"
@@ -728,8 +797,8 @@ export function AssetMediaLibrary() {
                       </AlertDialog.Root>
                     </div>
 
-                    <hr className={styles.divider} />
-                    <p className={styles.footnote}>
+                    <hr className={`${styles.divider} border-0 my-5 mx-0`} />
+                    <p className={`${styles.footnote} text-sm`}>
                       {m.alt_not_stored_on_asset()}
                     </p>
                   </>
@@ -749,7 +818,7 @@ export function AssetMediaLibrary() {
             placement="center"
           >
             <Modal.Dialog
-              className={styles.galleryDialog}
+              className={`${styles.galleryDialog} m-0 p-0`}
               aria-label={
                 selected
                   ? m.preview_of_filename({
@@ -759,13 +828,15 @@ export function AssetMediaLibrary() {
               }
             >
               <Modal.CloseTrigger
-                className={styles.galleryClose}
+                className={`${styles.galleryClose} place-items-center cursor-pointer top-3 right-3`}
                 aria-label={m.close_full_image_preview()}
               />
-              <div className={styles.galleryStage}>
+              <div
+                className={`${styles.galleryStage} grid place-items-center pt-10 px-8 pb-6`}
+              >
                 {selected && selectedPresentation?.showPreview ? (
                   <img
-                    className={styles.galleryImage}
+                    className={`${styles.galleryImage} block`}
                     src={`/media/private/${selected.id}`}
                     alt={m.preview_of_filename({
                       filename: selected.originalFilename,
@@ -774,11 +845,13 @@ export function AssetMediaLibrary() {
                 ) : null}
               </div>
               {selected ? (
-                <footer className={styles.galleryCaption}>
-                  <div className={styles.galleryFilename}>
+                <footer
+                  className={`${styles.galleryCaption} flex flex-wrap items-baseline justify-between gap-y-2 gap-x-4 pt-4 px-5 pb-5`}
+                >
+                  <div className={`${styles.galleryFilename} text-sm`}>
                     {selected.originalFilename}
                   </div>
-                  <div className={styles.galleryMeta}>
+                  <div className={`${styles.galleryMeta} text-xs`}>
                     {m.asset_picker_summary_meta({
                       format: selected.mimeType
                         .replace("image/", "")
@@ -788,7 +861,9 @@ export function AssetMediaLibrary() {
                       size: selected.byteSize.toLocaleString(locale),
                     })}
                   </div>
-                  <p className={styles.galleryHint}>{m.gallery_close_hint()}</p>
+                  <p className={`${styles.galleryHint} w-full -mt-1`}>
+                    {m.gallery_close_hint()}
+                  </p>
                 </footer>
               ) : null}
             </Modal.Dialog>

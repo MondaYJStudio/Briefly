@@ -1,12 +1,8 @@
-@reference "tailwindcss";
-
 .frame {
   position: relative;
-  display: flex;
+
   min-height: 100dvh;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+
   padding: 1.5rem 1rem;
   overflow: hidden;
   background: var(--background, oklch(0.995 0.002 264));
@@ -33,7 +29,7 @@
 .panel {
   position: relative;
   z-index: 1;
-  width: 100%;
+
   max-width: 24rem;
   overflow: hidden;
   border: 1px solid var(--border, oklch(0.9 0.006 264));
@@ -43,18 +39,12 @@
 }
 
 .chrome {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 0.75rem;
   padding: 0.875rem 1rem;
   border-bottom: 1px solid var(--divider, oklch(0.915 0.005 264));
 }
 
 .brand {
-  display: flex;
-  min-width: 0;
-  align-items: center;
   gap: 0.5rem;
   font-size: 0.9375rem;
   font-weight: 650;
@@ -63,11 +53,9 @@
 }
 
 .mark {
-  display: grid;
   width: 1.75rem;
   height: 1.75rem;
-  flex-shrink: 0;
-  place-items: center;
+
   border-radius: 0.45rem;
   background: var(--foreground, oklch(0.21 0.008 264));
   color: var(--background, oklch(0.995 0.002 264));
@@ -78,22 +66,18 @@
 }
 
 .controls {
-  display: flex;
-  align-items: center;
   gap: 0.25rem;
 }
 
 .iconButton {
-  display: inline-flex;
   width: 2.25rem;
   height: 2.25rem;
-  align-items: center;
-  justify-content: center;
+
   border: 1px solid var(--border, oklch(0.9 0.006 264));
   border-radius: var(--radius-s, 0.5rem);
   background: transparent;
   color: var(--foreground-muted, oklch(0.46 0.012 264));
-  cursor: pointer;
+
   transition:
     background-color 150ms ease,
     border-color 150ms ease,
@@ -112,14 +96,11 @@
 }
 
 .body {
-  display: flex;
-  flex-direction: column;
   gap: 1.25rem;
   padding: 1.5rem 1.25rem 1.35rem;
 }
 
 .title {
-  margin: 0;
   font-size: 1.375rem;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -138,7 +119,7 @@
   position: relative;
   z-index: 1;
   margin-top: 1.25rem;
-  text-align: center;
+
   font-size: 0.75rem;
   color: var(--foreground-faint, oklch(0.56 0.014 264));
 }
@@ -153,18 +134,14 @@
 }
 
 .empty {
-  display: grid;
   justify-items: center;
   padding: 1rem 0;
-  text-align: center;
 }
 
 .emptyIcon {
-  display: grid;
   width: 3rem;
   height: 3rem;
-  margin-bottom: 1rem;
-  place-items: center;
+
   border-radius: 0.875rem;
   background: color-mix(in oklch, var(--success) 15%, transparent);
   color: var(--success-strong, var(--success));

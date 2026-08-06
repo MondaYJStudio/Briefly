@@ -1,32 +1,16 @@
-@reference "tailwindcss";
-
-.field {
-  @apply flex w-full flex-col;
-  gap: var(--space-2);
-}
-
 .label {
-  font-size: var(--text-small);
   font-weight: 550;
-  @apply flex items-baseline;
-  gap: var(--space-2);
 }
 
 .optional {
-  font-size: var(--text-tiny);
   font-weight: 400;
   color: var(--foreground-faint);
 }
 
 .issues {
-  @apply list-disc pl-5;
   color: var(--danger);
-  font-size: var(--text-tiny);
-  margin: 0;
 }
 
 .description {
-  font-size: var(--text-tiny);
   color: var(--foreground-muted);
-  margin: 0;
 }

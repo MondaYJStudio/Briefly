@@ -35,7 +35,7 @@ export function WorkspaceAlerts({
   } = workspace;
 
   return (
-    <div className={styles.stack}>
+    <div className={`flex flex-col gap-3`}>
       {trashActionState === "restored" ? (
         <Alert status="success" role="status">
           <Alert.Content>
@@ -62,7 +62,9 @@ export function WorkspaceAlerts({
             <Alert.Title>{m.alert_unsaved_local_changes()}</Alert.Title>
             <Alert.Description>
               {m.alert_unsaved_local_changes_description()}
-              <span className={styles.actions}>
+              <span
+                className={`flex items-center gap-3 mt-2`}
+              >
                 <Button
                   type="button"
                   variant="secondary"
@@ -91,7 +93,9 @@ export function WorkspaceAlerts({
             <Alert.Title>{m.alert_draft_save_failed()}</Alert.Title>
             <Alert.Description>
               {m.alert_draft_save_failed_description()}
-              <span className={styles.actions}>
+              <span
+                className={`flex items-center gap-3 mt-2`}
+              >
                 <Button
                   type="button"
                   onPress={() => void persistCurrentDraft()}
@@ -116,7 +120,9 @@ export function WorkspaceAlerts({
             <Alert.Title>{m.alert_draft_conflict()}</Alert.Title>
             <Alert.Description>
               {m.alert_draft_conflict_description()}
-              <span className={styles.actions}>
+              <span
+                className={`flex items-center gap-3 mt-2`}
+              >
                 <Button
                   type="button"
                   isDisabled={lifecycleActionPending}
@@ -156,7 +162,7 @@ export function WorkspaceAlerts({
                 ))}
               </ul>
               <Button
-                className={styles.actionTop}
+                className={`mt-2`}
                 type="button"
                 onPress={() => void persistCurrentDraft()}
               >
@@ -172,7 +178,7 @@ export function WorkspaceAlerts({
             <Alert.Description>
               {m.alert_offline_draft_not_saved_description()}
               <Button
-                className={styles.actionTop}
+                className={`mt-2`}
                 type="button"
                 onPress={() => void persistCurrentDraft()}
               >
@@ -185,11 +191,11 @@ export function WorkspaceAlerts({
 
       {conflictCopy ? (
         <details>
-          <summary className={styles.conflictSummary}>
+          <summary className={`${styles.conflictSummary} cursor-pointer`}>
             {m.alert_copy_preserved_draft_json()}
           </summary>
           <TextArea
-            className={`${styles.actionTop} font-mono`}
+            className={`font-mono`}
             aria-label={m.alert_preserved_draft_json_label()}
             readOnly
             value={JSON.stringify(conflictCopy, null, 2)}
@@ -210,7 +216,7 @@ export function WorkspaceAlerts({
                 ? m.alert_article_republished_description()
                 : m.alert_article_published_description()}
               {publicationReceipt ? (
-                <span className={styles.receipt}>
+                <span className={`block mt-2`}>
                   {m.alert_publication_receipt({
                     publicationId: publicationReceipt.publicationId,
                     draftVersion: String(publicationReceipt.draftVersion),
@@ -245,7 +251,7 @@ export function WorkspaceAlerts({
                 : m.alert_publication_conflict_unreconciled()}
               {publicationReconciliationState === "reconciled" ? (
                 <Button
-                  className={styles.actionTop}
+                  className={`mt-2`}
                   type="button"
                   variant="secondary"
                   onPress={acknowledgePublicationReconciliation}
@@ -254,7 +260,7 @@ export function WorkspaceAlerts({
                 </Button>
               ) : (
                 <Button
-                  className={styles.actionTop}
+                  className={`mt-2`}
                   type="button"
                   variant="secondary"
                   onPress={reloadDraft}
@@ -272,7 +278,7 @@ export function WorkspaceAlerts({
             <Alert.Description>
               {m.alert_publication_not_completed_description()}
               <Button
-                className={styles.actionTop}
+                className={`mt-2`}
                 type="button"
                 onPress={() => void retryPublishDraft()}
               >
@@ -305,7 +311,7 @@ export function WorkspaceAlerts({
                 : m.alert_publish_outcome_unreconciled()}
               {publicationReconciliationState === "reconciled" ? (
                 <Button
-                  className={styles.actionTop}
+                  className={`mt-2`}
                   type="button"
                   variant="secondary"
                   onPress={acknowledgePublicationReconciliation}
@@ -314,7 +320,7 @@ export function WorkspaceAlerts({
                 </Button>
               ) : (
                 <Button
-                  className={styles.actionTop}
+                  className={`mt-2`}
                   type="button"
                   variant="secondary"
                   onPress={reloadDraft}
@@ -332,7 +338,7 @@ export function WorkspaceAlerts({
             <Alert.Description>
               {m.alert_unable_to_publish_description()}
               <Button
-                className={styles.actionTop}
+                className={`mt-2`}
                 type="button"
                 variant="secondary"
                 onPress={reloadDraft}

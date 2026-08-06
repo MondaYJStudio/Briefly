@@ -113,7 +113,7 @@ export function PublicSiteShell({
       {variant === "home" ? (
         <h1 className="masthead__name">{siteName}</h1>
       ) : (
-        <p className="masthead__name">
+        <p className="masthead__name text-xl tracking-tight">
           <Link to="/">{siteName}</Link>
         </p>
       )}
@@ -121,40 +121,62 @@ export function PublicSiteShell({
   );
 
   return (
-    <div className="public-site" data-theme={theme} lang={locale}>
+    <div
+      className="public-site text-base leading-[1.65]"
+      data-theme={theme}
+      lang={locale}
+    >
       <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
-      <div className="page">
+      <div className="page flex flex-col">
         <header
-          className={`masthead reveal${
-            variant === "interior" ? " masthead--compact" : ""
+          className={`masthead reveal grid justify-items-center gap-2 pt-10 pb-6 text-center max-[860px]:pt-8${
+            variant === "interior"
+              ? " masthead--compact flex items-center justify-between gap-4 py-5 text-start justify-items-stretch"
+              : ""
           }`}
           style={revealStyle(0)}
         >
-          {issueLine ? <p className="masthead__issue">{issueLine}</p> : null}
+          {issueLine ? (
+            <p className="masthead__issue text-sm">{issueLine}</p>
+          ) : null}
           {name}
           {variant === "home" ? (
             <nav
               className="masthead__nav"
               aria-label={m.public_main_navigation()}
             >
-              <ul>
+              <ul className="flex flex-wrap justify-center items-center gap-y-2 gap-x-6 mt-2 p-0 m-0 list-none">
                 <li>
-                  <a href="#index" aria-current="page">
+                  <a
+                    className="inline-flex items-center px-1 text-sm no-underline"
+                    href="#index"
+                    aria-current="page"
+                  >
                     {m.articles()}
                   </a>
                 </li>
                 <li>
-                  <a href="#how">{m.public_how_it_works_nav()}</a>
+                  <a
+                    className="inline-flex items-center px-1 text-sm no-underline"
+                    href="#how"
+                  >
+                    {m.public_how_it_works_nav()}
+                  </a>
                 </li>
                 <li>
-                  <a href="#console">{m.public_console_nav()}</a>
+                  <a
+                    className="inline-flex items-center px-1 text-sm no-underline"
+                    href="#console"
+                  >
+                    {m.public_console_nav()}
+                  </a>
                 </li>
               </ul>
             </nav>
           ) : null}
-          <div className="masthead__controls">
+          <div className="masthead__controls inline-flex items-center shrink-0">
             <button
-              className="theme-toggle"
+              className="theme-toggle inline-flex items-center justify-center p-0"
               type="button"
               aria-label={
                 dark ? m.public_switch_to_light() : m.public_switch_to_dark()
@@ -167,24 +189,26 @@ export function PublicSiteShell({
             </button>
           </div>
         </header>
-        <hr className="masthead__rule" aria-hidden="true" />
+        <hr className="masthead__rule mt-6" aria-hidden="true" />
 
         {children}
 
-        <footer className="colophon reveal" style={revealStyle(5)}>
-          <div className="colophon__row">
-            <p>
+        <footer
+          className="colophon reveal pt-8 pb-10 mt-auto"
+          style={revealStyle(5)}
+        >
+          <div className="colophon__row flex flex-wrap items-center justify-between gap-y-3 gap-x-6">
+            <p className="text-xs font-[family-name:var(--font-outlier)]">
               {m.public_powered_by()}{" "}
               <a href="https://github.com/MondaYJStudio/Briefly">Briefly</a>
             </p>
-            <label className="colophon__locale">
+            <label className="colophon__locale inline-flex items-center">
               <span className="sr-only">{m.interface_language()}</span>
               <select
+                className="text-xs"
                 value={locale}
                 aria-label={m.interface_language()}
-                onChange={(event) =>
-                  switchLocale(event.target.value as Locale)
-                }
+                onChange={(event) => switchLocale(event.target.value as Locale)}
               >
                 <option value="en">{m.switch_to_english()}</option>
                 <option value="zh-CN">{m.switch_to_zh_cn()}</option>

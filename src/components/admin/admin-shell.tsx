@@ -73,37 +73,43 @@ export function AdminShell({
 
   return (
     <div
-      className={`briefly-theme ${styles.shell}${editingArticle ? ` ${styles.editorShell}` : ""}`}
+      className={`briefly-theme text-sm ${styles.shell} grid${editingArticle ? ` ${styles.editorShell} grid h-dvh` : ""}`}
       data-theme={theme}
     >
       <a
-        className="skip-link"
+        className="skip-link py-2 px-4"
         href={editingArticle ? "#canvas" : "#admin-main"}
       >
         {m.skip_to_content()}
       </a>
 
       <aside
-        className={`${styles.sidebar}${mobileNavigationOpen ? ` ${styles.sidebarOpen}` : ""}`}
+        className={`${styles.sidebar} sticky top-0 flex h-dvh flex-col max-[860px]:top-0${mobileNavigationOpen ? ` ${styles.sidebarOpen}` : ""}`}
         aria-label={m.admin_navigation()}
       >
         <Link
           to="/admin/articles"
-          className={styles.sidebarBrand}
+          className={`${styles.sidebarBrand} flex w-full cursor-pointer items-center border-0 text-left text-base gap-2 py-4 px-5`}
           onClick={() => onMobileNavigationChange(false)}
         >
-          <span className={styles.logoMark} aria-hidden="true">
+          <span
+            className={`${styles.logoMark} grid shrink-0 place-items-center`}
+            aria-hidden="true"
+          >
             B
           </span>
           Briefly
         </Link>
 
-        <nav className={styles.nav} aria-label={m.content_sections()}>
+        <nav
+          className={`${styles.nav} flex flex-1 flex-col overflow-y-auto p-3`}
+          aria-label={m.content_sections()}
+        >
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.to}
               to={item.to}
-              className={styles.navItem}
+              className={`${styles.navItem} flex w-full cursor-pointer items-center border-0 text-left no-underline gap-3 py-2 px-3`}
               aria-current={
                 matchRoute({
                   to: item.to,
@@ -120,13 +126,9 @@ export function AdminShell({
           ))}
         </nav>
 
-        <div className={styles.sidebarFooter}>
+        <div className={`${styles.sidebarFooter} flex flex-col p-3 gap-1`}>
           {signOutError ? (
-            <Alert
-              status="danger"
-              role="alert"
-              className={styles.signOutError}
-            >
+            <Alert status="danger" role="alert" className="mt-0 mx-1 mb-2">
               <Alert.Content>
                 <Alert.Title>{m.sign_out_failed()}</Alert.Title>
                 <Alert.Description>
@@ -137,19 +139,27 @@ export function AdminShell({
           ) : null}
           <Dropdown.Root>
             <Dropdown.Trigger
-              className={styles.adminId}
+              className={`${styles.adminId} flex w-full min-w-0 cursor-pointer items-center border-0 text-left gap-3 py-2 px-3`}
               aria-label={m.settings_and_account_menu({ email })}
             >
-              <span className={styles.avatar} aria-hidden="true">
+              <span
+                className={`${styles.avatar} grid shrink-0 place-items-center text-xs`}
+                aria-hidden="true"
+              >
                 {initials}
               </span>
-              <span className={styles.meta}>
-                <span className={styles.metaLabel}>{m.signed_in_as()}</span>
-                <span className={styles.email}>{email}</span>
+              <span className={`${styles.meta} min-w-0`}>
+                <span className={`${styles.metaLabel} block text-xs`}>
+                  {m.signed_in_as()}
+                </span>
+                <span className={`${styles.email} block text-xs`}>{email}</span>
               </span>
               <AdminIcon name="chevron" size={14} className={styles.chevron} />
             </Dropdown.Trigger>
-            <Dropdown.Popover placement="top start" className={styles.identityMenu}>
+            <Dropdown.Popover
+              placement="top start"
+              className={styles.identityMenu}
+            >
               <Dropdown.Menu
                 aria-label={m.settings_and_account()}
                 disabledKeys={signOutPending ? ["sign-out"] : []}
@@ -161,24 +171,32 @@ export function AdminShell({
                 }}
               >
                 <Dropdown.Item id="settings" textValue={m.settings_menu()}>
-                  <span className={styles.menuRow}>
+                  <span
+                    className={`${styles.menuRow} flex w-full min-w-0 items-center`}
+                  >
                     <AdminIcon name="settings" size={16} />
-                    <span className={styles.menuLabel}>{m.settings_menu()}</span>
+                    <span className={`${styles.menuLabel} min-w-0`}>
+                      {m.settings_menu()}
+                    </span>
                     <AdminIcon
                       name="chevron-right"
                       size={14}
-                      className={styles.menuAffordance}
+                      className={`${styles.menuAffordance} shrink-0`}
                     />
                   </span>
                 </Dropdown.Item>
                 <Dropdown.Item id="account" textValue={m.account_menu()}>
-                  <span className={styles.menuRow}>
+                  <span
+                    className={`${styles.menuRow} flex w-full min-w-0 items-center`}
+                  >
                     <AdminIcon name="account" size={16} />
-                    <span className={styles.menuLabel}>{m.account_menu()}</span>
+                    <span className={`${styles.menuLabel} min-w-0`}>
+                      {m.account_menu()}
+                    </span>
                     <AdminIcon
                       name="chevron-right"
                       size={14}
-                      className={styles.menuAffordance}
+                      className={`${styles.menuAffordance} shrink-0`}
                     />
                   </span>
                 </Dropdown.Item>
@@ -187,25 +205,28 @@ export function AdminShell({
                   id="theme"
                   textValue={`${m.appearance()}, ${theme === "light" ? m.light_mode() : m.dark_mode()}`}
                 >
-                  <span className={styles.menuRow}>
+                  <span
+                    className={`${styles.menuRow} flex w-full min-w-0 items-center`}
+                  >
                     <AdminIcon
                       name={theme === "light" ? "sun" : "moon"}
                       size={16}
                     />
-                    <span className={styles.menuLabel}>{m.appearance()}</span>
-                    <span className={styles.menuValue}>
+                    <span className={`${styles.menuLabel} min-w-0`}>
+                      {m.appearance()}
+                    </span>
+                    <span className={`${styles.menuValue} text-xs shrink-0`}>
                       {theme === "light" ? m.light_mode() : m.dark_mode()}
                     </span>
                   </span>
                 </Dropdown.Item>
                 <Dropdown.SubmenuTrigger>
-                  <Dropdown.Item
-                    id="locale"
-                    textValue={m.interface_language()}
-                  >
-                    <span className={styles.menuRow}>
+                  <Dropdown.Item id="locale" textValue={m.interface_language()}>
+                    <span
+                      className={`${styles.menuRow} flex w-full min-w-0 items-center`}
+                    >
                       <AdminIcon name="globe" size={16} />
-                      <span className={styles.menuLabel}>
+                      <span className={`${styles.menuLabel} min-w-0`}>
                         {m.interface_language()}
                       </span>
                     </span>
@@ -224,17 +245,11 @@ export function AdminShell({
                         }
                       }}
                     >
-                      <Dropdown.Item
-                        id="en"
-                        textValue={m.switch_to_english()}
-                      >
+                      <Dropdown.Item id="en" textValue={m.switch_to_english()}>
                         <Dropdown.ItemIndicator />
                         {m.switch_to_english()}
                       </Dropdown.Item>
-                      <Dropdown.Item
-                        id="zh-CN"
-                        textValue={m.switch_to_zh_cn()}
-                      >
+                      <Dropdown.Item id="zh-CN" textValue={m.switch_to_zh_cn()}>
                         <Dropdown.ItemIndicator />
                         {m.switch_to_zh_cn()}
                       </Dropdown.Item>
@@ -256,15 +271,17 @@ export function AdminShell({
       </aside>
 
       <button
-        className={`${styles.scrim}${mobileNavigationOpen ? ` ${styles.scrimOpen}` : ""}`}
+        className={`${styles.scrim} border-0 p-0${mobileNavigationOpen ? ` ${styles.scrimOpen}` : ""}`}
         type="button"
         aria-label={m.close_navigation()}
         tabIndex={mobileNavigationOpen ? 0 : -1}
         onClick={() => onMobileNavigationChange(false)}
       />
 
-      <div className={styles.main}>
-        <div className={styles.mobileBar}>
+      <div className={`${styles.main} flex min-w-0 flex-col`}>
+        <div
+          className={`${styles.mobileBar} hidden sticky top-0 items-center max-[860px]:flex gap-3 py-2 px-3`}
+        >
           <button
             className={`${styles.navItem} ${styles.mobileNavButton}`}
             type="button"

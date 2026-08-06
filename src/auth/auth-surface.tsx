@@ -68,19 +68,25 @@ export function AuthenticationSurface({
   }
 
   return (
-    <main className={`briefly-theme ${styles.frame}`} data-theme={theme}>
-      <div className={styles.panel}>
-        <div className={styles.chrome}>
-          <div className={styles.brand}>
-            <span aria-hidden="true" className={styles.mark}>
+    <main
+      className={`briefly-theme ${styles.frame} flex flex-col items-center justify-center`}
+      data-theme={theme}
+    >
+      <div className={`${styles.panel} w-full`}>
+        <div className={`${styles.chrome} flex items-center justify-between`}>
+          <div className={`${styles.brand} flex min-w-0 items-center`}>
+            <span
+              aria-hidden="true"
+              className={`${styles.mark} grid shrink-0 place-items-center`}
+            >
               B
             </span>
             <span>Briefly</span>
           </div>
-          <div className={styles.controls}>
+          <div className={`${styles.controls} flex items-center`}>
             <button
               type="button"
-              className={styles.iconButton}
+              className={`${styles.iconButton} inline-flex items-center justify-center cursor-pointer`}
               aria-label={m.toggle_theme()}
               aria-pressed={theme === "dark"}
               onClick={toggleTheme}
@@ -89,7 +95,7 @@ export function AuthenticationSurface({
             </button>
             <Dropdown.Root>
               <Dropdown.Trigger
-                className={styles.iconButton}
+                className={`${styles.iconButton} inline-flex items-center justify-center cursor-pointer`}
                 aria-label={m.interface_language()}
               >
                 <AdminIcon name="globe" size={16} />
@@ -124,10 +130,10 @@ export function AuthenticationSurface({
           </div>
         </div>
 
-        <div className={styles.body}>
+        <div className={`${styles.body} flex flex-col`}>
           {showHeader ? (
             <header>
-              <h1 className={styles.title}>{title}</h1>
+              <h1 className={`${styles.title} m-0`}>{title}</h1>
               {showDescription ? (
                 <p className={styles.description}>{description}</p>
               ) : null}
@@ -138,7 +144,7 @@ export function AuthenticationSurface({
       </div>
 
       {footerLink ? (
-        <p className={styles.footer}>
+        <p className={`${styles.footer} text-center`}>
           Briefly ·{" "}
           <a className={`${styles.link} font-medium`} href={footerLink.href}>
             {footerLink.label}

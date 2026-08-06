@@ -54,7 +54,7 @@ const ArticleEditor = lazy(async () => {
 
 function ArticleEditorFallback() {
   return (
-    <div className={`${styles.card} ${styles.cardPad}`} role="status">
+    <div className={`${styles.card} p-6`} role="status">
       {m.loading_text_rich_editor()}
     </div>
   );
@@ -121,9 +121,11 @@ export function EditorView({
   }
 
   return (
-    <main className={styles.editorMain} id="admin-main">
+    <main className={`${styles.editorMain} flex flex-col`} id="admin-main">
       {/* ===== Top bar ===== */}
-      <header className={styles.editorTopbar}>
+      <header
+        className={`${styles.editorTopbar} flex items-center gap-3 py-0 px-4`}
+      >
         <Button
           isIconOnly
           size="sm"
@@ -135,8 +137,8 @@ export function EditorView({
         >
           <AdminIcon name="back" size={18} />
         </Button>
-        <div className={styles.titleWrap}>
-          <span className={styles.docTitle}>
+        <div className={`${styles.titleWrap} min-w-0 flex items-center gap-3`}>
+          <span className={`${styles.docTitle} text-sm`}>
             {selected.draft.title || m.untitled_article()}
           </span>
           <span className={styles.hideM}>
@@ -184,7 +186,7 @@ export function EditorView({
         <Dropdown.Root>
           <Dropdown.Trigger
             aria-label={m.more_article_actions()}
-            className={styles.moreTrigger}
+            className={`${styles.moreTrigger} inline-flex items-center justify-center border-0 cursor-pointer`}
           >
             <AdminIcon name="more" size={18} />
           </Dropdown.Trigger>
@@ -205,10 +207,7 @@ export function EditorView({
               >
                 {m.save_now()}
               </Dropdown.Item>
-              <Dropdown.Item
-                id="preview"
-                textValue={m.preview_saved_draft()}
-              >
+              <Dropdown.Item id="preview" textValue={m.preview_saved_draft()}>
                 {m.preview_saved_draft()}
               </Dropdown.Item>
               <Separator />
@@ -246,9 +245,11 @@ export function EditorView({
       </header>
 
       {/* ===== Body: canvas + rail ===== */}
-      <div className={styles.editorBody}>
-        <div className={styles.editorScroll} id="canvas">
-          <div className={styles.editorCanvas}>
+      <div className={`${styles.editorBody} grid`}>
+        <div className={`overflow-y-auto min-w-0`} id="canvas">
+          <div
+            className={`${styles.editorCanvas} mx-auto pt-8 px-8 pb-16 max-[860px]:pt-5 max-[860px]:px-4 max-[860px]:pb-16`}
+          >
             <WorkspaceAlerts workspace={workspace} />
             <Form
               onSubmit={(event) => {
@@ -259,18 +260,18 @@ export function EditorView({
               <fieldset
                 aria-busy={editorLocked}
                 disabled={editorLocked}
-                className={styles.fieldsetReset}
+                className={`border-0 min-w-0 m-0 p-0`}
               >
                 {workspace.restoreState === "restoring" ? (
-                  <p className={styles.pendingState} role="status">
+                  <p className={`${styles.pendingState} text-xs`} role="status">
                     {m.restoring_publication_paused()}
                   </p>
                 ) : workspace.trashActionState === "trashing" ? (
-                  <p className={styles.pendingState} role="status">
+                  <p className={`${styles.pendingState} text-xs`} role="status">
                     {m.moving_to_trash_paused()}
                   </p>
                 ) : workspace.trashActionState === "restoring" ? (
-                  <p className={styles.pendingState} role="status">
+                  <p className={`${styles.pendingState} text-xs`} role="status">
                     {m.restoring_from_trash_paused()}
                   </p>
                 ) : null}
@@ -492,12 +493,12 @@ function EditorSaveState({
   }
   return (
     <span
-      className={`${styles.saveState}${tone === "is-error" ? ` ${styles.isError}` : tone === "is-warn" ? ` ${styles.isWarn}` : tone === "is-ok" ? ` ${styles.isOk}` : ""}`}
+      className={`${styles.saveState} inline-flex items-center text-xs gap-2${tone === "is-error" ? ` ${styles.isError}` : tone === "is-warn" ? ` ${styles.isWarn}` : tone === "is-ok" ? ` ${styles.isOk}` : ""}`}
       role="status"
     >
       {icon}
-      <span className={styles.saveStateFull}>{text}</span>
-      <span className={styles.saveStateCompact}>{compactText}</span>
+      <span className="max-[480px]:hidden">{text}</span>
+      <span className="hidden max-[480px]:inline">{compactText}</span>
     </span>
   );
 }
@@ -565,9 +566,9 @@ function EditorRail({
       className={`${styles.rail}${railOpen ? ` ${styles.railOpen}` : ""}`}
       aria-label={m.article_settings()}
     >
-      <div className={`${styles.railTabs} ${styles.rowBetween}`}>
+      <div className={`pt-3 px-4 pb-0 flex items-center justify-between gap-3`}>
         <div
-          className={styles.tabsLineList}
+          className={`${styles.tabsLineList} flex gap-1`}
           role="tablist"
           aria-label={m.rail_settings_sections()}
         >
@@ -579,7 +580,7 @@ function EditorRail({
           ).map(([id, label]) => (
             <button
               key={id}
-              className={styles.tabLine}
+              className={`${styles.tabLine} inline-flex items-center border-0 bg-transparent text-sm cursor-pointer py-2 px-3 gap-2`}
               type="button"
               role="tab"
               aria-selected={tab === id}
@@ -587,7 +588,7 @@ function EditorRail({
             >
               {label}
               {id === "history" && workspace.publicationHistory.length > 0 ? (
-                <span className={styles.tabCount}>
+                <span className={`${styles.tabCount} place-items-center`}>
                   {workspace.publicationHistory.length}
                 </span>
               ) : null}
@@ -607,10 +608,12 @@ function EditorRail({
       {tab === "settings" ? (
         <div role="tabpanel" aria-label={m.rail_tab_settings()}>
           {/* ---- Publish ---- */}
-          <section className={styles.railSection}>
-            <h3>{m.rail_publish_heading()}</h3>
-            <div className={styles.fieldStack}>
-              <div className={styles.rowGap2}>
+          <section className={`${styles.railSection} py-5 px-4`}>
+            <h3 className={`${styles.railSectionHeading} text-xs mb-4`}>
+              {m.rail_publish_heading()}
+            </h3>
+            <div className={`flex flex-col gap-5`}>
+              <div className={`flex items-center gap-2`}>
                 {changesPending ? (
                   <StatusChip variant="warning" icon="alert">
                     {m.lifecycle_changes_pending()}
@@ -628,7 +631,7 @@ function EditorRail({
                     {m.lifecycle_draft()}
                   </StatusChip>
                 )}
-                <span className="small muted">
+                <span className="text-xs muted">
                   {changesPending
                     ? m.rail_draft_ahead()
                     : checkingPublicationState
@@ -638,7 +641,9 @@ function EditorRail({
                         : m.rail_not_public_yet()}
                 </span>
               </div>
-              <dl className={styles.pubDetail}>
+              <dl
+                className={`${styles.pubDetail} grid gap-y-2 gap-x-3 text-xs`}
+              >
                 <dt>{m.rail_draft_label()}</dt>
                 <dd>
                   {serverConfirmed
@@ -692,7 +697,7 @@ function EditorRail({
                   ? m.republish_saved_draft()
                   : m.publish_saved_draft()}
               </Button>
-              <p className={`small faint ${styles.previewMeta}`}>
+              <p className={`text-xs faint ${styles.previewMeta}`}>
                 {m.rail_publishing_footnote()}
               </p>
             </div>
@@ -700,17 +705,17 @@ function EditorRail({
 
           {/* ---- Basic / Advanced switch ---- */}
           <section
-            className={`${styles.railSection} ${styles.railSectionFlush}`}
+            className={`${styles.railSection} ${styles.railSectionFlush} py-5 px-4`}
           >
             <div
-              className={styles.subNav}
+              className={`${styles.subNav} inline-flex`}
               role="tablist"
               aria-label={m.rail_subnav_label()}
             >
               <button
                 type="button"
                 role="tab"
-                className={styles.subNavButton}
+                className={`${styles.subNavButton} inline-flex flex-1 items-center justify-center border-0 bg-transparent text-sm cursor-pointer px-3`}
                 aria-selected={subTab === "basic"}
                 onClick={() => setSubTab("basic")}
               >
@@ -719,7 +724,7 @@ function EditorRail({
               <button
                 type="button"
                 role="tab"
-                className={styles.subNavButton}
+                className={`${styles.subNavButton} inline-flex flex-1 items-center justify-center border-0 bg-transparent text-sm cursor-pointer px-3`}
                 aria-selected={subTab === "advanced"}
                 onClick={() => setSubTab("advanced")}
               >
@@ -730,11 +735,11 @@ function EditorRail({
 
           {subTab === "basic" ? (
             <section
-              className={styles.railSection}
+              className={`${styles.railSection} py-5 px-4`}
               role="tabpanel"
               aria-label={m.rail_tab_basic()}
             >
-              <div className={styles.fieldStack}>
+              <div className={`flex flex-col gap-5`}>
                 <SettingsField
                   label={m.title_label()}
                   htmlFor="articleTitleRail"
@@ -779,11 +784,11 @@ function EditorRail({
             </section>
           ) : (
             <section
-              className={styles.railSection}
+              className={`${styles.railSection} py-5 px-4`}
               role="tabpanel"
               aria-label={m.rail_tab_advanced()}
             >
-              <div className={styles.fieldStack}>
+              <div className={`flex flex-col gap-5`}>
                 <SettingsField
                   label={m.advanced_slug_label()}
                   htmlFor="articleSlug"
@@ -797,7 +802,7 @@ function EditorRail({
                     </>
                   }
                 >
-                  <div className={styles.slugRow}>
+                  <div className={`${styles.slugRow} flex gap-2 items-start`}>
                     <Input
                       fullWidth
                       id="articleSlug"
@@ -852,7 +857,9 @@ function EditorRail({
                   />
                 </SettingsField>
                 {siteSettings ? (
-                  <p className={styles.inheritNote}>
+                  <p
+                    className={`${styles.inheritNote} flex items-center justify-between gap-2 text-xs py-2 px-3 mt-2`}
+                  >
                     {m.inheriting_value({
                       value: siteSettings.defaultByline.name,
                     })}
@@ -897,7 +904,7 @@ function EditorRail({
                       })
                     }
                   >
-                    <Select.Trigger className="briefly-language-trigger">
+                    <Select.Trigger className="briefly-language-trigger flex items-center">
                       <Select.Value />
                       <Select.Indicator />
                     </Select.Trigger>
@@ -913,11 +920,11 @@ function EditorRail({
                           <ListBox.Item
                             key={language.id}
                             id={language.id}
-                            className="briefly-language-option"
+                            className="briefly-language-option flex items-center gap-4"
                             textValue={`${language.label} (${language.detail})`}
                           >
                             <span>{language.label}</span>
-                            <span className="briefly-select-detail mono">
+                            <span className="briefly-select-detail text-xs mono">
                               {language.detail}
                             </span>
                           </ListBox.Item>
@@ -927,7 +934,9 @@ function EditorRail({
                   </Select>
                 </SettingsField>
                 {siteSettings ? (
-                  <p className={styles.inheritNote}>
+                  <p
+                    className={`${styles.inheritNote} flex items-center justify-between gap-2 text-xs py-2 px-3 mt-2`}
+                  >
                     {m.inheriting_value({
                       value: siteSettings.defaultLanguage,
                     })}
@@ -939,19 +948,21 @@ function EditorRail({
 
           {/* ---- Danger zone ---- */}
           <section
-            className={`${styles.railSection} ${styles.railSectionFlush}`}
+            className={`${styles.railSection} ${styles.railSectionFlush} py-5 px-4`}
           >
             <h3>{m.danger_zone_title()}</h3>
             <div className={styles.dangerZone}>
-              <div className={styles.dangerZoneHead}>
+              <div className={`${styles.dangerZoneHead} text-sm py-3 px-4`}>
                 {m.danger_zone_caution()}
               </div>
-              <div className={styles.dangerRow}>
-                <p className={styles.dangerCopy}>
+              <div
+                className={`flex flex-wrap items-center justify-between gap-3 py-3 px-4`}
+              >
+                <p className={`${styles.dangerCopy} text-xs`}>
                   <strong>{m.unpublish()}</strong>
                   {m.danger_unpublish_description()}
                   {unpublishDisabledReason ? (
-                    <span className={styles.dangerReason}>
+                    <span className={`${styles.dangerReason} block`}>
                       {unpublishDisabledReason}
                     </span>
                   ) : null}
@@ -967,12 +978,14 @@ function EditorRail({
                   {m.unpublish()}
                 </Button>
               </div>
-              <div className={styles.dangerRow}>
-                <p className={styles.dangerCopy}>
+              <div
+                className={`flex flex-wrap items-center justify-between gap-3 py-3 px-4`}
+              >
+                <p className={`${styles.dangerCopy} text-xs`}>
                   <strong>{m.move_to_trash()}</strong>
                   {m.danger_trash_description()}
                   {trashDisabledReason ? (
-                    <span className={styles.dangerReason}>
+                    <span className={`${styles.dangerReason} block`}>
                       {trashDisabledReason}
                     </span>
                   ) : null}
@@ -1025,9 +1038,14 @@ function TagsField({
       htmlFor="articleTagsRail"
       optional={m.optional()}
     >
-      <div className={styles.tagInput}>
+      <div
+        className={`${styles.tagInput} flex flex-wrap items-center gap-2 p-2`}
+      >
         {tags.map((tag) => (
-          <span key={tag} className={styles.tagChip}>
+          <span
+            key={tag}
+            className={`${styles.tagChip} inline-flex items-center text-xs gap-1`}
+          >
             {tag}
             <button
               type="button"
@@ -1042,7 +1060,7 @@ function TagsField({
           </span>
         ))}
         <input
-          className={styles.tagInputField}
+          className={`${styles.tagInputField} border-0`}
           id="articleTagsRail"
           type="text"
           disabled={disabled}
@@ -1073,7 +1091,7 @@ function TagsField({
           }}
         />
       </div>
-      <p className={`small faint ${styles.previewMeta}`}>{m.tags_hint()}</p>
+      <p className={`text-xs faint ${styles.previewMeta}`}>{m.tags_hint()}</p>
     </SettingsField>
   );
 }
@@ -1094,9 +1112,12 @@ function CoverField({
 
   return (
     <div>
-      <h4 className={styles.subheading}>{m.cover_label()}</h4>
+      <h4 className={`${styles.subheading} text-sm mb-2`}>{m.cover_label()}</h4>
       {issues.length > 0 ? (
-        <ul className={styles.issueList} role="alert">
+        <ul
+          className={`${styles.issueList} list-disc text-xs pl-5 mt-0 mx-0 mb-2`}
+          role="alert"
+        >
           {issues.map((issue) => (
             <li key={issue}>{issue}</li>
           ))}
@@ -1105,7 +1126,7 @@ function CoverField({
       {cover ? (
         <div className={styles.coverBox}>
           <img src={`/media/private/${cover.assetId}`} alt={cover.alt} />
-          <div className={styles.coverMeta}>
+          <div className={`${styles.coverMeta} flex flex-col gap-3 p-3`}>
             <SettingsField
               label={m.cover_alternative_text()}
               htmlFor="articleCoverAltRail"
@@ -1120,7 +1141,7 @@ function CoverField({
                 }
               />
             </SettingsField>
-            <div className={styles.coverActions}>
+            <div className={`flex flex-wrap gap-2`}>
               <Button
                 size="sm"
                 type="button"
@@ -1143,7 +1164,9 @@ function CoverField({
           </div>
         </div>
       ) : (
-        <div className={styles.coverDrop}>
+        <div
+          className={`${styles.coverDrop} flex flex-col items-center text-center text-xs gap-3 p-6`}
+        >
           <p>{m.no_cover_yet_rail()}</p>
           <Button
             size="sm"
@@ -1258,7 +1281,7 @@ function CoverPickerDialog({
           className="editor-tool-modal editor-tool-modal--wide"
         >
           <Modal.Header>
-            <div className="briefly-drawer-head">
+            <div className="briefly-drawer-head flex items-center justify-between gap-3 w-full">
               <Modal.Heading>{m.optional_cover()}</Modal.Heading>
               <Modal.CloseTrigger aria-label={m.close_insert_image_dialog()} />
             </div>
@@ -1290,11 +1313,11 @@ function CoverPickerDialog({
                 />
               </SettingsField>
               {statusMessage ? (
-                <p className="small muted" role="status" aria-live="polite">
+                <p className="text-xs muted" role="status" aria-live="polite">
                   {statusMessage}
                 </p>
               ) : null}
-              <div className="editor-tool-actions">
+              <div className="editor-tool-actions flex justify-end flex-wrap gap-2 max-[860px]:flex-col-reverse max-[860px]:[&>*]:w-full">
                 <Button type="button" onPress={confirm}>
                   {m.use_selected_asset_as_cover()}
                 </Button>
@@ -1324,12 +1347,14 @@ function HistoryPanel({
 
   return (
     <div role="tabpanel" aria-label={m.rail_tab_history()}>
-      <section className={`${styles.railSection} ${styles.railSectionFlush}`}>
+      <section
+        className={`${styles.railSection} ${styles.railSectionFlush} py-5 px-4`}
+      >
         <h3>{m.publication_history()}</h3>
-        <div className={styles.fieldStack}>
+        <div className={`flex flex-col gap-5`}>
           {historyHasUnpublishedChanges && historyState === "ready" ? (
             <div
-              className={`${styles.alert} ${styles.alertWarning}`}
+              className={`${styles.alert} flex items-start text-sm gap-3 py-3 px-4 ${styles.alertWarning}`}
               role="status"
             >
               <AdminIcon name="alert" strokeWidth={2.2} />
@@ -1363,8 +1388,10 @@ function HistoryPanel({
               </Alert.Content>
             </Alert>
           ) : historyState === "ready" && publicationHistory.length === 0 ? (
-            <div className={styles.empty}>
-              <div className={styles.emptyIcon}>
+            <div className={`flex flex-col items-center text-center py-8 px-4`}>
+              <div
+                className={`${styles.emptyIcon} grid place-items-center mb-4`}
+              >
                 <AdminIcon name="history" size={24} />
               </div>
               <h3>{m.no_publications_yet()}</h3>
@@ -1420,30 +1447,32 @@ function HistoryPanel({
           {publicationHistory.length > 0 ? (
             <ol
               aria-label={m.retained_publications()}
-              className={styles.issueListReset}
+              className={`${styles.issueListReset} m-0 p-0`}
             >
               {publicationHistory.map((publication) => (
                 <li
                   key={publication.id}
-                  className={`${styles.pubItem}${publication.isCurrent ? ` ${styles.pubItemLive}` : ""}`}
+                  className={`${styles.pubItem} flex gap-3 py-3${publication.isCurrent ? ` ${styles.pubItemLive}` : ""}`}
                 >
-                  <span className={styles.pubNum}>
+                  <span
+                    className={`${styles.pubNum} grid place-items-center text-xs`}
+                  >
                     #{publication.publicationNumber}
                   </span>
-                  <div className={styles.grow}>
-                    <div className={styles.rowGap2}>
-                      <strong className="small">{publication.title}</strong>
+                  <div className={`${styles.grow} min-w-0`}>
+                    <div className={`flex items-center gap-2`}>
+                      <strong className="text-sm">{publication.title}</strong>
                       {publication.isCurrent ? (
                         <StatusChip variant="success" dot>
                           {m.live()}
                         </StatusChip>
                       ) : null}
                     </div>
-                    <p className="small faint mono">/{publication.slug}</p>
-                    <p className={`small faint ${styles.previewMeta}`}>
+                    <p className="text-xs faint mono">/{publication.slug}</p>
+                    <p className={`text-xs faint ${styles.previewMeta}`}>
                       {new Date(publication.publishedAt).toLocaleString()}
                     </p>
-                    <div className={`${styles.rowGap2} ${styles.actionTop}`}>
+                    <div className={`mt-2`}>
                       <Button
                         size="sm"
                         type="button"
@@ -1466,7 +1495,7 @@ function HistoryPanel({
               ))}
             </ol>
           ) : null}
-          <p className={`small faint ${styles.previewMeta}`}>
+          <p className={`text-xs faint ${styles.previewMeta}`}>
             {m.restore_replaces_draft_footnote()}
           </p>
         </div>
@@ -1539,23 +1568,23 @@ export function PreviewDrawer({
       >
         <Drawer.Dialog aria-label={m.saved_draft_preview()}>
           <Drawer.Header>
-            <div className="briefly-drawer-head">
+            <div className="briefly-drawer-head flex items-center justify-between gap-3 w-full">
               <div>
                 <Drawer.Heading>
                   <strong>{m.draft_preview()}</strong>
                 </Drawer.Heading>
-                <p className={`small faint ${styles.previewMeta}`}>
+                <p className={`text-xs faint ${styles.previewMeta}`}>
                   {m.draft_preview_description()}
                 </p>
               </div>
               <Drawer.CloseTrigger aria-label={m.close_preview()} />
             </div>
           </Drawer.Header>
-          <Drawer.Body className={styles.previewBody}>
+          <Drawer.Body className={`p-5`}>
             {previewState === "loading" || previewState === "idle" ? (
-              <div className={styles.row} role="status">
+              <div className={`flex items-center gap-3`} role="status">
                 <Spinner aria-label={m.loading_saved_draft_preview()} />
-                <span className="small muted">
+                <span className="text-xs muted">
                   {m.rendering_saved_draft_preview()}
                 </span>
               </div>
@@ -1589,32 +1618,30 @@ export function PreviewDrawer({
                   <Alert.Title>
                     {m.unable_load_saved_draft_preview()}
                   </Alert.Title>
-                  <Alert.Description>
-                    {m.please_try_again()}
-                  </Alert.Description>
+                  <Alert.Description>{m.please_try_again()}</Alert.Description>
                 </Alert.Content>
               </Alert>
             ) : preview ? (
-              <div className={styles.stack}>
-                <p className="small muted" role="status">
+              <div className={`flex flex-col gap-4`}>
+                <p className="text-xs muted" role="status">
                   {m.showing_saved_draft_preview({
                     draftVersion: preview.draftVersion,
                     rendererVersion: preview.rendererVersion,
                   })}
                 </p>
                 <article
-                  className={`doc ${styles.card} ${styles.cardPad}`}
+                  className={`doc ${styles.card} p-6`}
                   lang={preview.metadata.language}
                   aria-labelledby="saved-draft-preview-title"
                 >
                   <header>
                     <h2
                       id="saved-draft-preview-title"
-                      className={styles.previewTitle}
+                      className={`${styles.previewTitle} m-0`}
                     >
                       {preview.metadata.title}
                     </h2>
-                    <p className="small muted">
+                    <p className="text-xs muted">
                       {m.byline_by({ name: preview.metadata.byline.name })} ·{" "}
                       {preview.metadata.language}
                     </p>

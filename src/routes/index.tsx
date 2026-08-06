@@ -19,8 +19,7 @@ export const Route = createFileRoute("/")({
     // an opaque Response; at runtime the JSON body is already parsed.
     const siteSettings = site.data as unknown as SiteSettings | undefined;
     const page = articles.data as unknown as
-      | { items: PublicArticleListItem[] }
-      | undefined;
+      { items: PublicArticleListItem[] } | undefined;
     if (site.error || !siteSettings) {
       throw new Error("Site Settings unavailable");
     }
@@ -75,7 +74,7 @@ function Home() {
       <main>
         {site.siteDescription ? (
           <section
-            className="intro reveal"
+            className="intro reveal pt-12 pb-10 max-[860px]:pt-10"
             style={revealStyle(1)}
             aria-label={m.public_about_site()}
           >
@@ -84,43 +83,47 @@ function Home() {
         ) : null}
 
         <section
-          className="index reveal"
+          className="index reveal pb-20"
           style={revealStyle(2)}
           id="index"
           aria-labelledby="index-h"
         >
-          <div className="section-head">
-            <h2 id="index-h">{m.articles()}</h2>
+          <div className="section-head pb-5">
+            <h2 className="text-2xl tracking-tight" id="index-h">
+              {m.articles()}
+            </h2>
           </div>
           {articles.length === 0 ? (
-            <p className="index__empty">{m.public_no_articles()}</p>
+            <p className="index__empty py-8 text-base">
+              {m.public_no_articles()}
+            </p>
           ) : (
-            <ol className="article-list" reversed>
+            <ol className="article-list list-none m-0 p-0" reversed>
               {articles.map((article) => (
                 <li key={article.id}>
                   <Link
-                    className="article-row"
+                    className="article-row grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_auto] items-baseline gap-y-3 gap-x-6 py-5 px-2 -mx-2 no-underline max-[860px]:grid-cols-1 max-[860px]:gap-2"
                     to="/articles/$slug"
                     params={{ slug: article.slug }}
                   >
                     <span
-                      className="article-row__date"
+                      className="article-row__date text-xs max-[860px]:hidden"
                       aria-label={m.public_publication_date()}
                     >
                       {formatPublicDate(article.publishedAt)}
                     </span>
-                    <span className="article-row__body">
+                    <span className="article-row__body grid gap-1">
                       <span
-                        className="article-row__meta-date"
+                        className="article-row__meta-date hidden max-[860px]:inline text-xs"
                         aria-hidden="true"
                       >
                         {formatPublicDate(article.publishedAt)} ·{" "}
                       </span>
-                      <span className="article-row__title">
+                      <span className="article-row__title text-xl tracking-tight">
                         {article.title}
                       </span>
                       {article.summary ? (
-                        <span className="article-row__summary">
+                        <span className="article-row__summary text-sm">
                           {article.summary}
                         </span>
                       ) : null}
@@ -133,43 +136,88 @@ function Home() {
         </section>
 
         <section
-          className="how reveal"
+          className="how reveal pb-20"
           style={revealStyle(3)}
           id="how"
           aria-labelledby="how-h"
         >
-          <div className="section-head">
-            <h2 id="how-h">{m.public_how_it_works()}</h2>
+          <div className="section-head pb-5">
+            <h2 className="text-2xl tracking-tight" id="how-h">
+              {m.public_how_it_works()}
+            </h2>
           </div>
-          <p className="how__note">{m.public_how_it_works_note()}</p>
+          <p className="how__note pb-6 text-base">
+            {m.public_how_it_works_note()}
+          </p>
           <table className="spec">
             <tbody>
               <tr>
-                <th scope="row">{m.public_spec_draft()}</th>
-                <td>{m.public_spec_draft_body()}</td>
-                <td className="spec__foot">{m.public_spec_draft_foot()}</td>
+                <th
+                  scope="row"
+                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[860px]:w-36 max-[640px]:w-auto max-[640px]:pb-1 max-[640px]:pe-2"
+                >
+                  {m.public_spec_draft()}
+                </th>
+                <td className="py-4 pe-6 text-base leading-snug">
+                  {m.public_spec_draft_body()}
+                </td>
+                <td className="spec__foot py-4 pe-6 text-sm max-[860px]:hidden w-64">
+                  {m.public_spec_draft_foot()}
+                </td>
               </tr>
               <tr>
-                <th scope="row">{m.public_spec_publication()}</th>
-                <td>{m.public_spec_publication_body()}</td>
-                <td className="spec__foot">
+                <th
+                  scope="row"
+                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[860px]:w-36 max-[640px]:w-auto max-[640px]:pb-1 max-[640px]:pe-2"
+                >
+                  {m.public_spec_publication()}
+                </th>
+                <td className="py-4 pe-6 text-base leading-snug">
+                  {m.public_spec_publication_body()}
+                </td>
+                <td className="spec__foot py-4 pe-6 text-sm max-[860px]:hidden w-64">
                   {m.public_spec_publication_foot()}
                 </td>
               </tr>
               <tr>
-                <th scope="row">{m.public_spec_history()}</th>
-                <td>{m.public_spec_history_body()}</td>
-                <td className="spec__foot">{m.public_spec_history_foot()}</td>
+                <th
+                  scope="row"
+                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[860px]:w-36 max-[640px]:w-auto max-[640px]:pb-1 max-[640px]:pe-2"
+                >
+                  {m.public_spec_history()}
+                </th>
+                <td className="py-4 pe-6 text-base leading-snug">
+                  {m.public_spec_history_body()}
+                </td>
+                <td className="spec__foot py-4 pe-6 text-sm max-[860px]:hidden w-64">
+                  {m.public_spec_history_foot()}
+                </td>
               </tr>
               <tr>
-                <th scope="row">{m.public_spec_media()}</th>
-                <td>{m.public_spec_media_body()}</td>
-                <td className="spec__foot">{m.public_spec_media_foot()}</td>
+                <th
+                  scope="row"
+                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[860px]:w-36 max-[640px]:w-auto max-[640px]:pb-1 max-[640px]:pe-2"
+                >
+                  {m.public_spec_media()}
+                </th>
+                <td className="py-4 pe-6 text-base leading-snug">
+                  {m.public_spec_media_body()}
+                </td>
+                <td className="spec__foot py-4 pe-6 text-sm max-[860px]:hidden w-64">
+                  {m.public_spec_media_foot()}
+                </td>
               </tr>
               <tr>
-                <th scope="row">{m.public_spec_deployment()}</th>
-                <td>{m.public_spec_deployment_body()}</td>
-                <td className="spec__foot">
+                <th
+                  scope="row"
+                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[860px]:w-36 max-[640px]:w-auto max-[640px]:pb-1 max-[640px]:pe-2"
+                >
+                  {m.public_spec_deployment()}
+                </th>
+                <td className="py-4 pe-6 text-base leading-snug">
+                  {m.public_spec_deployment_body()}
+                </td>
+                <td className="spec__foot py-4 pe-6 text-sm max-[860px]:hidden w-64">
                   {m.public_spec_deployment_foot()}
                 </td>
               </tr>
@@ -178,16 +226,21 @@ function Home() {
         </section>
 
         <section
-          className="console reveal"
+          className="console reveal pt-4 pb-24"
           style={revealStyle(4)}
           id="console"
           aria-labelledby="console-h"
         >
-          <div className="section-head">
-            <h2 id="console-h">{m.public_publishing_console()}</h2>
+          <div className="section-head pb-5">
+            <h2 className="text-2xl tracking-tight" id="console-h">
+              {m.public_publishing_console()}
+            </h2>
           </div>
-          <p>{m.public_publishing_console_body()}</p>
-          <a className="console-link" href="/admin">
+          <p className="text-base">{m.public_publishing_console_body()}</p>
+          <a
+            className="console-link inline-flex items-center gap-2 mt-5 text-lg underline underline-offset-4"
+            href="/admin"
+          >
             {m.public_enter_console()}
             <svg
               className="arrow"

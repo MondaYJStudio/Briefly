@@ -1,66 +1,29 @@
-@reference "tailwindcss";
-
-.head {
-  @apply flex w-full items-center justify-between;
-  gap: var(--space-3);
-}
-
 .description {
   margin-top: 2px;
-}
-
-.body {
-  padding: var(--space-5);
-}
-
-.stack {
-  @apply flex flex-col;
-  gap: var(--space-4);
-}
-
-.fieldStack {
-  @apply flex flex-col;
-  gap: var(--space-5);
 }
 
 .card {
   background: var(--content1);
   border: 1px solid var(--border);
   border-radius: var(--radius-l);
-  padding: var(--space-5);
 }
 
 .sectionTitle {
-  margin: 0 0 var(--space-5);
-  font-size: var(--text-medium);
   font-weight: 700;
 }
 
-.sectionDescription {
-  margin: calc(var(--space-3) * -1) 0 var(--space-5);
-}
-
 .note {
-  @apply flex items-start;
-  gap: var(--space-3);
-  padding: var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
   background: var(--content2);
   color: var(--foreground-muted);
-  font-size: var(--text-small);
 }
 
 .actions {
-  @apply flex flex-wrap items-center justify-end;
-  gap: var(--space-3);
   min-height: 2.5rem;
 }
 
 .saveState {
-  @apply inline-flex items-center;
-  gap: var(--space-2);
-  font-size: var(--text-small);
   color: var(--foreground-muted);
 }
 
@@ -96,10 +59,6 @@
   height: 2.5rem;
 }
 
-.mt4 {
-  margin-top: var(--space-4);
-}
-
 .formDisabled {
   opacity: 0.6;
   pointer-events: none;
@@ -107,18 +66,11 @@
 
 .languageTrigger {
   min-height: 2.75rem;
-  padding-block: var(--space-2);
-}
-
-.languageOption {
-  @apply flex w-full items-center justify-between;
-  gap: var(--space-3);
 }
 
 .languageDetail {
   color: var(--foreground-faint);
   font-family: var(--font-mono);
-  font-size: var(--text-tiny);
 }
 
 .retryInAlert :global(button:last-child) {

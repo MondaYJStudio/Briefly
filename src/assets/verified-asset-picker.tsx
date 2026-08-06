@@ -63,9 +63,13 @@ export function VerifiedAssetPicker({
 
   return (
     <div className={styles.panel}>
-      <div className={styles.tabs} role="tablist" aria-label={m.image_source()}>
+      <div
+        className={`${styles.tabs} flex flex-wrap gap-1 mb-4`}
+        role="tablist"
+        aria-label={m.image_source()}
+      >
         <button
-          className={styles.tab}
+          className={`${styles.tab} inline-flex items-center border-0 bg-transparent text-sm cursor-pointer gap-2`}
           id={libraryTabId}
           type="button"
           role="tab"
@@ -76,7 +80,7 @@ export function VerifiedAssetPicker({
           {m.library()}
         </button>
         <button
-          className={styles.tab}
+          className={`${styles.tab} inline-flex items-center border-0 bg-transparent text-sm cursor-pointer gap-2`}
           id={uploadTabId}
           type="button"
           role="tab"
@@ -104,17 +108,22 @@ export function VerifiedAssetPicker({
             onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
           />
           {uploadPreviewUrl ? (
-            <div className={styles.uploadPreview}>
-              <img
-                src={uploadPreviewUrl}
-                alt={m.selected_upload_preview()}
-              />
+            <div
+              className={`${styles.uploadPreview} grid place-items-center gap-2 p-4`}
+            >
+              <img src={uploadPreviewUrl} alt={m.selected_upload_preview()} />
               {uploadFile ? (
-                <p className={styles.uploadPreviewName}>{uploadFile.name}</p>
+                <p
+                  className={`${styles.uploadPreviewName} text-sm text-center m-0`}
+                >
+                  {uploadFile.name}
+                </p>
               ) : null}
             </div>
           ) : null}
-          <p className={styles.uploadHint}>{m.upload_format_limit()}</p>
+          <p className={`${styles.uploadHint} text-sm`}>
+            {m.upload_format_limit()}
+          </p>
           <Button
             type="button"
             isPending={uploading}
@@ -134,7 +143,9 @@ export function VerifiedAssetPicker({
           {state === "loading" ? (
             <p role="status">{m.loading_reusable_assets()}</p>
           ) : assets.length === 0 ? (
-            <div className={styles.empty}>
+            <div
+              className={`${styles.empty} flex flex-col items-center text-center p-6 gap-3`}
+            >
               <AdminIcon name="image" size={24} />
               <p>{m.no_reusable_assets_yet()}</p>
               <Button
@@ -148,22 +159,24 @@ export function VerifiedAssetPicker({
             </div>
           ) : (
             <ul
-              className={styles.grid}
+              className={`${styles.grid} grid gap-3 m-0 p-0`}
               aria-label={m.assets_available_to_draft()}
             >
               {assets.map((asset) => (
                 <li key={asset.id}>
                   <button
-                    className={styles.cell}
+                    className={`${styles.cell} cursor-pointer text-left w-full p-0`}
                     type="button"
                     aria-pressed={asset.id === selectedAssetId}
                     onClick={() => onSelect(asset)}
                   >
-                    <span className={styles.thumb}>
+                    <span className={`${styles.thumb} grid place-items-center`}>
                       <img src={`/media/private/${asset.id}`} alt="" />
                     </span>
-                    <span className={styles.cellMeta}>
-                      <span className={styles.filename}>
+                    <span
+                      className={`${styles.cellMeta} flex flex-col py-2 px-3`}
+                    >
+                      <span className={`${styles.filename} text-xs`}>
                         {asset.originalFilename}
                       </span>
                       <span className={styles.fileMeta}>
@@ -180,8 +193,13 @@ export function VerifiedAssetPicker({
           )}
 
           {selected ? (
-            <div className={styles.summary} aria-label={m.selected_asset()}>
-              <div className={styles.summaryPreview}>
+            <div
+              className={`${styles.summary} flex flex-col gap-3 p-3`}
+              aria-label={m.selected_asset()}
+            >
+              <div
+                className={`${styles.summaryPreview} grid place-items-center p-4`}
+              >
                 <img
                   src={`/media/private/${selected.id}`}
                   alt={m.preview_of_filename({
@@ -189,12 +207,14 @@ export function VerifiedAssetPicker({
                   })}
                 />
               </div>
-              <div className={styles.summaryMetaRow}>
-                <div className={styles.summaryGrow}>
-                  <div className={styles.summaryName}>
+              <div
+                className={`flex items-center gap-3`}
+              >
+                <div className={`${styles.summaryGrow} min-w-0`}>
+                  <div className={`${styles.summaryName} text-sm`}>
                     {selected.originalFilename}
                   </div>
-                  <div className={styles.summaryMeta}>
+                  <div className={`${styles.summaryMeta} text-sm`}>
                     {m.asset_picker_summary_meta({
                       format: selected.mimeType
                         .replace("image/", "")
