@@ -6,6 +6,7 @@ import {
   AuthenticationField,
   AuthenticationSurface,
 } from "../auth/auth-surface";
+import authStyles from "../auth/auth-surface.module.css";
 import { cloudflareWorkerSettingsHref } from "../auth/authentication-presentation";
 import { m } from "../paraglide/messages.js";
 
@@ -77,8 +78,8 @@ function Setup() {
           <span>{m.setup_checking()}</span>
         </div>
       ) : state === "success" ? (
-        <div className="authentication-empty" role="status">
-          <div className="authentication-empty-icon" aria-hidden="true">
+        <div className={authStyles.empty} role="status">
+          <div className={authStyles.emptyIcon} aria-hidden="true">
             <svg
               width="24"
               height="24"
@@ -123,7 +124,7 @@ function Setup() {
             labelEnd={
               cloudflareSettingsHref ? (
                 <a
-                  className="authentication-link text-xs font-medium"
+                  className={`${authStyles.link} text-xs font-medium`}
                   href={cloudflareSettingsHref}
                   target="_blank"
                   rel="noopener noreferrer"

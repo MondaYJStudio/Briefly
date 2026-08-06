@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { EditorView } from "../../../components/admin/editor-view";
+import pageStyles from "../../../components/admin/articles-view.module.css";
 import { useArticlesRouteContext } from "./-context";
 
 export const Route = createFileRoute("/admin/articles/$articleId")({
@@ -43,7 +44,7 @@ function ArticleEditorRoute() {
 
   if (workspace.selected?.id !== articleId) {
     return (
-      <main className="page" id="admin-main">
+      <main className={pageStyles.page} id="admin-main">
         {loadState === "failed" ? (
           <Alert status="danger" role="alert">
             <Alert.Content>
@@ -52,7 +53,7 @@ function ArticleEditorRoute() {
                 The Article may have moved to Trash, or the request failed.
               </Alert.Description>
               <Button
-                className="mt-4"
+                className={pageStyles.actionTop}
                 type="button"
                 variant="secondary"
                 onPress={() => void navigate({ to: "/admin/articles" })}
@@ -62,7 +63,10 @@ function ArticleEditorRoute() {
             </Alert.Content>
           </Alert>
         ) : (
-          <div className="card card-pad row" role="status">
+          <div
+            className={`${pageStyles.card} ${pageStyles.cardPad} ${pageStyles.loadingRow}`}
+            role="status"
+          >
             <Spinner aria-label="Loading Article editor" />
             <span>Loading Article editor…</span>
           </div>

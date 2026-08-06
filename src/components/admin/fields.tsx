@@ -1,6 +1,8 @@
 import { Label } from "@heroui/react";
 import type { ReactNode } from "react";
 
+import styles from "./fields.module.css";
+
 /** Labelled form field row matching the prototype's `.field` pattern. */
 export function SettingsField({
   label,
@@ -18,65 +20,20 @@ export function SettingsField({
   children: ReactNode;
 }>) {
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--space-2)",
-        width: "100%",
-      }}
-    >
-      <Label
-        htmlFor={htmlFor}
-        style={{
-          fontSize: "var(--text-small)",
-          fontWeight: 550,
-          display: "flex",
-          alignItems: "baseline",
-          gap: "var(--space-2)",
-        }}
-      >
+    <div className={styles.field}>
+      <Label htmlFor={htmlFor} className={styles.label}>
         {label}
-        {optional ? (
-          <span
-            style={{
-              fontSize: "var(--text-tiny)",
-              fontWeight: 400,
-              color: "var(--foreground-faint)",
-            }}
-          >
-            {optional}
-          </span>
-        ) : null}
+        {optional ? <span className={styles.optional}>{optional}</span> : null}
       </Label>
       {children}
       {issues.length > 0 ? (
-        <ul
-          id={`${htmlFor}-error`}
-          className="list-disc pl-5"
-          role="alert"
-          style={{
-            color: "var(--danger)",
-            fontSize: "var(--text-tiny)",
-            margin: 0,
-          }}
-        >
+        <ul id={`${htmlFor}-error`} className={styles.issues} role="alert">
           {issues.map((issue) => (
             <li key={issue}>{issue}</li>
           ))}
         </ul>
       ) : null}
-      {description ? (
-        <p
-          style={{
-            fontSize: "var(--text-tiny)",
-            color: "var(--foreground-muted)",
-            margin: 0,
-          }}
-        >
-          {description}
-        </p>
-      ) : null}
+      {description ? <p className={styles.description}>{description}</p> : null}
     </div>
   );
 }

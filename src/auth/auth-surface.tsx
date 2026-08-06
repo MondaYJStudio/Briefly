@@ -140,7 +140,7 @@ export function AuthenticationSurface({
       {footerLink ? (
         <p className={styles.footer}>
           Briefly ·{" "}
-          <a className="authentication-link font-medium" href={footerLink.href}>
+          <a className={`${styles.link} font-medium`} href={footerLink.href}>
             {footerLink.label}
           </a>
         </p>

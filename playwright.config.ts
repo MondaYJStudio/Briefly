@@ -4,7 +4,11 @@ import { playwrightBaseUrl } from "./playwright/runtime";
 
 export default defineConfig({
   testDir: "./playwright",
-  testMatch: ["critical-journey.spec.ts", "settings-account-drawers.spec.ts"],
+  testMatch: [
+    "critical-journey.spec.ts",
+    "settings-account-drawers.spec.ts",
+    "reference-acceptance.spec.ts",
+  ],
   fullyParallel: false,
   workers: 1,
   retries: 0,

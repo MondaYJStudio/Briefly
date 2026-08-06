@@ -1,11 +1,4 @@
-import {
-  Alert,
-  AlertDialog,
-  Button,
-  Drawer,
-  Form,
-  Modal,
-} from "@heroui/react";
+import { Alert, AlertDialog, Button, Drawer, Form, Modal } from "@heroui/react";
 import {
   type ChangeEvent,
   type DragEvent,
@@ -382,7 +375,9 @@ export function AssetMediaLibrary() {
             {[70, 60, 75, 65].map((width) => (
               <li key={width} aria-hidden="true">
                 <div className={styles.cell}>
-                  <div className={`${styles.skeleton} ${styles.skeletonThumb}`} />
+                  <div
+                    className={`${styles.skeleton} ${styles.skeletonThumb}`}
+                  />
                   <div className={styles.cellMeta}>
                     <div
                       className={styles.skeleton}
@@ -460,7 +455,10 @@ export function AssetMediaLibrary() {
           </ul>
         )}
 
-        <Modal.Backdrop isOpen={uploadOpen} onOpenChange={handleUploadOpenChange}>
+        <Modal.Backdrop
+          isOpen={uploadOpen}
+          onOpenChange={handleUploadOpenChange}
+        >
           <Modal.Container>
             <Modal.Dialog aria-label={m.upload_image()}>
               <Modal.Header>
@@ -488,7 +486,9 @@ export function AssetMediaLibrary() {
                           />
                         </div>
                         {uploadFileName ? (
-                          <p className={styles.dropzoneFile}>{uploadFileName}</p>
+                          <p className={styles.dropzoneFile}>
+                            {uploadFileName}
+                          </p>
                         ) : null}
                         <p className={styles.dropzoneHint}>
                           {m.choose_verified_image()}
@@ -743,7 +743,10 @@ export function AssetMediaLibrary() {
           isOpen={lightboxOpen && selected !== null}
           onOpenChange={setLightboxOpen}
         >
-          <Modal.Container className={styles.galleryContainer} placement="center">
+          <Modal.Container
+            className={styles.galleryContainer}
+            placement="center"
+          >
             <Modal.Dialog
               className={styles.galleryDialog}
               aria-label={

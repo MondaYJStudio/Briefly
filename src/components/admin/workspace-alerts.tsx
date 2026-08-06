@@ -2,6 +2,7 @@ import { Alert, Button, TextArea } from "@heroui/react";
 
 import { publicationIssueGuidance } from "./publication-issues";
 import type { ArticleWorkspace } from "./use-article-workspace";
+import styles from "./workspace-alerts.module.css";
 
 /**
  * The workspace-wide feedback stack: trash lifecycle, leave guard, autosave
@@ -33,7 +34,7 @@ export function WorkspaceAlerts({
   } = workspace;
 
   return (
-    <div className="stack" style={{ gap: "var(--space-3)" }}>
+    <div className={styles.stack}>
       {trashActionState === "restored" ? (
         <Alert status="success" role="status">
           <Alert.Content>
@@ -64,7 +65,7 @@ export function WorkspaceAlerts({
             <Alert.Title>Unsaved local changes</Alert.Title>
             <Alert.Description>
               Leaving now discards changes that the server has not confirmed.
-              <span className="row mt-2">
+              <span className={styles.actions}>
                 <Button
                   type="button"
                   variant="secondary"
@@ -93,7 +94,7 @@ export function WorkspaceAlerts({
             <Alert.Title>Draft save failed</Alert.Title>
             <Alert.Description>
               Your current-tab changes are still available but are not durable.
-              <span className="row mt-2">
+              <span className={styles.actions}>
                 <Button
                   type="button"
                   onPress={() => void persistCurrentDraft()}
@@ -119,7 +120,7 @@ export function WorkspaceAlerts({
             <Alert.Description>
               A newer Draft Version is already saved. No automatic rich-text
               merge or overwrite was attempted.
-              <span className="row mt-2">
+              <span className={styles.actions}>
                 <Button
                   type="button"
                   isDisabled={lifecycleActionPending}
@@ -160,7 +161,7 @@ export function WorkspaceAlerts({
                 ))}
               </ul>
               <Button
-                className="mt-2"
+                className={styles.actionTop}
                 type="button"
                 onPress={() => void persistCurrentDraft()}
               >
@@ -177,7 +178,7 @@ export function WorkspaceAlerts({
               Changes remain only in this tab. Briefly does not promise offline
               durability or synchronization. Reconnect, then retry.
               <Button
-                className="mt-2"
+                className={styles.actionTop}
                 type="button"
                 onPress={() => void persistCurrentDraft()}
               >
@@ -190,11 +191,11 @@ export function WorkspaceAlerts({
 
       {conflictCopy ? (
         <details>
-          <summary style={{ cursor: "pointer", fontWeight: 500 }}>
+          <summary className={styles.conflictSummary}>
             Copy the preserved local Draft JSON
           </summary>
           <TextArea
-            className="mt-2 font-mono"
+            className={`${styles.actionTop} font-mono`}
             aria-label="Preserved unsaved local Draft JSON"
             readOnly
             value={JSON.stringify(conflictCopy, null, 2)}
@@ -215,7 +216,7 @@ export function WorkspaceAlerts({
                 ? "The new immutable Publication is public now; earlier Publications remain unchanged."
                 : "A new immutable Publication is public now."}
               {publicationReceipt ? (
-                <span className="block mt-2">
+                <span className={styles.receipt}>
                   Current Publication {publicationReceipt.publicationId} was
                   confirmed from saved Draft Version{" "}
                   {publicationReceipt.draftVersion}.
@@ -251,7 +252,7 @@ export function WorkspaceAlerts({
                 : " Briefly could not fully reread the authoritative Article and public state. Reload it before publishing again."}
               {publicationReconciliationState === "reconciled" ? (
                 <Button
-                  className="mt-2"
+                  className={styles.actionTop}
                   type="button"
                   variant="secondary"
                   onPress={acknowledgePublicationReconciliation}
@@ -260,7 +261,7 @@ export function WorkspaceAlerts({
                 </Button>
               ) : (
                 <Button
-                  className="mt-2"
+                  className={styles.actionTop}
                   type="button"
                   variant="secondary"
                   onPress={reloadDraft}
@@ -279,7 +280,7 @@ export function WorkspaceAlerts({
               The server confirmed that this Publish command made no public
               change. Briefly will not retry it automatically.
               <Button
-                className="mt-2"
+                className={styles.actionTop}
                 type="button"
                 onPress={() => void retryPublishDraft()}
               >
@@ -313,7 +314,7 @@ export function WorkspaceAlerts({
                 : "Briefly could not fully reread the Article and public endpoint. Reload the authoritative Article state before issuing another Publish command."}
               {publicationReconciliationState === "reconciled" ? (
                 <Button
-                  className="mt-2"
+                  className={styles.actionTop}
                   type="button"
                   variant="secondary"
                   onPress={acknowledgePublicationReconciliation}
@@ -322,7 +323,7 @@ export function WorkspaceAlerts({
                 </Button>
               ) : (
                 <Button
-                  className="mt-2"
+                  className={styles.actionTop}
                   type="button"
                   variant="secondary"
                   onPress={reloadDraft}
@@ -341,7 +342,7 @@ export function WorkspaceAlerts({
               Briefly could not classify this failure safely. Reload the Article
               state before trying another command.
               <Button
-                className="mt-2"
+                className={styles.actionTop}
                 type="button"
                 variant="secondary"
                 onPress={reloadDraft}

@@ -276,6 +276,30 @@
   min-width: 0;
 }
 
+.skeleton {
+  border-radius: var(--radius-s);
+  background: linear-gradient(
+    90deg,
+    var(--content2) 25%,
+    var(--content3) 50%,
+    var(--content2) 75%
+  );
+  background-size: 200% 100%;
+  animation: briefly-shimmer 1.4s var(--ease-in-out) infinite;
+}
+
+@keyframes briefly-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
 @media (max-width: 860px) {
   .page {
     padding: var(--space-5) var(--space-4) var(--space-12);
@@ -301,4 +325,18 @@
   .searchMarker {
     width: 100%;
   }
+}
+
+.cardPad {
+  padding: var(--space-6);
+}
+
+.loadingRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.actionTop {
+  margin-top: var(--space-4);
 }

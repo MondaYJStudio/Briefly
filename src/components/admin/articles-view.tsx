@@ -439,24 +439,27 @@ function ArticleListSkeleton() {
   return (
     <div aria-busy="true" role="status" aria-label={m.loading_article_drafts()}>
       <div className={styles.toolbar}>
-        <div className="skeleton" style={{ width: "22rem", height: "2rem" }} />
+        <div
+          className={styles.skeleton}
+          style={{ width: "22rem", height: "2rem" }}
+        />
       </div>
       <div className={styles.card}>
         <div className={styles.list}>
           {[40, 55, 35, 48].map((width) => (
             <div className={styles.skeletonRow} key={width}>
-              <div className={`skeleton ${styles.coverThumb}`} />
+              <div className={`${styles.skeleton} ${styles.coverThumb}`} />
               <div className={styles.skeletonStack}>
                 <div
-                  className="skeleton"
+                  className={styles.skeleton}
                   style={{ width: `${width}%`, height: "1rem" }}
                 />
                 <div
-                  className="skeleton"
+                  className={styles.skeleton}
                   style={{ width: "24%", height: "0.75rem" }}
                 />
                 <div
-                  className="skeleton"
+                  className={styles.skeleton}
                   style={{ width: "60%", height: "0.75rem" }}
                 />
               </div>

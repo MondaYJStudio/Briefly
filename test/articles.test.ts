@@ -1050,9 +1050,7 @@ describe("Article Draft administration", () => {
     expect(html).toContain("Articles");
     expect(html).toContain("Create Article Draft");
     expect(html).toContain("Loading Article Drafts");
-    expect(html).toContain(
-      "Each article has one living Draft. Publishing freezes an immutable Publication",
-    );
+    expect(html).toContain("Manage drafts and publications.");
   }, 15_000);
 
   it("rejects a malformed persisted Draft envelope instead of trusting stored JSON", async () => {

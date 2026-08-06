@@ -1,0 +1,52 @@
+@reference "tailwindcss";
+
+.chip {
+  @apply inline-flex items-center;
+  gap: var(--space-2);
+  height: 1.5rem;
+  padding: 0 var(--space-2);
+  font-size: var(--text-tiny);
+  font-weight: 550;
+  line-height: 1;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+.chip svg {
+  width: 12px;
+  height: 12px;
+}
+
+.chipDefault {
+  background: var(--content2);
+  color: var(--foreground-muted);
+  border-color: var(--border);
+}
+
+.chipPrimary {
+  background: var(--primary-soft-bg);
+  color: var(--primary);
+}
+
+.chipSuccess {
+  background: var(--success-soft-bg);
+  color: var(--success-strong);
+}
+
+.chipWarning {
+  background: var(--warning-soft-bg);
+  color: var(--warning-strong);
+}
+
+.chipDanger {
+  background: var(--danger-soft-bg);
+  color: var(--danger-strong);
+}
