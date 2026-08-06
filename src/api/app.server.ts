@@ -35,6 +35,7 @@ import {
 } from "../auth/initialization.server";
 import { secretsMatch } from "../auth/secret.server";
 import { logPublicationWorkflowFailure } from "../env/logger.server";
+import { applicationOriginForRequest } from "../env/origin.server";
 import { requestIdFor } from "../env/request-id.server";
 import {
   validateRuntimeBindings,
@@ -103,12 +104,15 @@ function getValidatedWorkerBindings() {
 
 async function administratorIsAuthenticated(
   bindings: RuntimeBindings,
-  headers: Headers,
+  request: Request,
 ): Promise<boolean> {
   const { createAuth } = await import("../auth/auth.server");
   return Boolean(
-    await createAuth(bindings).api.getSession({
-      headers,
+    await createAuth(
+      bindings,
+      applicationOriginForRequest(bindings, request),
+    ).api.getSession({
+      headers: request.headers,
       query: { disableRefresh: true },
     }),
   );
@@ -269,7 +273,11 @@ function createApi(getBindings: () => RuntimeBindings) {
     )
     .get("/admin/session", async ({ request }) => {
       const { createAuth } = await import("../auth/auth.server");
-      const result = await createAuth(getBindings()).api.getSession({
+      const bindings = getBindings();
+      const result = await createAuth(
+        bindings,
+        applicationOriginForRequest(bindings, request),
+      ).api.getSession({
         headers: request.headers,
         returnHeaders: true,
       });
@@ -290,7 +298,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,
@@ -310,7 +318,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ body, request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,
@@ -338,7 +346,7 @@ function createApi(getBindings: () => RuntimeBindings) {
     .post("/admin/articles", async ({ request, set, status }) => {
       const bindings = getBindings();
       set.headers["cache-control"] = "no-store";
-      if (!(await administratorIsAuthenticated(bindings, request.headers)))
+      if (!(await administratorIsAuthenticated(bindings, request)))
         return status(401, {
           status: "error" as const,
           code: "AUTHENTICATION_REQUIRED" as const,
@@ -349,7 +357,7 @@ function createApi(getBindings: () => RuntimeBindings) {
     .get("/admin/articles", async ({ request, set, status }) => {
       const bindings = getBindings();
       set.headers["cache-control"] = "no-store";
-      if (!(await administratorIsAuthenticated(bindings, request.headers)))
+      if (!(await administratorIsAuthenticated(bindings, request)))
         return status(401, {
           status: "error" as const,
           code: "AUTHENTICATION_REQUIRED" as const,
@@ -360,7 +368,7 @@ function createApi(getBindings: () => RuntimeBindings) {
     .get("/admin/trash/articles", async ({ request, set, status }) => {
       const bindings = getBindings();
       set.headers["cache-control"] = "no-store";
-      if (!(await administratorIsAuthenticated(bindings, request.headers)))
+      if (!(await administratorIsAuthenticated(bindings, request)))
         return status(401, {
           status: "error" as const,
           code: "AUTHENTICATION_REQUIRED" as const,
@@ -373,7 +381,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ params, request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,
@@ -402,7 +410,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ params, request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,
@@ -431,7 +439,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ body, params, request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,
@@ -471,7 +479,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ params, request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,
@@ -492,7 +500,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ body, params, request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,
@@ -533,7 +541,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ body, request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,
@@ -554,7 +562,7 @@ function createApi(getBindings: () => RuntimeBindings) {
     .get("/admin/assets", async ({ request, set, status }) => {
       const bindings = getBindings();
       set.headers["cache-control"] = "no-store";
-      if (!(await administratorIsAuthenticated(bindings, request.headers)))
+      if (!(await administratorIsAuthenticated(bindings, request)))
         return status(401, {
           status: "error" as const,
           code: "AUTHENTICATION_REQUIRED" as const,
@@ -567,7 +575,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ body, request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,
@@ -597,7 +605,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ params, request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,
@@ -635,7 +643,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ body, params, request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "private, no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,
@@ -653,7 +661,7 @@ function createApi(getBindings: () => RuntimeBindings) {
           result = await previewSavedDraft(
             bindings.DB,
             bindings.MEDIA_BUCKET,
-            bindings.APP_ORIGIN,
+            applicationOriginForRequest(bindings, request),
             {
               articleId: params.articleId,
               draftVersion: body.draftVersion,
@@ -702,7 +710,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ params, request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,
@@ -726,7 +734,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ body, params, request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,
@@ -754,7 +762,7 @@ function createApi(getBindings: () => RuntimeBindings) {
           result = await publishSavedDraft(
             bindings.DB,
             bindings.MEDIA_BUCKET,
-            bindings.APP_ORIGIN,
+            applicationOriginForRequest(bindings, request),
             {
               articleId: params.articleId,
               draftVersion: body.draftVersion,
@@ -804,7 +812,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ body, params, request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,
@@ -869,7 +877,7 @@ function createApi(getBindings: () => RuntimeBindings) {
       async ({ params, request, set, status }) => {
         const bindings = getBindings();
         set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request.headers)))
+        if (!(await administratorIsAuthenticated(bindings, request)))
           return status(401, {
             status: "error" as const,
             code: "AUTHENTICATION_REQUIRED" as const,

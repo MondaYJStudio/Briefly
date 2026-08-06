@@ -4,7 +4,7 @@ export type ApplicationEnvironment = "local" | "test" | "production";
 
 export interface RuntimeBindings {
   APP_ENV: ApplicationEnvironment;
-  APP_ORIGIN: string;
+  APP_ORIGIN?: string;
   BETTER_AUTH_SECRET: string;
   DB: D1Database;
   MEDIA_BUCKET: R2Bucket;
@@ -57,7 +57,7 @@ function isR2Bucket(value: unknown): value is R2Bucket {
 const runtimeBindingsSchema = z
   .object({
     APP_ENV: z.enum(["local", "test", "production"]),
-    APP_ORIGIN: z.string().url(),
+    APP_ORIGIN: z.string().url().optional(),
     BETTER_AUTH_SECRET: z.string().min(32),
     DB: z.custom<D1Database>(isD1Database),
     MEDIA_BUCKET: z.custom<R2Bucket>(isR2Bucket),
@@ -65,19 +65,19 @@ const runtimeBindingsSchema = z
     SETUP_SECRET: z.string().min(32),
   })
   .superRefine((bindings, context) => {
-    if (!URL.canParse(bindings.APP_ORIGIN)) return;
+    if (bindings.APP_ORIGIN && URL.canParse(bindings.APP_ORIGIN)) {
+      const origin = new URL(bindings.APP_ORIGIN);
+      const isCanonicalOrigin = origin.origin === bindings.APP_ORIGIN;
+      const usesProductionHttps =
+        bindings.APP_ENV !== "production" || origin.protocol === "https:";
 
-    const origin = new URL(bindings.APP_ORIGIN);
-    const isCanonicalOrigin = origin.origin === bindings.APP_ORIGIN;
-    const usesProductionHttps =
-      bindings.APP_ENV !== "production" || origin.protocol === "https:";
-
-    if (!isCanonicalOrigin || !usesProductionHttps) {
-      context.addIssue({
-        code: "custom",
-        path: ["APP_ORIGIN"],
-        message: "APP_ORIGIN must be a canonical origin",
-      });
+      if (!isCanonicalOrigin || !usesProductionHttps) {
+        context.addIssue({
+          code: "custom",
+          path: ["APP_ORIGIN"],
+          message: "APP_ORIGIN must be a canonical origin",
+        });
+      }
     }
 
     if (

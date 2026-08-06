@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { readPrivateAsset } from "../assets/assets.server";
 import { createAuth } from "../auth/auth.server";
+import { applicationOriginForRequest } from "../env/origin.server";
 import type { RuntimeBindings } from "../env/runtime.server";
 
 async function handle({
@@ -19,7 +20,10 @@ async function handle({
     "cache-control": "private, no-store",
     "x-content-type-options": "nosniff",
   };
-  const session = await createAuth(bindings).api.getSession({
+  const session = await createAuth(
+    bindings,
+    applicationOriginForRequest(bindings, request),
+  ).api.getSession({
     headers: request.headers,
     query: { disableRefresh: true },
   });

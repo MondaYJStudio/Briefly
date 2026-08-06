@@ -98,11 +98,12 @@ export async function recoverAdministrator(
 
 export async function changeAdministratorPassword(
   bindings: RuntimeBindings,
+  applicationOrigin: string,
   headers: Headers,
   passwords: { currentPassword: string; newPassword: string },
 ): Promise<PasswordChangeResult> {
   const { createAuth } = await import("./auth.server");
-  const session = await createAuth(bindings).api.getSession({
+  const session = await createAuth(bindings, applicationOrigin).api.getSession({
     headers,
     query: { disableRefresh: true },
   });

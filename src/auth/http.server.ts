@@ -1,4 +1,5 @@
 import type { RuntimeBindings } from "../env/runtime.server";
+import { applicationOriginForRequest } from "../env/origin.server";
 import { createAuth } from "./auth.server";
 import { changeAdministratorPassword } from "./credentials.server";
 
@@ -16,10 +17,11 @@ export async function handleAuthenticationRequest(
   bindings: RuntimeBindings,
 ): Promise<Response> {
   const pathname = new URL(request.url).pathname;
+  const applicationOrigin = applicationOriginForRequest(bindings, request);
   if (request.method !== "POST" || pathname !== "/api/auth/change-password") {
-    return createAuth(bindings).handler(request);
+    return createAuth(bindings, applicationOrigin).handler(request);
   }
-  if (request.headers.get("origin") !== bindings.APP_ORIGIN) {
+  if (request.headers.get("origin") !== applicationOrigin) {
     return passwordChangeDenied(403);
   }
 
@@ -34,10 +36,15 @@ export async function handleAuthenticationRequest(
     return passwordChangeDenied(400);
   }
 
-  const result = await changeAdministratorPassword(bindings, request.headers, {
-    currentPassword: body.currentPassword,
-    newPassword: body.newPassword,
-  });
+  const result = await changeAdministratorPassword(
+    bindings,
+    applicationOrigin,
+    request.headers,
+    {
+      currentPassword: body.currentPassword,
+      newPassword: body.newPassword,
+    },
+  );
   if (!result.ok) {
     return passwordChangeDenied(
       result.reason === "authentication-required" ? 401 : 400,

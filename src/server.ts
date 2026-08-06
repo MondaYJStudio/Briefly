@@ -7,6 +7,10 @@ import {
   validateRuntimeBindings,
   type RuntimeBindings,
 } from "./env/runtime.server";
+import {
+  applicationOriginForRequest,
+  requestUsesApplicationOrigin,
+} from "./env/origin.server";
 
 type WorkerBindings = RuntimeBindings;
 
@@ -87,7 +91,7 @@ const worker = {
       return finishResponse(response, "RUNTIME_CONFIGURATION_INVALID");
     }
 
-    if (requestUrl.origin !== configuration.bindings.APP_ORIGIN) {
+    if (!requestUsesApplicationOrigin(configuration.bindings, request)) {
       return finishResponse(
         jsonResponse(
           { status: "error", code: "ORIGIN_MISMATCH", requestId },
@@ -194,24 +198,35 @@ const worker = {
           requestUrl.pathname.startsWith("/admin/"))
       ) {
         const { createAuth } = await import("./auth/auth.server");
-        const session = await createAuth(configuration.bindings).api.getSession(
-          {
-            headers: request.headers,
-            query: { disableRefresh: true },
-          },
+        const applicationOrigin = applicationOriginForRequest(
+          configuration.bindings,
+          request,
         );
-        response = session
-          ? withRequestId(
-              await handleStartRequest(request, configuration.bindings),
-              requestId,
-            )
-          : withRequestId(
-              Response.redirect(
-                new URL("/sign-in", configuration.bindings.APP_ORIGIN),
-                302,
-              ),
-              requestId,
-            );
+        const session = await createAuth(
+          configuration.bindings,
+          applicationOrigin,
+        ).api.getSession({
+          headers: request.headers,
+          query: { disableRefresh: true },
+        });
+        if (session) {
+          response = withRequestId(
+            await handleStartRequest(request, configuration.bindings),
+            requestId,
+          );
+        } else {
+          const { installationIsInitialized } =
+            await import("./auth/initialization.server");
+          const redirectPath = (await installationIsInitialized(
+            configuration.bindings.DB,
+          ))
+            ? "/sign-in"
+            : "/setup";
+          response = withRequestId(
+            Response.redirect(new URL(redirectPath, applicationOrigin), 302),
+            requestId,
+          );
+        }
         response.headers.set("cache-control", "no-store");
       } else if (requestUrl.pathname.startsWith("/api/auth/")) {
         const { handleAuthenticationRequest } =

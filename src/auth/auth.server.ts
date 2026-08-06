@@ -12,12 +12,15 @@ import {
   SESSION_RENEWAL_AGE_SECONDS,
 } from "./policy";
 
-export function createAuth(bindings: RuntimeBindings) {
+export function createAuth(
+  bindings: RuntimeBindings,
+  applicationOrigin: string,
+) {
   const database = drizzle(bindings.DB, { schema: betterAuthSchema });
 
   return betterAuth({
     appName: "Briefly",
-    baseURL: bindings.APP_ORIGIN,
+    baseURL: applicationOrigin,
     basePath: "/api/auth",
     secret: bindings.BETTER_AUTH_SECRET,
     database: drizzleAdapter(database, {
@@ -40,7 +43,7 @@ export function createAuth(bindings: RuntimeBindings) {
       useSecureCookies: bindings.APP_ENV === "production",
       cookiePrefix: "briefly",
     },
-    trustedOrigins: [bindings.APP_ORIGIN],
+    trustedOrigins: [applicationOrigin],
     rateLimit: { enabled: false },
     logger: { disabled: true },
     plugins: [tanstackStartCookies()],

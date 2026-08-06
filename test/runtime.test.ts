@@ -51,6 +51,22 @@ describe("Worker HTTP runtime", () => {
     });
   });
 
+  it("runs on a newly assigned workers.dev origin without APP_ORIGIN", async () => {
+    const context = createExecutionContext();
+    const response = await worker.fetch(
+      new Request("https://briefly-example.workers.dev/health") as Request<
+        unknown,
+        IncomingRequestCfProperties
+      >,
+      { ...env, APP_ENV: "production", APP_ORIGIN: undefined },
+      context,
+    );
+    await waitOnExecutionContext(context);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ status: "ok" });
+  });
+
   it("preserves a safe caller request ID", async () => {
     const requestId = "018f7d63-7b8a-4a2e-91ec-99732fb645bb";
     const response = await SELF.fetch("http://briefly.test/health", {

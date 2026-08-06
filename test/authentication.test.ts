@@ -634,7 +634,7 @@ describe("sole Administrator authentication", () => {
       {
         ...env,
         APP_ENV: "production",
-        APP_ORIGIN: "https://publication.example.com",
+        APP_ORIGIN: undefined,
       },
       context,
     );
@@ -645,6 +645,57 @@ describe("sole Administrator authentication", () => {
     expect(setCookie).toContain("__Secure-briefly.session_token=");
     expect(setCookie).toContain("Secure");
     expect(setCookie).toContain("HttpOnly");
+  });
+
+  it("accepts same-origin password changes at an assigned workers.dev origin", async () => {
+    expect((await initialize()).status).toBe(201);
+    const bindings = {
+      ...env,
+      APP_ENV: "production" as const,
+      APP_ORIGIN: undefined,
+    };
+    const context = createExecutionContext();
+    const signInResponse = await worker.fetch(
+      new Request(
+        "https://briefly-example.workers.dev/api/auth/sign-in/email",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin: "https://briefly-example.workers.dev",
+          },
+          body: JSON.stringify(administrator),
+        },
+      ) as Request<unknown, IncomingRequestCfProperties>,
+      bindings,
+      context,
+    );
+    await waitOnExecutionContext(context);
+
+    const changeContext = createExecutionContext();
+    const changeResponse = await worker.fetch(
+      new Request(
+        "https://briefly-example.workers.dev/api/auth/change-password",
+        {
+          method: "POST",
+          headers: {
+            cookie: cookieFrom(signInResponse),
+            "content-type": "application/json",
+            origin: "https://briefly-example.workers.dev",
+          },
+          body: JSON.stringify({
+            currentPassword: administrator.password,
+            newPassword: "a fresh password on workers dev",
+          }),
+        },
+      ) as Request<unknown, IncomingRequestCfProperties>,
+      bindings,
+      changeContext,
+    );
+    await waitOnExecutionContext(changeContext);
+
+    expect(signInResponse.status).toBe(200);
+    expect(changeResponse.status).toBe(200);
   });
 
   it("rate-limits malformed initialization attempts before body validation", async () => {
@@ -806,10 +857,19 @@ describe("sole Administrator authentication", () => {
     });
     expect(anonymousResponse.status).toBe(302);
     expect(anonymousResponse.headers.get("location")).toBe(
-      "http://briefly.test/sign-in",
+      "http://briefly.test/setup",
     );
 
     expect((await initialize()).status).toBe(201);
+    const initializedAnonymousResponse = await SELF.fetch(
+      "http://briefly.test/admin",
+      { redirect: "manual" },
+    );
+    expect(initializedAnonymousResponse.status).toBe(302);
+    expect(initializedAnonymousResponse.headers.get("location")).toBe(
+      "http://briefly.test/sign-in",
+    );
+
     const cookie = cookieFrom(await signIn());
     const authenticatedRedirect = await SELF.fetch(
       "http://briefly.test/admin",
@@ -834,8 +894,8 @@ describe("sole Administrator authentication", () => {
     const recoveryResponse = await SELF.fetch("http://briefly.test/recover");
     const recoveryHtml = await recoveryResponse.text();
     expect(recoveryResponse.status).toBe(200);
-    expect(recoveryHtml).toContain("Recover Administrator");
-    expect(recoveryHtml).toContain("revokes every Administrator session");
+    expect(recoveryHtml).toContain("Emergency recovery");
+    expect(recoveryHtml).toContain("RECOVERY_SECRET");
     expect(recoveryHtml).toContain('name="recoverySecret"');
     expect(recoveryHtml).toContain('name="newPassword"');
   }, 30_000);
