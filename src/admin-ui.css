@@ -13,8 +13,8 @@
 html[data-theme],
 .briefly-theme {
   /* Brand / semantic hues (HeroUI-aligned, OKLCH) */
-  --hue-primary: oklch(0.552 0.208 262.9);
-  --hue-primary-soft: oklch(0.63 0.17 256.5);
+  --hue-primary: oklch(0.21 0.008 264);
+  --hue-primary-soft: oklch(0.38 0.01 264);
   --hue-secondary: oklch(0.471 0.216 293);
   --hue-success: oklch(0.712 0.191 149.5);
   --hue-warning: oklch(0.769 0.163 75.5);
@@ -82,10 +82,10 @@ html[data-theme],
   --divider: oklch(0.915 0.005 264);
   --hover: oklch(0.955 0.004 264);
   --pressed: oklch(0.93 0.005 264);
-  --primary: var(--hue-primary);
-  --primary-hover: oklch(0.5 0.2 262.9);
-  --primary-soft-bg: oklch(0.95 0.025 262);
-  --primary-fg: oklch(0.99 0.005 260);
+  --primary: var(--foreground);
+  --primary-hover: oklch(0.32 0.008 264);
+  --primary-soft-bg: oklch(0.955 0.004 264);
+  --primary-fg: var(--background);
   --secondary: var(--hue-secondary);
   --secondary-soft-bg: oklch(0.95 0.03 295);
   --success: var(--hue-success);
@@ -98,7 +98,9 @@ html[data-theme],
   --danger-hover: oklch(0.53 0.23 16.9);
   --danger-strong: oklch(0.48 0.2 17);
   --danger-soft-bg: oklch(0.95 0.025 17);
-  --focus: var(--hue-primary-soft);
+  --accent: var(--foreground);
+  --accent-foreground: var(--background);
+  --focus: var(--foreground);
   --shadow-s: 0 1px 2px oklch(0.21 0.008 264 / 0.06);
   --shadow-m:
     0 4px 16px -2px oklch(0.21 0.008 264 / 0.1),
@@ -132,10 +134,10 @@ html[data-theme="dark"],
   --divider: oklch(0.28 0.008 264);
   --hover: oklch(0.25 0.008 264);
   --pressed: oklch(0.31 0.009 264);
-  --primary: var(--hue-primary-soft);
-  --primary-hover: oklch(0.7 0.15 256.5);
-  --primary-soft-bg: oklch(0.3 0.07 262);
-  --primary-fg: oklch(0.14 0.02 262);
+  --primary: var(--foreground);
+  --primary-hover: oklch(0.86 0.006 264);
+  --primary-soft-bg: oklch(0.25 0.008 264);
+  --primary-fg: var(--background);
   --secondary: oklch(0.6 0.19 293);
   --secondary-soft-bg: oklch(0.3 0.07 293);
   --success: oklch(0.75 0.17 149.5);
@@ -148,7 +150,9 @@ html[data-theme="dark"],
   --danger-hover: oklch(0.73 0.19 17);
   --danger-strong: oklch(0.76 0.17 17);
   --danger-soft-bg: oklch(0.31 0.07 17);
-  --focus: var(--hue-primary-soft);
+  --accent: var(--foreground);
+  --accent-foreground: var(--background);
+  --focus: var(--foreground);
   --shadow-s: 0 1px 2px oklch(0 0 0 / 0.5);
   --shadow-m:
     0 4px 16px -2px oklch(0 0 0 / 0.55), 0 2px 6px -2px oklch(0 0 0 / 0.4);
