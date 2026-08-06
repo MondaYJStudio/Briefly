@@ -1,0 +1,1 @@
+ALTER TABLE `article_draft` ADD `slug_is_manual` integer DEFAULT true NOT NULL;

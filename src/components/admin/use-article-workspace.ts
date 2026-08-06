@@ -11,6 +11,7 @@ import {
   type ArticlePublicationHistoryEntry,
   type ArticleTrashEntry,
 } from "../../articles/articles";
+import { slugAfterTitleChange } from "../../articles/slug-follow";
 
 export function articleLifecycleProjection(
   article: Article,
@@ -71,6 +72,7 @@ type EditableArticleDraft = Pick<
   Article["draft"],
   | "title"
   | "slug"
+  | "slugIsManual"
   | "summary"
   | "tags"
   | "byline"
@@ -80,9 +82,28 @@ type EditableArticleDraft = Pick<
 >;
 
 function editableArticleDraft(draft: Article["draft"]): EditableArticleDraft {
-  const { title, slug, summary, tags, byline, language, cover, document } =
-    draft;
-  return { title, slug, summary, tags, byline, language, cover, document };
+  const {
+    title,
+    slug,
+    slugIsManual,
+    summary,
+    tags,
+    byline,
+    language,
+    cover,
+    document,
+  } = draft;
+  return {
+    title,
+    slug,
+    slugIsManual,
+    summary,
+    tags,
+    byline,
+    language,
+    cover,
+    document,
+  };
 }
 
 function draftUpdate(
@@ -714,7 +735,15 @@ export function useArticleWorkspace() {
       trashLifecyclePendingRef.current
     )
       return;
-    const next = { ...current, draft: { ...current.draft, ...changes } };
+    let draft = { ...current.draft, ...changes };
+    if ("title" in changes && !("slug" in changes) && !draft.slugIsManual) {
+      const followed = slugAfterTitleChange(
+        { mode: "auto", slug: draft.slug },
+        draft.title,
+      );
+      draft = { ...draft, slug: followed.slug, slugIsManual: false };
+    }
+    const next = { ...current, draft };
     const nextRevision = revisionRef.current + 1;
     selectedRef.current = next;
     revisionRef.current = nextRevision;

@@ -1,0 +1,379 @@
+@reference "tailwindcss";
+
+/* ============ Right settings rail shell ============ */
+.rail {
+  border-left: 1px solid var(--divider);
+  background: var(--surface);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.railTabs {
+  padding: var(--space-3) var(--space-4) 0;
+}
+
+.railToggle {
+  display: none !important;
+}
+
+.tabsLineList {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--divider);
+}
+
+.tabLine {
+  @apply inline-flex items-center border-0 bg-transparent;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-small);
+  font-weight: 550;
+  color: var(--foreground-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  font-family: inherit;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.tabLine:hover {
+  color: var(--foreground);
+}
+
+.tabLine[aria-selected="true"] {
+  color: var(--foreground);
+  border-bottom-color: var(--primary);
+}
+
+.tabCount {
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 4px;
+  background: var(--content2);
+  border-radius: var(--radius-full);
+  color: var(--foreground-muted);
+}
+
+.tabLine[aria-selected="true"] .tabCount {
+  background: var(--primary-soft-bg);
+  color: var(--primary);
+}
+
+.railClose {
+  border-bottom: 0 !important;
+  min-height: 2rem;
+  padding: 0.25rem;
+}
+
+/* ============ Rail sections ============ */
+.railSection {
+  padding: var(--space-5) var(--space-4);
+  border-bottom: 1px solid var(--divider);
+}
+
+.railSectionFlush {
+  border-bottom: 0;
+}
+
+.railSection > h3 {
+  font-size: var(--text-tiny);
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--foreground-faint);
+  margin-bottom: var(--space-4);
+}
+
+.railSection :global(.field-stack) > * + * {
+  margin-top: var(--space-4);
+}
+
+.subheading {
+  font-size: var(--text-small);
+  font-weight: 550;
+  margin-bottom: var(--space-2);
+}
+
+.issueList {
+  @apply list-disc pl-5;
+  font-size: var(--text-tiny);
+  color: var(--danger-strong);
+  margin: 0 0 var(--space-2);
+}
+
+/* ============ Basic / Advanced secondary switch ============ */
+.subNav {
+  @apply inline-flex w-full;
+  gap: 2px;
+  padding: 3px;
+  background: var(--content2);
+  border-radius: var(--radius-m);
+}
+
+.subNavButton {
+  @apply inline-flex flex-1 items-center justify-center border-0 bg-transparent;
+  padding: 0.4rem var(--space-3);
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--text-small);
+  color: var(--foreground-muted);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.subNavButton[aria-selected="true"] {
+  background: var(--content1);
+  color: var(--foreground);
+  box-shadow: var(--shadow-s);
+}
+
+/* ============ Publish summary ============ */
+.pubDetail {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  font-size: var(--text-tiny);
+}
+
+.pubDetail dt {
+  color: var(--foreground-faint);
+}
+
+.pubDetail dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--foreground-muted);
+}
+
+/* ============ Inherited-value notes ============ */
+.inheritNote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-tiny);
+  color: var(--foreground-muted);
+  background: var(--content2);
+  border-radius: var(--radius-s);
+  padding: var(--space-2) var(--space-3);
+  margin-top: var(--space-2);
+}
+
+/* ============ Slug field ============ */
+.slugRow {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.slugRow > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ============ Cover field ============ */
+.coverBox {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+
+.coverBox img {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  background: var(--content2);
+  display: block;
+}
+
+.coverMeta {
+  @apply flex flex-col;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-top: 1px solid var(--divider);
+}
+
+.coverActions {
+  @apply flex flex-wrap;
+  gap: var(--space-2);
+}
+
+.coverDrop {
+  @apply flex flex-col items-center text-center;
+  gap: var(--space-3);
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-m);
+  padding: var(--space-6);
+  color: var(--foreground-muted);
+  font-size: var(--text-tiny);
+}
+
+/* ============ Tag chip input ============ */
+.tagInput {
+  @apply flex flex-wrap items-center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--content1);
+}
+
+.tagInput:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-soft-bg);
+}
+
+.tagChip {
+  @apply inline-flex items-center;
+  gap: var(--space-1);
+  background: var(--content2);
+  border: 1px solid var(--border);
+  font-size: var(--text-tiny);
+  font-weight: 500;
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.tagChip button {
+  @apply inline-flex border-0 bg-transparent;
+  color: var(--foreground-faint);
+  cursor: pointer;
+  padding: 0;
+}
+
+.tagChip button:hover {
+  color: var(--danger-strong);
+}
+
+.tagInputField {
+  flex: 1;
+  min-width: 6rem;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  padding: 3px var(--space-1);
+}
+
+.tagInputField:focus {
+  outline: none;
+}
+
+/* ============ Publication history ============ */
+.pubItem {
+  @apply flex;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.pubItem:last-child {
+  border-bottom: 0;
+}
+
+.pubNum {
+  @apply grid place-items-center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-s);
+  background: var(--content2);
+  color: var(--foreground-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-tiny);
+  font-weight: 600;
+  flex: none;
+}
+
+.pubItemLive .pubNum {
+  background: var(--success-soft-bg);
+  color: var(--success-strong);
+}
+
+/* ============ Danger zone ============ */
+.dangerZone {
+  border: 1.5px solid var(--danger);
+  border-radius: var(--radius-l);
+  overflow: hidden;
+}
+
+.dangerZoneHead {
+  padding: var(--space-3) var(--space-4);
+  background: var(--danger-soft-bg);
+  color: var(--danger-strong);
+  font-size: var(--text-small);
+  font-weight: 650;
+}
+
+.dangerRow {
+  @apply flex flex-wrap items-center justify-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.dangerRow + .dangerRow {
+  border-top: 1px solid var(--divider);
+}
+
+.dangerCopy {
+  font-size: var(--text-tiny);
+  color: var(--foreground-muted);
+}
+
+.dangerCopy strong {
+  display: block;
+  color: var(--foreground);
+  font-size: var(--text-small);
+}
+
+.dangerReason {
+  display: block;
+  color: var(--danger-strong);
+  font-weight: 550;
+  margin-top: 2px;
+}
+
+/* ============ Responsive overlay behavior ============ */
+@media (max-width: 1024px) {
+  .rail {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 140;
+    width: min(24rem, 92vw);
+    transform: translateX(100%);
+    transition: transform var(--dur-med) var(--ease-out);
+    box-shadow: var(--shadow-l);
+    border-left: 1px solid var(--border);
+  }
+
+  .rail.railOpen {
+    transform: translateX(0);
+  }
+
+  .railClose {
+    display: inline-flex !important;
+  }
+
+  .railToggle {
+    display: inline-flex !important;
+  }
+}
+
+@media (min-width: 1025px) {
+  .railClose {
+    display: none !important;
+  }
+}
