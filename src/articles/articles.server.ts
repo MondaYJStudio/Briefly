@@ -4,7 +4,6 @@ import {
   ARTICLE_ASSET_ALT_MAXIMUM_LENGTH,
   ARTICLE_DOCUMENT_SCHEMA_VERSION,
   ARTICLE_SUMMARY_MAXIMUM_LENGTH,
-  ARTICLE_TAG_MAXIMUM_LENGTH,
   ARTICLE_TAGS_MAXIMUM_COUNT,
   ARTICLE_TITLE_MAXIMUM_LENGTH,
   type Article,
@@ -16,6 +15,7 @@ import {
   validateArticleDocument,
 } from "./article-document";
 import { articleSlugKey, articleSlugSchema } from "./article-slug";
+import { articleTagSchema, normalizeArticleTag } from "./tag-chips";
 
 const emptyDocument = {
   documentSchemaVersion: ARTICLE_DOCUMENT_SCHEMA_VERSION,
@@ -64,22 +64,16 @@ const coverUsage = z
   })
   .strict();
 
-const tag = z
-  .string()
-  .transform((value) => value.normalize("NFC").trim().replace(/\s+/gu, " "))
-  .pipe(z.string().min(1).max(ARTICLE_TAG_MAXIMUM_LENGTH))
-  .transform((value) => value.toLocaleLowerCase("und"));
+const tag = articleTagSchema;
 
-export function normalizeArticleTag(value: string): string | null {
-  const result = tag.safeParse(value);
-  return result.success ? result.data : null;
-}
+export { normalizeArticleTag };
 
 const draftInput = z
   .object({
     version: z.number().int().positive(),
     title: z.string().trim().max(ARTICLE_TITLE_MAXIMUM_LENGTH),
     slug: articleSlugSchema.nullable(),
+    slugIsManual: z.boolean().optional(),
     summary: z.string().max(ARTICLE_SUMMARY_MAXIMUM_LENGTH).nullable(),
     tags: z.array(tag).max(ARTICLE_TAGS_MAXIMUM_COUNT),
     byline: byline.nullable(),
@@ -101,6 +95,7 @@ const persistedArticleBase = z.object({
   version: z.number().int().positive(),
   title: z.string(),
   slug: z.string().nullable(),
+  slug_is_manual: z.number().int().pipe(z.union([z.literal(0), z.literal(1)])),
   summary: z.string().nullable(),
   tags: z.string().transform((value, context) => {
     try {
@@ -174,6 +169,7 @@ type ArticleDraftMetadata = Pick<
   | "version"
   | "title"
   | "slug"
+  | "slugIsManual"
   | "summary"
   | "tags"
   | "byline"
@@ -195,6 +191,7 @@ function articleDraftMetadataFromRow(
     version: row.version,
     title: row.title,
     slug: row.slug,
+    slugIsManual: row.slug_is_manual === 1,
     summary: row.summary,
     tags: row.tags,
     byline: row.byline,
@@ -205,6 +202,7 @@ function articleDraftMetadataFromRow(
     version: parsed.version,
     title: parsed.title,
     slug: parsed.slug,
+    slugIsManual: parsed.slugIsManual ?? row.slug_is_manual === 1,
     summary: parsed.summary,
     tags: parsed.tags,
     byline: parsed.byline,
@@ -215,6 +213,7 @@ function articleDraftMetadataFromRow(
     version: row.version,
     title: row.title,
     slug: row.slug,
+    slugIsManual: row.slug_is_manual === 1,
     summary: row.summary,
     tags: row.tags,
     byline: row.byline,
@@ -249,8 +248,9 @@ const articleSelection = `
          article.created_at AS article_created_at,
          article.updated_at AS article_updated_at,
          article_draft.version, article_draft.title, article_draft.slug,
-         article_draft.summary, article_draft.tags, article_draft.byline,
-         article_draft.language, article_draft.cover, article_draft.document,
+         article_draft.slug_is_manual, article_draft.summary, article_draft.tags,
+         article_draft.byline, article_draft.language, article_draft.cover,
+         article_draft.document,
          article_draft.created_at AS draft_created_at,
          article_draft.updated_at AS draft_updated_at
   FROM article
@@ -374,8 +374,8 @@ export async function replaceArticleDraftState(
       .prepare(
         `UPDATE article_draft
          SET version = version + 1, title = ?, slug = ?, slug_key = ?,
-             summary = ?, tags = ?, byline = ?, language = ?, cover = ?, document = ?,
-             updated_at = ?
+             slug_is_manual = ?, summary = ?, tags = ?, byline = ?, language = ?,
+             cover = ?, document = ?, updated_at = ?
          WHERE article_id = ? AND version = ?
            AND (
              ? IS NULL OR EXISTS (
@@ -403,6 +403,7 @@ export async function replaceArticleDraftState(
         replacement.title,
         replacement.slug,
         slugKey,
+        replacement.slugIsManual ? 1 : 0,
         replacement.summary,
         JSON.stringify(replacement.tags),
         replacement.byline === null ? null : JSON.stringify(replacement.byline),
@@ -540,9 +541,9 @@ export async function createArticle(database: D1Database): Promise<Article> {
     database
       .prepare(
         `INSERT INTO article_draft
-           (article_id, version, title, slug, slug_key, summary, tags,
-            byline, language, cover, document, created_at, updated_at)
-         VALUES (?, 1, '', NULL, NULL, NULL, '[]', NULL, NULL, NULL, ?, ?, ?)`,
+           (article_id, version, title, slug, slug_key, slug_is_manual, summary,
+            tags, byline, language, cover, document, created_at, updated_at)
+         VALUES (?, 1, '', NULL, NULL, 0, NULL, '[]', NULL, NULL, NULL, ?, ?, ?)`,
       )
       .bind(id, JSON.stringify(emptyDocument), now, now),
   ]);
@@ -625,6 +626,7 @@ export async function updateArticleDraft(
     version: value.version,
     title: value.title,
     slug: value.slug,
+    slugIsManual: value.slugIsManual ?? before.draft.slugIsManual,
     summary: value.summary,
     tags: value.tags,
     byline: value.byline,
