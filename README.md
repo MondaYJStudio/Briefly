@@ -4,6 +4,8 @@
 
 Briefly is a modern, self-hosted publishing engine built for content that deserves a durable life. It brings rich authoring, immutable versioning, private media, and a clean content API into one compact deployment—from the first draft to every website, app, or feed that publishes it.
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/MondaYJStudio/Briefly)
+
 ## Status
 
 Briefly is **pre-alpha**. Its Cloudflare runtime foundation is runnable, but article authoring and publication features are still under development.
@@ -75,7 +77,7 @@ The production Publication renderer is the single `renderPublication` operation 
 
 Renderer Versions `1` through `3` use the DOM-free `@tiptap/static-renderer/pm/html-string` path proven in workerd by Ticket 02. Version `2` records the now-publishable video output and provider facts; Version `3` records application-owned public Asset URLs and Publication Asset reference facts. Production versions are pinned exactly: `@tiptap/core`, `@tiptap/pm`, and `@tiptap/static-renderer` at `3.29.2`, with Zod `4.4.3`. It runs under the project-wide Cloudflare compatibility date `2026-07-28` and `nodejs_compat` flag. The reproducible runtime, dependency, bundle, security, and rejected-path evidence remains in [`prototype/publication-renderer/README.md`](prototype/publication-renderer/README.md).
 
-`pnpm build` selects Wrangler's `production` environment before Cloudflare's Vite plugin writes the deploy configuration. This prevents a later deploy from accidentally carrying local D1/R2 bindings. Wrangler CLI metrics and deployment dependency instrumentation are disabled in the committed configuration.
+`pnpm build` uses the repository-root Cloudflare deployment template. Maintainer releases use `pnpm build:production`, which selects the explicitly configured `production` environment before Cloudflare's Vite plugin writes the deploy configuration. Wrangler CLI metrics and deployment dependency instrumentation are disabled in the committed configuration.
 
 ## Local development
 
@@ -108,17 +110,19 @@ pnpm build
 Non-secret runtime values and binding names are declared in `wrangler.jsonc`:
 
 - `APP_ENV` — `local`, `test`, or `production`
-- `APP_ORIGIN` — the exact canonical application origin; production requires HTTPS
+- `APP_ORIGIN` — optional exact canonical origin for a custom domain; when omitted, Briefly uses the current HTTPS Worker origin
 - `DB` — the D1 binding
 - `MEDIA_BUCKET` — the private R2 binding
 
-Ticket 01 has no required application secrets. For later features, put local-only values in an ignored `.dev.vars` copied from `.dev.vars.example`. Production credentials must be created with Cloudflare Secrets, for example `pnpm exec wrangler secret put <NAME> --env production`; never add credential values to `wrangler.jsonc`, committed environment files, logs, or client code.
+Briefly requires two independent random values of at least 32 characters: `BETTER_AUTH_SECRET` is the permanent authentication secret, while `SETUP_SECRET` is entered once on the First-run setup page. For local development, put them in an ignored `.dev.vars` copied from `.dev.vars.example`. Production values belong in Cloudflare Secrets; never add them to `wrangler.jsonc`, committed environment files, logs, or client code.
 
 ## Cloudflare deployment
 
-Cloudflare Workers with one production D1 database and one private production R2 bucket is the only supported deployment shape. Production releases run only through the committed GitHub Actions workflow after a checked change reaches protected `main`. The workflow builds first, applies pending committed migrations with Wrangler, deploys the Worker only after migration success, and then makes a read-only `GET /health` capability probe.
+For self-hosting, click the Deploy to Cloudflare button near the top of this README. Cloudflare clones this public repository, asks for two secrets, provisions the D1 database and private R2 bucket, applies the committed D1 migrations, and deploys the Worker. Generate a different random value of at least 32 characters for each secret and keep the `SETUP_SECRET` available until setup is complete.
 
-Before the first release, create the Cloudflare resources, replace the production placeholders in `wrangler.jsonc`, and configure the protected GitHub environment and branch rules described in [OPERATIONS.md](OPERATIONS.md). Application credentials, including future setup, recovery, and Better Auth secrets, belong in Cloudflare Secrets. The Cloudflare deployment token and account identifier belong in protected GitHub environment secrets; neither is passed to pull-request jobs.
+After deployment succeeds, open the Worker URL shown by Cloudflare. Visiting `/admin` automatically opens `/setup` on an uninitialized installation. Enter the administrator email and password, then paste the same `SETUP_SECRET` from the deployment form. No `APP_ORIGIN` value is needed for the automatically assigned `workers.dev` address.
+
+The button requires this repository (or a fork of it) to be publicly readable by Cloudflare. Maintainers using a fixed custom domain should instead configure the `production` placeholders in `wrangler.jsonc` and follow the protected GitHub Actions release process in [OPERATIONS.md](OPERATIONS.md). That workflow builds first, applies pending migrations, deploys only after migration success, and finishes with a read-only `GET /health` probe.
 
 Drizzle schema files are the source of truth, and Drizzle Kit generates the ordered SQL and metadata committed under `src/db/migrations`. Wrangler is the sole migration executor and owns D1's migration ledger. Production schema push is unsupported, and the Worker never runs migrations during initialization, requests, or health checks. See the operations runbook for expand-contract migration rules, 0.x release compatibility, and failure diagnosis.
 

@@ -8,14 +8,14 @@
   },
   "compatibility_date": "2026-07-28",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
   "vars": {
-    "APP_ENV": "local",
-    "APP_ORIGIN": "http://localhost:3000",
+    "APP_ENV": "production",
   },
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "briefly-local",
+      "database_name": "briefly",
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "src/db/migrations",
     },
@@ -23,10 +23,31 @@
   "r2_buckets": [
     {
       "binding": "MEDIA_BUCKET",
-      "bucket_name": "briefly-local",
+      "bucket_name": "briefly-media",
     },
   ],
   "env": {
+    "local": {
+      "name": "briefly-local",
+      "vars": {
+        "APP_ENV": "local",
+        "APP_ORIGIN": "http://localhost:3000",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "briefly-local",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "src/db/migrations",
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "MEDIA_BUCKET",
+          "bucket_name": "briefly-local",
+        },
+      ],
+    },
     "production": {
       "name": "briefly",
       "workers_dev": false,
