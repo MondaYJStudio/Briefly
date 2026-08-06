@@ -3,6 +3,7 @@ import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { paraglideCompileOptions } from "./scripts/paraglide-options";
 import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
 
@@ -41,8 +42,7 @@ export default defineConfig(({ mode }) => {
         project: "./project.inlang",
         outdir: "./src/paraglide",
         emitTsDeclarations: true,
-        strategy: ["cookie", "preferredLanguage", "baseLocale"],
-        urlPatterns: [],
+        ...paraglideCompileOptions,
       }),
       tailwindcss(),
       tanstackStart(),

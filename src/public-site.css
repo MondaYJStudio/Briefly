@@ -290,10 +290,47 @@
 }
 
 /* Theme toggle — quiet corner control, 44px hit target */
-.public-site .theme-toggle {
+.public-site .masthead__controls {
   position: absolute;
   inset-block-start: var(--space-6);
   inset-inline-end: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.public-site .locale-switch select {
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: var(--rule-hair) solid var(--border);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--foreground-muted);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.public-site .locale-switch select:focus-visible,
+.public-site .theme-toggle:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+}
+
+.public-site .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.public-site .theme-toggle {
+  position: static;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -840,7 +877,7 @@
     padding-block-start: var(--space-8);
   }
 
-  .public-site .theme-toggle {
+  .public-site .masthead__controls {
     inset-block-start: var(--space-4);
   }
 

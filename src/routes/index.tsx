@@ -4,6 +4,8 @@ import type { CSSProperties } from "react";
 import { getApiClient } from "./api.$";
 import type { PublicArticleListItem } from "../articles/articles";
 import { PublicSiteShell } from "../components/public/public-site-shell";
+import { formatPublicDate } from "../components/public/public-date";
+import { m } from "../paraglide/messages.js";
 import type { SiteSettings } from "../site-settings/site-settings";
 
 export const Route = createFileRoute("/")({
@@ -17,7 +19,8 @@ export const Route = createFileRoute("/")({
     // an opaque Response; at runtime the JSON body is already parsed.
     const siteSettings = site.data as unknown as SiteSettings | undefined;
     const page = articles.data as unknown as
-      { items: PublicArticleListItem[] } | undefined;
+      | { items: PublicArticleListItem[] }
+      | undefined;
     if (site.error || !siteSettings) {
       throw new Error("Site Settings unavailable");
     }
@@ -44,23 +47,20 @@ function revealStyle(index: number): CSSProperties {
   return { "--i": index } as CSSProperties;
 }
 
-function publicationDate(iso: string): string {
-  // Eden treaty revives ISO date strings into Date objects, so normalize
-  // through Date before formatting.
-  return new Date(iso).toISOString().slice(0, 10);
-}
-
-function currentSeason(): string {
+function currentSeasonLabel(): string {
   const month = new Date().getMonth() + 1;
-  if (month >= 3 && month <= 5) return "Spring";
-  if (month >= 6 && month <= 8) return "Summer";
-  if (month >= 9 && month <= 11) return "Autumn";
-  return "Winter";
+  if (month >= 3 && month <= 5) return m.public_season_spring();
+  if (month >= 6 && month <= 8) return m.public_season_summer();
+  if (month >= 9 && month <= 11) return m.public_season_autumn();
+  return m.public_season_winter();
 }
 
 function issueLine(articleCount: number): string {
-  const year = new Date().getFullYear();
-  return `Vol. ${articleCount} · ${currentSeason()} ${year}`;
+  return m.public_issue_line({
+    count: articleCount,
+    season: currentSeasonLabel(),
+    year: new Date().getFullYear(),
+  });
 }
 
 function Home() {
@@ -70,7 +70,6 @@ function Home() {
     <PublicSiteShell
       siteName={site.siteName}
       issueLine={issueLine(articles.length)}
-      locale="en"
       variant="home"
     >
       <main>
@@ -78,7 +77,7 @@ function Home() {
           <section
             className="intro reveal"
             style={revealStyle(1)}
-            aria-label="About this site"
+            aria-label={m.public_about_site()}
           >
             <p>{site.siteDescription}</p>
           </section>
@@ -91,10 +90,10 @@ function Home() {
           aria-labelledby="index-h"
         >
           <div className="section-head">
-            <h2 id="index-h">Articles</h2>
+            <h2 id="index-h">{m.articles()}</h2>
           </div>
           {articles.length === 0 ? (
-            <p className="index__empty">No articles have been published yet.</p>
+            <p className="index__empty">{m.public_no_articles()}</p>
           ) : (
             <ol className="article-list" reversed>
               {articles.map((article) => (
@@ -106,16 +105,16 @@ function Home() {
                   >
                     <span
                       className="article-row__date"
-                      aria-label="Publication date"
+                      aria-label={m.public_publication_date()}
                     >
-                      {publicationDate(article.publishedAt)}
+                      {formatPublicDate(article.publishedAt)}
                     </span>
                     <span className="article-row__body">
                       <span
                         className="article-row__meta-date"
                         aria-hidden="true"
                       >
-                        {publicationDate(article.publishedAt)} ·{" "}
+                        {formatPublicDate(article.publishedAt)} ·{" "}
                       </span>
                       <span className="article-row__title">
                         {article.title}
@@ -140,38 +139,39 @@ function Home() {
           aria-labelledby="how-h"
         >
           <div className="section-head">
-            <h2 id="how-h">How it works</h2>
+            <h2 id="how-h">{m.public_how_it_works()}</h2>
           </div>
-          <p className="how__note">
-            Each article lives as an editable draft alongside a history of
-            immutable publications.
-          </p>
+          <p className="how__note">{m.public_how_it_works_note()}</p>
           <table className="spec">
             <tbody>
               <tr>
-                <th scope="row">Draft</th>
-                <td>A working copy you can revise at any time</td>
-                <td className="spec__foot">Private until published</td>
+                <th scope="row">{m.public_spec_draft()}</th>
+                <td>{m.public_spec_draft_body()}</td>
+                <td className="spec__foot">{m.public_spec_draft_foot()}</td>
               </tr>
               <tr>
-                <th scope="row">Publication</th>
-                <td>A validated, immutable snapshot</td>
-                <td className="spec__foot">Promoted atomically</td>
+                <th scope="row">{m.public_spec_publication()}</th>
+                <td>{m.public_spec_publication_body()}</td>
+                <td className="spec__foot">
+                  {m.public_spec_publication_foot()}
+                </td>
               </tr>
               <tr>
-                <th scope="row">History</th>
-                <td>Every published version is preserved</td>
-                <td className="spec__foot">Review any version</td>
+                <th scope="row">{m.public_spec_history()}</th>
+                <td>{m.public_spec_history_body()}</td>
+                <td className="spec__foot">{m.public_spec_history_foot()}</td>
               </tr>
               <tr>
-                <th scope="row">Media</th>
-                <td>Private assets with stable URLs</td>
-                <td className="spec__foot">Delivered with access control</td>
+                <th scope="row">{m.public_spec_media()}</th>
+                <td>{m.public_spec_media_body()}</td>
+                <td className="spec__foot">{m.public_spec_media_foot()}</td>
               </tr>
               <tr>
-                <th scope="row">Deployment</th>
-                <td>One Cloudflare Worker</td>
-                <td className="spec__foot">Serverless at the edge</td>
+                <th scope="row">{m.public_spec_deployment()}</th>
+                <td>{m.public_spec_deployment_body()}</td>
+                <td className="spec__foot">
+                  {m.public_spec_deployment_foot()}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -184,11 +184,11 @@ function Home() {
           aria-labelledby="console-h"
         >
           <div className="section-head">
-            <h2 id="console-h">Publishing console</h2>
+            <h2 id="console-h">{m.public_publishing_console()}</h2>
           </div>
-          <p>Write, publish, and manage media in one focused workspace.</p>
+          <p>{m.public_publishing_console_body()}</p>
           <a className="console-link" href="/admin">
-            Enter the console
+            {m.public_enter_console()}
             <svg
               className="arrow"
               viewBox="0 0 16 16"
