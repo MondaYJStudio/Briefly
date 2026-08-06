@@ -4,6 +4,11 @@ import type { CSSProperties } from "react";
 import { getApiClient } from "../api.$";
 import type { PublicArticle } from "../../articles/articles";
 import { PublicSiteShell } from "../../components/public/public-site-shell";
+import {
+  formatPublicDate,
+  publicationTimestamp,
+} from "../../components/public/public-date";
+import { m } from "../../paraglide/messages.js";
 import type { SiteSettings } from "../../site-settings/site-settings";
 
 export const Route = createFileRoute("/articles/$slug")({
@@ -48,28 +53,18 @@ function revealStyle(index: number): CSSProperties {
   return { "--i": index } as CSSProperties;
 }
 
-function publicationDate(iso: string): string {
-  // Eden treaty revives ISO date strings into Date objects, so normalize
-  // through Date before formatting.
-  return new Date(iso).toISOString().slice(0, 10);
-}
-
-function publicationTimestamp(iso: string): string {
-  return new Date(iso).toISOString();
-}
-
 function ArticleUnavailable() {
   return (
     <PublicSiteShell siteName="Briefly" variant="interior">
       <main>
         <Link className="back-link" to="/">
-          ← 返回首页
+          ← {m.public_back_to_home()}
         </Link>
         <section className="unavailable reveal" style={revealStyle(1)}>
           <div className="section-head">
-            <h2>文章不可用</h2>
+            <h2>{m.public_article_unavailable()}</h2>
           </div>
-          <p>这篇文章不存在，或者当前没有对外发布。</p>
+          <p>{m.public_article_unavailable_body()}</p>
         </section>
       </main>
     </PublicSiteShell>
@@ -78,14 +73,15 @@ function ArticleUnavailable() {
 
 function ArticlePage() {
   const { site, article } = Route.useLoaderData();
-  const updated =
-    publicationDate(article.updatedAt) !== publicationDate(article.publishedAt);
+  const publishedLabel = formatPublicDate(article.publishedAt);
+  const updatedLabel = formatPublicDate(article.updatedAt);
+  const updated = updatedLabel !== publishedLabel;
 
   return (
     <PublicSiteShell siteName={site.siteName} variant="interior">
       <main>
         <Link className="back-link reveal" style={revealStyle(1)} to="/">
-          ← 返回首页
+          ← {m.public_back_to_home()}
         </Link>
         <article lang={article.language}>
           <header className="article-header reveal" style={revealStyle(2)}>
@@ -106,16 +102,16 @@ function ArticlePage() {
                 )}
               </span>
               <span>
-                发布于{" "}
+                {m.public_published()}{" "}
                 <time dateTime={publicationTimestamp(article.publishedAt)}>
-                  {publicationDate(article.publishedAt)}
+                  {publishedLabel}
                 </time>
               </span>
               {updated ? (
                 <span>
-                  更新于{" "}
+                  {m.public_updated()}{" "}
                   <time dateTime={publicationTimestamp(article.updatedAt)}>
-                    {publicationDate(article.updatedAt)}
+                    {updatedLabel}
                   </time>
                 </span>
               ) : null}

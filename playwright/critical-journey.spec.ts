@@ -116,6 +116,57 @@ test("Interface Locale fallback and switching keep SSR and hydration aligned", a
   await context.close();
 });
 
+test("public locale URLs switch while preserving the destination", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    baseURL: playwrightBaseUrl,
+    locale: "en",
+  });
+  const page = await context.newPage();
+  const hydrationErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && /hydration/i.test(message.text())) {
+      hydrationErrors.push(message.text());
+    }
+  });
+
+  const homeResponse = await page.goto("/?ref=nav");
+  expect(await homeResponse?.text()).toContain('<html lang="en"');
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(
+    page.getByRole("heading", { name: "How it works" }),
+  ).toBeVisible();
+
+  await page.getByLabel("Interface language").selectOption("zh-CN");
+  await expect(page).toHaveURL(/\/zh-CN\/?/);
+  expect(page.url()).toContain("ref=nav");
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  await expect(
+    page.getByRole("heading", { name: "核心机制" }),
+  ).toBeVisible();
+
+  const articleResponse = await page.goto(
+    "/articles/missing-public-locale?src=list",
+  );
+  expect(await articleResponse?.text()).toContain('<html lang="en"');
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(
+    page.getByRole("heading", { name: "Article unavailable" }),
+  ).toBeVisible();
+
+  await page.getByLabel("Interface language").selectOption("zh-CN");
+  await expect(page).toHaveURL(/\/zh-CN\/articles\/missing-public-locale/);
+  expect(page.url()).toContain("src=list");
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  await expect(
+    page.getByRole("heading", { name: "文章不可用" }),
+  ).toBeVisible();
+
+  expect(hydrationErrors).toEqual([]);
+  await context.close();
+});
+
 test("the recovery surface restores invalid and successful states", async ({
   page,
 }) => {
