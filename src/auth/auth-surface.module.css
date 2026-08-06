@@ -21,7 +21,7 @@
   background:
     radial-gradient(
       60% 80% at 50% 0%,
-      color-mix(in oklch, var(--primary, oklch(0.55 0.2 263)) 10%, transparent),
+      color-mix(in oklch, var(--foreground, oklch(0.21 0.008 264)) 8%, transparent),
       transparent 70%
     );
   opacity: 0.9;
@@ -104,7 +104,7 @@
 }
 
 .iconButton:focus-visible {
-  outline: 2px solid var(--focus, oklch(0.63 0.17 256));
+  outline: 2px solid var(--focus, var(--foreground, oklch(0.21 0.008 264)));
   outline-offset: 2px;
 }
 
