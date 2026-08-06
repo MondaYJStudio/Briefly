@@ -70,6 +70,7 @@ function Setup() {
           : "Create the single administrator for this site."
       }
       footerLink={{ href: "/sign-in", label: "Sign in" }}
+      showHeader={state !== "success"}
     >
       {state === "checking" ? (
         <div className="flex items-center gap-3" role="status">
@@ -77,16 +78,30 @@ function Setup() {
           <span>Checking installation status…</span>
         </div>
       ) : state === "success" ? (
-        <div className="space-y-4">
-          <Alert status="success">
-            <Alert.Content>
-              <Alert.Title>Initialization complete</Alert.Title>
-              <Alert.Description>
-                The sole Administrator can now sign in.
-              </Alert.Description>
-            </Alert.Content>
-          </Alert>
-          <Button onPress={() => globalThis.location.assign("/sign-in")}>
+        <div className="authentication-empty" role="status">
+          <div className="authentication-empty-icon" aria-hidden="true">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+          </div>
+          <h1>Briefly is ready</h1>
+          <p>
+            The admin account was created. The one-time setup code is now
+            permanently disabled.
+          </p>
+          <Button
+            fullWidth
+            onPress={() => globalThis.location.assign("/sign-in")}
+          >
             Continue to sign in
           </Button>
         </div>
