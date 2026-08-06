@@ -52,6 +52,7 @@ export function SettingsField({
       {children}
       {issues.length > 0 ? (
         <ul
+          id={`${htmlFor}-error`}
           className="list-disc pl-5"
           role="alert"
           style={{

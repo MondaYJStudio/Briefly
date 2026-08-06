@@ -1452,6 +1452,38 @@ html[data-theme="dark"],
   gap: var(--space-3);
   width: 100%;
 }
+.briefly-drawer-wide .stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.briefly-drawer-wide .field-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.settings-section-title {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-medium);
+  font-weight: 700;
+}
+.settings-section-description {
+  margin: calc(var(--space-3) * -1) 0 var(--space-5);
+}
+.settings-actions {
+  justify-content: flex-end;
+  min-height: 2.5rem;
+}
+.settings-actions .save-state {
+  margin-right: var(--space-1);
+}
+.briefly-drawer-wide .alert > button:last-child {
+  margin-left: auto;
+}
+.briefly-drawer-wide form[aria-disabled="true"] {
+  opacity: 0.6;
+  pointer-events: none;
+}
 .briefly-menu-note {
   font-size: 0.75rem;
   color: var(--foreground-faint, #71717a);

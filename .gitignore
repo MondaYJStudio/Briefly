@@ -29,3 +29,5 @@ Thumbs.db
 .scratch/
 docs/
 AGENTS.md
+/.claude/
+/skills-lock.json
