@@ -4,11 +4,16 @@ import {
   Button,
   Drawer,
   Form,
-  Input,
-  Label,
   Modal,
 } from "@heroui/react";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  type DragEvent,
+  type FormEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { assetHasReferences, type AssetLibraryEntry } from "./assets";
 import { AdminIcon } from "../components/admin/icons";
@@ -101,7 +106,10 @@ export function AssetMediaLibrary() {
   const [state, setState] = useState<MediaLibraryState>("loading");
   const [issues, setIssues] = useState<string[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadFileName, setUploadFileName] = useState<string | null>(null);
+  const [uploadDragging, setUploadDragging] = useState(false);
   const lastFocusRef = useRef<HTMLElement | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const locale = getLocale();
   const selected = assets.find((asset) => asset.id === selectedAssetId) ?? null;
   const selectedIsReferenced = selected ? assetHasReferences(selected) : false;
@@ -138,6 +146,54 @@ export function AssetMediaLibrary() {
     setUploadOpen(true);
   }
 
+  function handleUploadOpenChange(open: boolean) {
+    setUploadOpen(open);
+    if (!open) {
+      setUploadFileName(null);
+      setUploadDragging(false);
+      if (uploadInputRef.current) uploadInputRef.current.value = "";
+    }
+  }
+
+  function setUploadFile(file: File | null) {
+    const input = uploadInputRef.current;
+    if (!input) return;
+    if (!file) {
+      input.value = "";
+      setUploadFileName(null);
+      return;
+    }
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+    setUploadFileName(file.name);
+  }
+
+  function onUploadInputChange(event: ChangeEvent<HTMLInputElement>) {
+    setUploadFileName(event.target.files?.[0]?.name ?? null);
+  }
+
+  function onUploadDragEnter(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setUploadDragging(true);
+  }
+
+  function onUploadDragOver(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+  }
+
+  function onUploadDragLeave(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setUploadDragging(false);
+  }
+
+  function onUploadDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setUploadDragging(false);
+    const file = event.dataTransfer.files?.[0] ?? null;
+    if (file) setUploadFile(file);
+  }
+
   function selectAsset(assetId: string, trigger: HTMLElement) {
     lastFocusRef.current = trigger;
     setSelectedAssetId(assetId);
@@ -168,6 +224,7 @@ export function AssetMediaLibrary() {
         setSelectedAssetId(response.data.id);
         setState("uploaded");
         setUploadOpen(false);
+        setUploadFileName(null);
         form.reset();
         return;
       }
@@ -379,7 +436,7 @@ export function AssetMediaLibrary() {
           </ul>
         )}
 
-        <Modal.Backdrop isOpen={uploadOpen} onOpenChange={setUploadOpen}>
+        <Modal.Backdrop isOpen={uploadOpen} onOpenChange={handleUploadOpenChange}>
           <Modal.Container>
             <Modal.Dialog aria-label={m.upload_image()}>
               <Modal.Header>
@@ -390,7 +447,14 @@ export function AssetMediaLibrary() {
               </Modal.Header>
               <Form onSubmit={uploadImage}>
                 <Modal.Body>
-                  <div className={styles.dropzone}>
+                  <label
+                    className={`${styles.dropzone}${uploadDragging ? ` ${styles.dropzoneActive}` : ""}`}
+                    htmlFor="assetFile"
+                    onDragEnter={onUploadDragEnter}
+                    onDragOver={onUploadDragOver}
+                    onDragLeave={onUploadDragLeave}
+                    onDrop={onUploadDrop}
+                  >
                     <AdminIcon name="upload" size={24} />
                     <p className={styles.dropzoneTitle}>
                       {m.choose_verified_image()}
@@ -398,21 +462,20 @@ export function AssetMediaLibrary() {
                     <p className={styles.dropzoneHint}>
                       {m.accepted_image_formats_short()}
                     </p>
-                    <div className="mt-4" style={{ textAlign: "left" }}>
-                      <Label htmlFor="assetFile">
-                        {m.upload_verified_image()}
-                      </Label>
-                      <Input
-                        className="mt-2"
-                        fullWidth
-                        id="assetFile"
-                        name="assetFile"
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,image/avif"
-                        required
-                      />
-                    </div>
-                  </div>
+                    {uploadFileName ? (
+                      <p className={styles.dropzoneFile}>{uploadFileName}</p>
+                    ) : null}
+                    <input
+                      ref={uploadInputRef}
+                      className={styles.dropzoneInput}
+                      id="assetFile"
+                      name="assetFile"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/avif"
+                      required
+                      onChange={onUploadInputChange}
+                    />
+                  </label>
                   <div className={styles.uploadLimits} role="note">
                     <AdminIcon name="alert" strokeWidth={1.8} />
                     <div>{m.upload_limits_note()}</div>
@@ -422,7 +485,7 @@ export function AssetMediaLibrary() {
                   <Button
                     type="button"
                     variant="secondary"
-                    onPress={() => setUploadOpen(false)}
+                    onPress={() => handleUploadOpenChange(false)}
                   >
                     {m.cancel()}
                   </Button>

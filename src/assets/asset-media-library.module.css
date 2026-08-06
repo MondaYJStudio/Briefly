@@ -154,17 +154,22 @@
 }
 
 .dropzone {
+  display: block;
+  position: relative;
   border: 1.5px dashed var(--border-strong);
   border-radius: var(--radius-l);
   padding: var(--space-6);
   text-align: center;
   color: var(--foreground-muted);
+  cursor: pointer;
   transition:
     border-color var(--dur-fast) var(--ease-out),
     background var(--dur-fast) var(--ease-out);
 }
 
-.dropzone:hover {
+.dropzone:hover,
+.dropzone:focus-within,
+.dropzoneActive {
   border-color: var(--primary);
   background: var(--primary-soft-bg);
 }
@@ -183,6 +188,26 @@
 .dropzoneHint {
   font-size: var(--text-small);
   color: var(--foreground-faint);
+}
+
+.dropzoneFile {
+  margin-top: var(--space-3);
+  font-size: var(--text-small);
+  font-weight: 500;
+  color: var(--foreground);
+  word-break: break-all;
+}
+
+.dropzoneInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .uploadLimits {
