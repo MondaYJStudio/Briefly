@@ -282,7 +282,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await expect(page).toHaveURL(/\/admin\/articles$/);
 
     await identityMenu().click();
-    await page.getByRole("menuitem", { name: "Settings…" }).click();
+    await page.getByRole("menuitem", { name: "Settings" }).click();
     await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
     await expect(page).toHaveURL(/\/admin\/articles$/);
     await page.keyboard.press("Escape");
@@ -291,24 +291,25 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     );
 
     await identityMenu().click();
-    await page.getByRole("menuitem", { name: "Account…" }).click();
+    await page.getByRole("menuitem", { name: "Account" }).click();
     await expect(page.getByRole("dialog", { name: "Account" })).toBeVisible();
     await expect(page.getByLabel("Email")).toHaveValue(administratorEmail);
     await expect(page).toHaveURL(/\/admin\/articles$/);
     await page.keyboard.press("Escape");
 
     await identityMenu().click();
-    await page.getByRole("menuitem", { name: "Dark mode" }).click();
+    await page.getByRole("menuitem", { name: "Appearance, Light" }).click();
     await expect
       .poll(async () => page.locator("html").getAttribute("data-theme"))
       .toBe("dark");
     await identityMenu().click();
-    await page.getByRole("menuitem", { name: "Light mode" }).click();
+    await page.getByRole("menuitem", { name: "Appearance, Dark" }).click();
     await expect
       .poll(async () => page.locator("html").getAttribute("data-theme"))
       .toBe("light");
 
     await identityMenu().click();
+    await page.getByRole("menuitem", { name: "Interface language" }).hover();
     await page.getByRole("menuitem", { name: "简体中文" }).click();
     await expect
       .poll(async () => page.locator("html").getAttribute("lang"))
@@ -320,6 +321,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
         name: `设置与账户菜单 — ${administratorEmail}`,
       })
       .click();
+    await page.getByRole("menuitem", { name: "界面语言" }).hover();
     await page.getByRole("menuitem", { name: "English" }).click();
     await expect
       .poll(async () => page.locator("html").getAttribute("lang"))

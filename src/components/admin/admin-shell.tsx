@@ -149,7 +149,7 @@ export function AdminShell({
               </span>
               <AdminIcon name="chevron" size={14} className={styles.chevron} />
             </Dropdown.Trigger>
-            <Dropdown.Popover placement="top start">
+            <Dropdown.Popover placement="top start" className={styles.identityMenu}>
               <Dropdown.Menu
                 aria-label={m.settings_and_account()}
                 disabledKeys={signOutPending ? ["sign-out"] : []}
@@ -157,41 +157,90 @@ export function AdminShell({
                   if (key === "settings") onOpenDrawer("settings");
                   else if (key === "account") onOpenDrawer("account");
                   else if (key === "theme") onToggleTheme();
-                  else if (key === "locale") {
-                    setLocale(locale === "en" ? "zh-CN" : "en");
-                  } else if (key === "sign-out") onSignOut();
+                  else if (key === "sign-out") onSignOut();
                 }}
               >
                 <Dropdown.Item id="settings" textValue={m.settings_menu()}>
                   <span className={styles.menuRow}>
                     <AdminIcon name="settings" size={16} />
-                    {m.settings_menu()}
+                    <span className={styles.menuLabel}>{m.settings_menu()}</span>
+                    <AdminIcon
+                      name="chevron-right"
+                      size={14}
+                      className={styles.menuAffordance}
+                    />
                   </span>
                 </Dropdown.Item>
                 <Dropdown.Item id="account" textValue={m.account_menu()}>
                   <span className={styles.menuRow}>
                     <AdminIcon name="account" size={16} />
-                    {m.account_menu()}
+                    <span className={styles.menuLabel}>{m.account_menu()}</span>
+                    <AdminIcon
+                      name="chevron-right"
+                      size={14}
+                      className={styles.menuAffordance}
+                    />
                   </span>
                 </Dropdown.Item>
                 <Separator />
-                <Dropdown.Item id="theme" textValue={m.toggle_theme()}>
+                <Dropdown.Item
+                  id="theme"
+                  textValue={`${m.appearance()}, ${theme === "light" ? m.light_mode() : m.dark_mode()}`}
+                >
                   <span className={styles.menuRow}>
                     <AdminIcon
-                      name={theme === "light" ? "moon" : "sun"}
+                      name={theme === "light" ? "sun" : "moon"}
                       size={16}
                     />
-                    {theme === "light" ? m.dark_mode() : m.light_mode()}
+                    <span className={styles.menuLabel}>{m.appearance()}</span>
+                    <span className={styles.menuValue}>
+                      {theme === "light" ? m.light_mode() : m.dark_mode()}
+                    </span>
                   </span>
                 </Dropdown.Item>
-                <Dropdown.Item id="locale" textValue={m.interface_language()}>
-                  <span className={styles.menuRow}>
-                    <AdminIcon name="globe" size={16} />
-                    {locale === "en"
-                      ? m.switch_to_zh_cn()
-                      : m.switch_to_english()}
-                  </span>
-                </Dropdown.Item>
+                <Dropdown.SubmenuTrigger>
+                  <Dropdown.Item
+                    id="locale"
+                    textValue={m.interface_language()}
+                  >
+                    <span className={styles.menuRow}>
+                      <AdminIcon name="globe" size={16} />
+                      <span className={styles.menuLabel}>
+                        {m.interface_language()}
+                      </span>
+                    </span>
+                    <Dropdown.SubmenuIndicator />
+                  </Dropdown.Item>
+                  <Dropdown.Popover placement="end top">
+                    <Dropdown.Menu
+                      aria-label={m.interface_language()}
+                      selectionMode="single"
+                      selectedKeys={new Set([locale])}
+                      onSelectionChange={(keys) => {
+                        if (keys === "all") return;
+                        const next = keys.values().next().value;
+                        if (next === "en" || next === "zh-CN") {
+                          setLocale(next);
+                        }
+                      }}
+                    >
+                      <Dropdown.Item
+                        id="en"
+                        textValue={m.switch_to_english()}
+                      >
+                        <Dropdown.ItemIndicator />
+                        {m.switch_to_english()}
+                      </Dropdown.Item>
+                      <Dropdown.Item
+                        id="zh-CN"
+                        textValue={m.switch_to_zh_cn()}
+                      >
+                        <Dropdown.ItemIndicator />
+                        {m.switch_to_zh_cn()}
+                      </Dropdown.Item>
+                    </Dropdown.Menu>
+                  </Dropdown.Popover>
+                </Dropdown.SubmenuTrigger>
                 <Separator />
                 <Dropdown.Item
                   id="sign-out"

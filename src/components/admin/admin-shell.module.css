@@ -142,13 +142,42 @@
 }
 
 .menuRow {
-  @apply flex items-center;
+  @apply flex w-full min-w-0 items-center;
   gap: 0.75rem;
+}
+
+.menuRow > svg:first-child {
+  flex-shrink: 0;
+  color: var(--foreground-muted);
+}
+
+.menuLabel {
+  flex: 1;
+  min-width: 0;
+}
+
+.menuValue {
+  margin-left: auto;
+  color: var(--foreground-faint);
+  font-size: var(--text-tiny);
+  font-weight: 550;
+  letter-spacing: 0.01em;
+  flex-shrink: 0;
+}
+
+.menuAffordance {
+  margin-left: auto;
+  color: var(--foreground-faint);
+  flex-shrink: 0;
 }
 
 .chevron {
   margin-left: auto;
   color: var(--foreground-faint);
+}
+
+.identityMenu {
+  min-width: 13.5rem;
 }
 
 .main {

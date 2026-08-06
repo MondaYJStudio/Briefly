@@ -10,6 +10,7 @@ export type AdminIconName =
   | "check"
   | "chevron"
   | "chevron-down"
+  | "chevron-right"
   | "clock"
   | "close"
   | "code"
@@ -55,6 +56,7 @@ const STROKE_ICONS: Record<Exclude<AdminIconName, "more">, string> = {
   check: "M20 6 9 17l-5-5",
   chevron: "m18 15-6-6-6 6",
   "chevron-down": "m6 9 6 6 6-6",
+  "chevron-right": "m9 6 6 6-6 6",
   clock: "M12 12m-9 0a9 9 0 1 0 18 0 9 9 0 1 0-18 0|M12 7v5l3 2",
   close: "M18 6 6 18M6 6l12 12",
   code: "m16 18 6-6-6-6M8 6l-6 6 6 6",
