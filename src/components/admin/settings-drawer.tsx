@@ -7,7 +7,13 @@ import {
   Spinner,
   TextArea,
 } from "@heroui/react";
-import { type FormEvent, useEffect, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { getApiClient } from "../../routes/api.$";
 import {
@@ -18,6 +24,7 @@ import {
   SITE_NAME_MAXIMUM_LENGTH,
   type SiteSettings,
 } from "../../site-settings/site-settings";
+import { AdminIcon } from "./icons";
 import { SettingsField } from "./fields";
 
 interface SettingsDrawerProps {
@@ -27,46 +34,83 @@ interface SettingsDrawerProps {
   onSettingsChange: (settings: SiteSettings) => void;
 }
 
-/**
- * Site settings as an overlay drawer (deep-linkable route in the prototype):
- * it covers the current page instead of replacing it.
- */
+type SettingsState = "loading" | "ready" | "submitting" | "saved" | "failed";
+
+function LoadingState() {
+  return (
+    <div className="stack" role="status" aria-label="Loading settings">
+      <div className="card card-pad">
+        <div className="skeleton" style={{ width: "8rem", height: "0.9rem" }} />
+        <div className="skeleton mt-4" style={{ height: "2.5rem" }} />
+        <div className="skeleton mt-4" style={{ height: "5rem" }} />
+      </div>
+      <div className="card card-pad">
+        <div
+          className="skeleton"
+          style={{ width: "10rem", height: "0.9rem" }}
+        />
+        <div className="skeleton mt-4" style={{ height: "2.5rem" }} />
+        <div className="skeleton mt-4" style={{ height: "2.5rem" }} />
+        <div
+          className="skeleton mt-4"
+          style={{ width: "60%", height: "2.5rem" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SettingsCard({ children }: Readonly<{ children: ReactNode }>) {
+  return <section className="card card-pad">{children}</section>;
+}
+
 export function SettingsDrawer({
   open,
   onOpenChange,
   settings,
   onSettingsChange,
 }: SettingsDrawerProps) {
-  const [state, setState] = useState<
-    "loading" | "ready" | "submitting" | "saved" | "error"
-  >("loading");
-  const [issues, setIssues] = useState<string[]>([]);
+  const [state, setState] = useState<SettingsState>("loading");
+  const [issues, setIssues] = useState<
+    ReadonlyArray<{ path: string; message: string }>
+  >([]);
 
   useEffect(() => {
     if (!open) return;
     let active = true;
     setState("loading");
+    setIssues([]);
     void getApiClient()
       .admin["site-settings"].get()
       .then((response) => {
         if (response.status !== 200 || !response.data)
-          throw new Error("Site Settings unavailable");
+          throw new Error("unavailable");
         if (active) {
           onSettingsChange(response.data);
           setState("ready");
         }
       })
       .catch(() => {
-        if (active) setState("error");
+        if (active) setState("failed");
       });
     return () => {
       active = false;
     };
+    // Settings are intentionally refreshed whenever the drawer opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const issueByPath = useMemo(
+    () => new Map(issues.map((issue) => [issue.path, issue.message])),
+    [issues],
+  );
+
+  function update(next: SiteSettings) {
+    onSettingsChange(next);
+    if (state === "saved" || state === "failed") setState("ready");
+  }
+
+  async function persistSettings() {
     if (!settings) return;
     setState("submitting");
     setIssues([]);
@@ -74,21 +118,26 @@ export function SettingsDrawer({
       const response =
         await getApiClient().admin["site-settings"].put(settings);
       if (response.status !== 200 || !response.data) {
-        const error = response.error?.value;
-        setIssues(
-          error && "issues" in error
-            ? error.issues.map((issue) => issue.message)
-            : [],
-        );
-        setState("error");
+        const value = response.error?.value;
+        const nextIssues = value && "issues" in value ? value.issues : [];
+        setIssues(nextIssues);
+        setState("failed");
         return;
       }
       onSettingsChange(response.data);
       setState("saved");
     } catch {
-      setState("error");
+      setState("failed");
     }
   }
+
+  function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void persistSettings();
+  }
+
+  const disabled = state === "submitting";
+  const hasValidation = issues.length > 0;
 
   return (
     <Drawer.Backdrop isOpen={open} onOpenChange={onOpenChange}>
@@ -109,29 +158,55 @@ export function SettingsDrawer({
             </div>
           </Drawer.Header>
           <Drawer.Body style={{ padding: "var(--space-5)" }}>
-            {state === "loading" ? (
-              <div className="card card-pad row" role="status">
-                <Spinner aria-label="Loading Site Settings" />
-                <span>Loading Site Settings…</span>
-              </div>
-            ) : settings ? (
-              <Form className="stack" onSubmit={save}>
-                {state === "error" ? (
+            {state === "loading" || !settings ? (
+              state === "loading" ? (
+                <LoadingState />
+              ) : (
+                <Alert status="danger" role="alert">
+                  <Alert.Content>
+                    <Alert.Title>Unable to load Site Settings</Alert.Title>
+                    <Alert.Description>
+                      Refresh the page to try again.
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert>
+              )
+            ) : (
+              <Form
+                className="stack"
+                onSubmit={save}
+                aria-label="Site settings"
+                aria-disabled={disabled}
+              >
+                {hasValidation ? (
+                  <Alert status="danger" role="alert">
+                    <Alert.Content>
+                      <Alert.Title>
+                        {issues.length} field{issues.length === 1 ? "" : "s"}{" "}
+                        need attention
+                      </Alert.Title>
+                      <Alert.Description>
+                        Nothing was saved. Fix the highlighted fields and save
+                        again.
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert>
+                ) : state === "failed" ? (
                   <Alert status="danger" role="alert">
                     <Alert.Content>
                       <Alert.Title>Couldn’t save settings</Alert.Title>
                       <Alert.Description>
-                        {issues.length > 0 ? (
-                          <ul className="list-disc pl-5">
-                            {issues.map((issue) => (
-                              <li key={issue}>{issue}</li>
-                            ))}
-                          </ul>
-                        ) : (
-                          "The request failed. Your edits are still in the form — retry to send them again."
-                        )}
+                        The request failed. Your edits are still in the form —
+                        retry to send them again.
                       </Alert.Description>
                     </Alert.Content>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onPress={() => void persistSettings()}
+                    >
+                      Retry
+                    </Button>
                   </Alert>
                 ) : state === "saved" ? (
                   <Alert status="success" role="status">
@@ -145,30 +220,33 @@ export function SettingsDrawer({
                   </Alert>
                 ) : null}
 
-                <div className="card card-pad">
-                  <h2
-                    style={{
-                      fontSize: "var(--text-medium)",
-                      fontWeight: 700,
-                      marginBottom: "var(--space-5)",
-                    }}
-                  >
-                    Site information
-                  </h2>
+                <SettingsCard>
+                  <h2 className="settings-section-title">Site information</h2>
                   <div className="field-stack">
-                    <SettingsField label="Site name" htmlFor="siteName">
+                    <SettingsField
+                      label="Site name"
+                      htmlFor="siteName"
+                      issues={
+                        issueByPath.has("siteName")
+                          ? [issueByPath.get("siteName")!]
+                          : []
+                      }
+                    >
                       <Input
                         fullWidth
                         id="siteName"
                         name="siteName"
                         required
                         maxLength={SITE_NAME_MAXIMUM_LENGTH}
+                        aria-invalid={issueByPath.has("siteName")}
+                        aria-describedby={
+                          issueByPath.has("siteName")
+                            ? "siteName-error"
+                            : undefined
+                        }
                         value={settings.siteName}
-                        onChange={(event) =>
-                          onSettingsChange({
-                            ...settings,
-                            siteName: event.target.value,
-                          })
+                        onChange={(e) =>
+                          update({ ...settings, siteName: e.target.value })
                         }
                       />
                     </SettingsField>
@@ -183,31 +261,22 @@ export function SettingsDrawer({
                         name="siteDescription"
                         maxLength={SITE_DESCRIPTION_MAXIMUM_LENGTH}
                         value={settings.siteDescription ?? ""}
-                        onChange={(event) =>
-                          onSettingsChange({
+                        onChange={(e) =>
+                          update({
                             ...settings,
-                            siteDescription: event.target.value || null,
+                            siteDescription: e.target.value || null,
                           })
                         }
                       />
                     </SettingsField>
                   </div>
-                </div>
+                </SettingsCard>
 
-                <div className="card card-pad">
-                  <h2
-                    style={{
-                      fontSize: "var(--text-medium)",
-                      fontWeight: 700,
-                      marginBottom: "var(--space-2)",
-                    }}
-                  >
+                <SettingsCard>
+                  <h2 className="settings-section-title">
                     Default public identity
                   </h2>
-                  <p
-                    className="small muted"
-                    style={{ marginBottom: "var(--space-5)" }}
-                  >
+                  <p className="small muted settings-section-description">
                     Shown alongside published content. Articles may override any
                     of these per article.
                   </p>
@@ -215,6 +284,11 @@ export function SettingsDrawer({
                     <SettingsField
                       label="Default byline name"
                       htmlFor="defaultBylineName"
+                      issues={
+                        issueByPath.has("defaultByline.name")
+                          ? [issueByPath.get("defaultByline.name")!]
+                          : []
+                      }
                     >
                       <Input
                         fullWidth
@@ -222,13 +296,19 @@ export function SettingsDrawer({
                         name="defaultBylineName"
                         required
                         maxLength={BYLINE_NAME_MAXIMUM_LENGTH}
+                        aria-invalid={issueByPath.has("defaultByline.name")}
+                        aria-describedby={
+                          issueByPath.has("defaultByline.name")
+                            ? "defaultBylineName-error"
+                            : undefined
+                        }
                         value={settings.defaultByline.name}
-                        onChange={(event) =>
-                          onSettingsChange({
+                        onChange={(e) =>
+                          update({
                             ...settings,
                             defaultByline: {
                               ...settings.defaultByline,
-                              name: event.target.value,
+                              name: e.target.value,
                             },
                           })
                         }
@@ -238,6 +318,11 @@ export function SettingsDrawer({
                       label="Byline link"
                       htmlFor="defaultBylineUrl"
                       optional="optional"
+                      issues={
+                        issueByPath.has("defaultByline.url")
+                          ? [issueByPath.get("defaultByline.url")!]
+                          : []
+                      }
                     >
                       <Input
                         fullWidth
@@ -245,13 +330,19 @@ export function SettingsDrawer({
                         name="defaultBylineUrl"
                         type="url"
                         maxLength={BYLINE_URL_MAXIMUM_LENGTH}
+                        aria-invalid={issueByPath.has("defaultByline.url")}
+                        aria-describedby={
+                          issueByPath.has("defaultByline.url")
+                            ? "defaultBylineUrl-error"
+                            : undefined
+                        }
                         value={settings.defaultByline.url ?? ""}
-                        onChange={(event) =>
-                          onSettingsChange({
+                        onChange={(e) =>
+                          update({
                             ...settings,
                             defaultByline: {
                               ...settings.defaultByline,
-                              url: event.target.value || null,
+                              url: e.target.value || null,
                             },
                           })
                         }
@@ -268,6 +359,11 @@ export function SettingsDrawer({
                           <span className="mono">zh-Hans</span>.
                         </>
                       }
+                      issues={
+                        issueByPath.has("defaultLanguage")
+                          ? [issueByPath.get("defaultLanguage")!]
+                          : []
+                      }
                     >
                       <Input
                         fullWidth
@@ -276,40 +372,48 @@ export function SettingsDrawer({
                         name="defaultLanguage"
                         required
                         maxLength={LANGUAGE_TAG_MAXIMUM_LENGTH}
+                        aria-invalid={issueByPath.has("defaultLanguage")}
+                        aria-describedby={
+                          issueByPath.has("defaultLanguage")
+                            ? "defaultLanguage-error"
+                            : undefined
+                        }
                         value={settings.defaultLanguage}
-                        onChange={(event) =>
-                          onSettingsChange({
+                        onChange={(e) =>
+                          update({
                             ...settings,
-                            defaultLanguage: event.target.value,
+                            defaultLanguage: e.target.value,
                           })
                         }
                       />
                     </SettingsField>
                   </div>
-                </div>
+                </SettingsCard>
 
                 <div className="alert alert-default" role="note">
+                  <AdminIcon name="alert" />
                   <div className="alert-body">
                     These values describe <strong>public content</strong>. They
                     are unrelated to the administrator sign-in email in Account.
                   </div>
                 </div>
-
-                <div className="row" style={{ justifyContent: "flex-end" }}>
-                  <Button type="submit" isPending={state === "submitting"}>
-                    Save changes
+                <div className="row settings-actions">
+                  {state === "submitting" ? (
+                    <span className="save-state" role="status">
+                      <Spinner size="sm" />
+                      Saving…
+                    </span>
+                  ) : state === "saved" ? (
+                    <span className="save-state is-ok" role="status">
+                      <AdminIcon name="check" />
+                      All changes saved · just now
+                    </span>
+                  ) : null}
+                  <Button type="submit" isPending={disabled}>
+                    {disabled ? "Saving…" : "Save changes"}
                   </Button>
                 </div>
               </Form>
-            ) : (
-              <Alert status="danger" role="alert">
-                <Alert.Content>
-                  <Alert.Title>Unable to load Site Settings</Alert.Title>
-                  <Alert.Description>
-                    Refresh the page to try again.
-                  </Alert.Description>
-                </Alert.Content>
-              </Alert>
             )}
           </Drawer.Body>
         </Drawer.Dialog>
