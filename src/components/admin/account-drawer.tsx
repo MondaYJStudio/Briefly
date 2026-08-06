@@ -1,5 +1,16 @@
 import { Alert, Button, Drawer, Form, Input, Label } from "@heroui/react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
+
+import { PASSWORD_MINIMUM_LENGTH } from "../../auth/policy";
+import { m } from "../../paraglide/messages.js";
+import styles from "./account-drawer.module.css";
+
+type PasswordState =
+  | "ready"
+  | "submitting"
+  | "validation"
+  | "request-failed"
+  | "success";
 
 /**
  * Account as an overlay drawer: read-only sign-in email, change password
@@ -18,178 +29,252 @@ export function AccountDrawer({
   onSignOut: () => void;
   signOutState: "ready" | "submitting" | "error";
 }>) {
-  const [passwordState, setPasswordState] = useState<
-    "ready" | "submitting" | "error"
-  >("ready");
+  const [passwordState, setPasswordState] = useState<PasswordState>("ready");
   const [newPasswordLength, setNewPasswordLength] = useState(0);
+  const [currentPasswordError, setCurrentPasswordError] = useState<
+    string | null
+  >(null);
+  const [newPasswordError, setNewPasswordError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setPasswordState("ready");
+      setNewPasswordLength(0);
+      setCurrentPasswordError(null);
+      setNewPasswordError(null);
+    }
+  }, [open]);
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const currentPassword = String(formData.get("currentPassword") ?? "");
+    const newPassword = String(formData.get("newPassword") ?? "");
+
+    let nextCurrentError: string | null = null;
+    let nextNewError: string | null = null;
+    if (newPassword.length < PASSWORD_MINIMUM_LENGTH) {
+      nextNewError = m.password_too_short({
+        count: newPassword.length,
+        minimum: PASSWORD_MINIMUM_LENGTH,
+      });
+    }
+    if (nextNewError) {
+      setCurrentPasswordError(null);
+      setNewPasswordError(nextNewError);
+      setPasswordState("validation");
+      return;
+    }
+
     setPasswordState("submitting");
-    const formData = new FormData(event.currentTarget);
+    setCurrentPasswordError(null);
+    setNewPasswordError(null);
+
     try {
       const response = await fetch("/api/auth/change-password", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          currentPassword: formData.get("currentPassword"),
-          newPassword: formData.get("newPassword"),
-        }),
+        body: JSON.stringify({ currentPassword, newPassword }),
       });
       if (response.ok) {
-        globalThis.location.replace("/admin/login");
-      } else {
-        setPasswordState("error");
+        setPasswordState("success");
+        return;
       }
+      if (response.status === 400) {
+        nextCurrentError = m.current_password_incorrect();
+        setCurrentPasswordError(nextCurrentError);
+        setNewPasswordError(null);
+        setPasswordState("validation");
+        return;
+      }
+      setPasswordState("request-failed");
     } catch {
-      setPasswordState("error");
+      setPasswordState("request-failed");
     }
   }
+
+  const passwordHint =
+    newPasswordLength >= PASSWORD_MINIMUM_LENGTH
+      ? m.password_long_enough({ count: newPasswordLength })
+      : m.password_chars_entered({ count: newPasswordLength });
 
   return (
     <Drawer.Backdrop isOpen={open} onOpenChange={onOpenChange}>
       <Drawer.Content placement="right" className="briefly-drawer-wide">
-        <Drawer.Dialog aria-label="Account">
+        <Drawer.Dialog aria-label={m.account_menu()}>
           <Drawer.Header>
-            <div className="briefly-drawer-head">
+            <div className={styles.head}>
               <div>
                 <Drawer.Heading>
-                  <strong>Account</strong>
+                  <strong>{m.account_menu()}</strong>
                 </Drawer.Heading>
-                <p className="small faint" style={{ marginTop: 2 }}>
-                  The single administrator — no other users, roles, or
-                  invitations by design.
+                <p className={`small faint ${styles.description}`}>
+                  {m.account_drawer_description()}
                 </p>
               </div>
-              <Drawer.CloseTrigger aria-label="Close account" />
+              <Drawer.CloseTrigger aria-label={m.close_account()} />
             </div>
           </Drawer.Header>
-          <Drawer.Body style={{ padding: "var(--space-5)" }}>
-            <div className="stack">
+          <Drawer.Body className={styles.body}>
+            <div className={styles.stack}>
               {signOutState === "error" ? (
                 <Alert status="danger" role="alert">
                   <Alert.Content>
-                    <Alert.Title>Unable to sign out</Alert.Title>
-                    <Alert.Description>Please try again.</Alert.Description>
+                    <Alert.Title>{m.sign_out_failed()}</Alert.Title>
+                    <Alert.Description>
+                      {m.sign_out_failed_description()}
+                    </Alert.Description>
                   </Alert.Content>
                 </Alert>
               ) : null}
 
-              <div className="card card-pad">
-                <h2
-                  style={{
-                    fontSize: "var(--text-medium)",
-                    fontWeight: 700,
-                    marginBottom: "var(--space-5)",
-                  }}
-                >
-                  Sign-in email
-                </h2>
-                <SettingsEmailField email={email} />
-              </div>
-
-              <Form className="card card-pad stack" onSubmit={changePassword}>
-                <div>
-                  <h2
-                    style={{
-                      fontSize: "var(--text-medium)",
-                      fontWeight: 700,
-                      marginBottom: "var(--space-2)",
-                    }}
-                  >
-                    Change password
-                  </h2>
-                  <p className="small muted">
-                    After a successful change,{" "}
-                    <strong>every existing session is revoked</strong> —
-                    including this one — and you return to the sign-in page.
+              <div className={styles.card}>
+                <h2 className={styles.sectionTitle}>{m.sign_in_email()}</h2>
+                <div className={styles.field}>
+                  <Label htmlFor="adminEmail">{m.email()}</Label>
+                  <Input
+                    fullWidth
+                    id="adminEmail"
+                    type="email"
+                    value={email}
+                    readOnly
+                    aria-describedby="admin-email-note"
+                  />
+                  <p className={styles.hint} id="admin-email-note">
+                    {m.admin_email_note()}
                   </p>
                 </div>
-                {passwordState === "error" ? (
-                  <Alert status="danger" role="alert">
-                    <Alert.Content>
-                      <Alert.Title>Unable to change password</Alert.Title>
-                      <Alert.Description>
-                        Check the current password and new password, then try
-                        again.
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert>
-                ) : null}
-                <div className="field-stack">
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "var(--space-2)",
-                    }}
-                  >
-                    <Label htmlFor="currentPassword">Current password</Label>
-                    <Input
-                      fullWidth
-                      id="currentPassword"
-                      name="currentPassword"
-                      type="password"
-                      autoComplete="current-password"
-                      required
-                    />
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "var(--space-2)",
-                    }}
-                  >
-                    <Label htmlFor="newPassword">New password</Label>
-                    <Input
-                      fullWidth
-                      id="newPassword"
-                      name="newPassword"
-                      type="password"
-                      autoComplete="new-password"
-                      minLength={12}
-                      maxLength={128}
-                      required
-                      aria-describedby="new-password-hint"
-                      onChange={(event) =>
-                        setNewPasswordLength(event.target.value.length)
-                      }
-                    />
-                    <p className="small faint" id="new-password-hint">
-                      Minimum 12 characters. {newPasswordLength} entered so far
-                      {newPasswordLength >= 12 ? " — long enough." : "."}
-                    </p>
-                  </div>
-                </div>
-                <div className="row" style={{ justifyContent: "flex-end" }}>
-                  <Button
-                    type="submit"
-                    isPending={passwordState === "submitting"}
-                  >
-                    Update password
-                  </Button>
-                </div>
-              </Form>
+              </div>
 
-              <div className="card card-pad">
-                <h2
-                  style={{
-                    fontSize: "var(--text-medium)",
-                    fontWeight: 700,
-                    marginBottom: "var(--space-5)",
-                  }}
-                >
-                  Session
-                </h2>
-                <div className="row-between wrap">
+              <div className={`${styles.card} ${styles.stack}`}>
+                <div>
+                  <h2 className={styles.sectionLead}>{m.change_password()}</h2>
+                  <p className={styles.muted}>
+                    {m.change_password_description()}
+                  </p>
+                </div>
+
+                {passwordState === "success" ? (
+                  <>
+                    <Alert status="success" role="status">
+                      <Alert.Content>
+                        <Alert.Title>{m.password_updated()}</Alert.Title>
+                        <Alert.Description>
+                          {m.password_updated_description()}
+                        </Alert.Description>
+                      </Alert.Content>
+                    </Alert>
+                    <div className={styles.actions}>
+                      <Button
+                        type="button"
+                        onPress={() => {
+                          globalThis.location.replace(
+                            "/admin/login?notice=password-updated",
+                          );
+                        }}
+                      >
+                        {m.continue_sign_in()}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <Form className={styles.stack} onSubmit={changePassword}>
+                    {passwordState === "request-failed" ? (
+                      <Alert status="danger" role="alert">
+                        <Alert.Content>
+                          <Alert.Title>{m.unable_change_password()}</Alert.Title>
+                          <Alert.Description>
+                            {m.unable_change_password_description()}
+                          </Alert.Description>
+                        </Alert.Content>
+                      </Alert>
+                    ) : null}
+                    <div className={styles.fieldStack}>
+                      <div className={styles.field}>
+                        <Label htmlFor="currentPassword">
+                          {m.current_password()}
+                        </Label>
+                        <Input
+                          fullWidth
+                          id="currentPassword"
+                          name="currentPassword"
+                          type="password"
+                          autoComplete="current-password"
+                          required
+                          aria-invalid={Boolean(currentPasswordError)}
+                          aria-describedby={
+                            currentPasswordError
+                              ? "current-password-error"
+                              : undefined
+                          }
+                        />
+                        {currentPasswordError ? (
+                          <p
+                            className={styles.fieldError}
+                            id="current-password-error"
+                            role="alert"
+                          >
+                            {currentPasswordError}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className={styles.field}>
+                        <Label htmlFor="newPassword">{m.new_password()}</Label>
+                        <Input
+                          fullWidth
+                          id="newPassword"
+                          name="newPassword"
+                          type="password"
+                          autoComplete="new-password"
+                          maxLength={128}
+                          required
+                          aria-invalid={Boolean(newPasswordError)}
+                          aria-describedby={
+                            newPasswordError
+                              ? "new-password-error"
+                              : "new-password-hint"
+                          }
+                          onChange={(event) =>
+                            setNewPasswordLength(event.target.value.length)
+                          }
+                        />
+                        {newPasswordError ? (
+                          <p
+                            className={styles.fieldError}
+                            id="new-password-error"
+                            role="alert"
+                          >
+                            {newPasswordError}
+                          </p>
+                        ) : (
+                          <p className={styles.hint} id="new-password-hint">
+                            {m.minimum_password()} {passwordHint}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className={styles.actions}>
+                      <Button
+                        type="submit"
+                        isPending={passwordState === "submitting"}
+                      >
+                        {m.update_password()}
+                      </Button>
+                    </div>
+                  </Form>
+                )}
+              </div>
+
+              <div className={styles.card}>
+                <h2 className={styles.sectionTitle}>{m.session_section()}</h2>
+                <div className={styles.sessionRow}>
                   <div>
-                    <p className="small" style={{ fontWeight: 600 }}>
-                      Sign out of this session
+                    <p className={styles.sessionLabel}>
+                      {m.sign_out_this_session()}
                     </p>
-                    <p className="small muted">
-                      Ends the current browser session only. MFA is not
-                      available in this version.
+                    <p className={styles.muted}>
+                      {m.sign_out_this_session_description()}
                     </p>
                   </div>
                   <Button
@@ -198,7 +283,7 @@ export function AccountDrawer({
                     isPending={signOutState === "submitting"}
                     onPress={onSignOut}
                   >
-                    Sign out
+                    {m.sign_out()}
                   </Button>
                 </div>
               </div>
@@ -207,31 +292,5 @@ export function AccountDrawer({
         </Drawer.Dialog>
       </Drawer.Content>
     </Drawer.Backdrop>
-  );
-}
-
-function SettingsEmailField({ email }: Readonly<{ email: string }>) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--space-2)",
-      }}
-    >
-      <Label htmlFor="adminEmail">Email</Label>
-      <Input
-        fullWidth
-        id="adminEmail"
-        type="email"
-        value={email}
-        readOnly
-        aria-describedby="admin-email-note"
-      />
-      <p className="small faint" id="admin-email-note">
-        Fixed at initialization. This address only signs you in — the public
-        byline lives in Settings.
-      </p>
-    </div>
   );
 }

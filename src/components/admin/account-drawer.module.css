@@ -1,0 +1,86 @@
+@reference "tailwindcss";
+
+.head {
+  @apply flex w-full items-center justify-between;
+  gap: var(--space-3);
+}
+
+.description {
+  margin-top: 2px;
+}
+
+.body {
+  padding: var(--space-5);
+}
+
+.stack {
+  @apply flex flex-col;
+  gap: var(--space-4);
+}
+
+.fieldStack {
+  @apply flex flex-col;
+  gap: var(--space-5);
+}
+
+.card {
+  background: var(--content1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  padding: var(--space-5);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-medium);
+  font-weight: 700;
+}
+
+.sectionLead {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-medium);
+  font-weight: 700;
+}
+
+.sectionLead + .muted {
+  margin-bottom: var(--space-5);
+}
+
+.field {
+  @apply flex w-full flex-col;
+  gap: var(--space-2);
+}
+
+.actions {
+  @apply flex flex-wrap items-center justify-end;
+  gap: var(--space-3);
+}
+
+.sessionRow {
+  @apply flex flex-wrap items-center justify-between;
+  gap: var(--space-4);
+}
+
+.sessionLabel {
+  margin: 0;
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.muted {
+  margin: 0;
+  color: var(--foreground-muted);
+  font-size: var(--text-small);
+}
+
+.hint {
+  margin: 0;
+  color: var(--foreground-faint);
+  font-size: var(--text-tiny);
+}
+
+.fieldError {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-tiny);
+}
