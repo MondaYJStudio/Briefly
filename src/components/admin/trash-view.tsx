@@ -147,8 +147,10 @@ export function TrashView({
                     <span className="article-meta">
                       <span className="m">
                         Trashed{" "}
-                        <time dateTime={article.trashedAt}>
-                          {article.trashedAt}
+                        <time
+                          dateTime={new Date(article.trashedAt).toISOString()}
+                        >
+                          {new Date(article.trashedAt).toLocaleString()}
                         </time>
                       </span>
                       <span className="m">Draft v{article.draftVersion}</span>
