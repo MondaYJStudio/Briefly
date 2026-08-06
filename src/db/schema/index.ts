@@ -17,5 +17,9 @@ export {
   publicationAssetReference,
 } from "./articles";
 export { asset } from "./assets";
+export {
+  installedPublicTemplate,
+  sitePublicPresentation,
+} from "./public-templates";
 export { runtimeMetadata } from "./runtime-metadata";
 export { siteSettings } from "./site-settings";

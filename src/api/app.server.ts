@@ -44,6 +44,10 @@ import {
   type RuntimeBindings,
 } from "../env/runtime.server";
 import {
+  installPublicTemplateFromZip,
+  listInstalledPublicTemplates,
+} from "../public-templates/public-templates.server";
+import {
   readSiteSettings,
   updateSiteSettings,
 } from "../site-settings/site-settings.server";
@@ -585,6 +589,47 @@ function createApi(getBindings: () => RuntimeBindings) {
 
       return { assets: await listAssets(bindings.DB) };
     })
+    .get("/admin/public-templates", async ({ request, set, status }) => {
+      const bindings = getBindings();
+      set.headers["cache-control"] = "no-store";
+      if (!(await administratorIsAuthenticated(bindings, request)))
+        return status(401, {
+          status: "error" as const,
+          code: "AUTHENTICATION_REQUIRED" as const,
+        });
+
+      return { templates: await listInstalledPublicTemplates(bindings.DB) };
+    })
+    .post(
+      "/admin/public-templates",
+      async ({ body, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        const result = await installPublicTemplateFromZip(
+          bindings.DB,
+          bindings.MEDIA_BUCKET,
+          body.file,
+        );
+        if (result.ok) return status(201, result.template);
+        return result.reason === "invalid"
+          ? status(400, {
+              status: "error" as const,
+              code: "PUBLIC_TEMPLATE_INSTALL_INVALID" as const,
+              issues: result.issues,
+            })
+          : status(503, {
+              status: "error" as const,
+              code: "PUBLIC_TEMPLATE_INSTALL_FAILED" as const,
+            });
+      },
+      { body: t.Object({ file: t.File() }) },
+    )
     .post(
       "/admin/assets",
       async ({ body, request, set, status }) => {
