@@ -1,14 +1,38 @@
-import { Alert, AlertDialog, Button, Spinner } from "@heroui/react";
-import { useState } from "react";
+import {
+  Alert,
+  AlertDialog,
+  Button,
+  Input,
+  Label,
+  Spinner,
+} from "@heroui/react";
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect, useId, useRef, useState } from "react";
 
 import type { ArticleTrashEntry } from "../../articles/articles";
+import {
+  expectedPurgeConfirmation,
+  purgeConfirmationMatches,
+} from "../../articles/article-trash";
+import { m } from "../../paraglide/messages.js";
+import { getLocale } from "../../paraglide/runtime.js";
 import { AdminIcon } from "./icons";
 import { StatusChip } from "./status-chip";
+import styles from "./trash-view.module.css";
 import type { ArticleWorkspace } from "./use-article-workspace";
+
+function displayTitle(article: ArticleTrashEntry): string {
+  return article.title || m.trash_untitled();
+}
+
+function formatTrashedAt(trashedAt: string | Date): string {
+  const date = new Date(trashedAt);
+  return date.toLocaleString(getLocale());
+}
 
 /**
  * Trash: trashed articles with restore and permanent-purge confirmations,
- * plus the prototype's "three different verbs" explainer card.
+ * plus the reference "three different verbs" explainer.
  */
 export function TrashView({
   workspace,
@@ -28,72 +52,121 @@ export function TrashView({
   const [purgeTarget, setPurgeTarget] = useState<ArticleTrashEntry | null>(
     null,
   );
+  const [purgeConfirmation, setPurgeConfirmation] = useState("");
+  const restoreTriggerRef = useRef<HTMLElement | null>(null);
+  const purgeTriggerRef = useRef<HTMLElement | null>(null);
+  const confirmInputId = useId();
+  const navigate = useNavigate();
+  const expectedConfirmation = purgeTarget
+    ? expectedPurgeConfirmation({
+        articleId: purgeTarget.id,
+        title: purgeTarget.title,
+      })
+    : "";
+  const purgeConfirmed =
+    purgeTarget !== null &&
+    purgeConfirmationMatches({
+      articleId: purgeTarget.id,
+      title: purgeTarget.title,
+      confirmationTitle: purgeConfirmation,
+    });
+
+  useEffect(() => {
+    if (purgeTarget === null) setPurgeConfirmation("");
+  }, [purgeTarget]);
+
+  const showPurgedOutcome =
+    trashActionState === "purged" && trashedArticles.length === 0;
 
   return (
-    <main className="page" id="admin-main">
-      <header className="page-head">
+    <main className={styles.page} id="admin-main">
+      <header className={styles.pageHead}>
         <div>
-          <h1 className="page-title">Trash</h1>
-          <p className="page-desc">
-            Trashed articles keep their Draft, all Publications, slug records
-            and media references — but leave the normal list. Nothing here is
-            public.
-          </p>
+          <h1 className={styles.pageTitle}>{m.trash_page_title()}</h1>
+          <p className={styles.pageDesc}>{m.trash_page_description()}</p>
         </div>
       </header>
 
-      <div className="stack">
+      <div className={styles.stack}>
+        <Alert status="warning" role="note">
+          <Alert.Content>
+            <Alert.Title>{m.trash_capability_title()}</Alert.Title>
+            <Alert.Description>
+              {m.trash_capability_description()}
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+
         {trashActionState === "trashed" ? (
           <Alert status="success" role="status">
             <Alert.Content>
-              <Alert.Title>Article moved to Trash</Alert.Title>
+              <Alert.Title>{m.trash_moved_title()}</Alert.Title>
               <Alert.Description>
-                It is absent from normal administration and public Article
-                endpoints. Its recoverable work is intact; restoring it will
-                leave it unpublished.
+                {m.trash_moved_description()}
               </Alert.Description>
             </Alert.Content>
           </Alert>
-        ) : trashActionState === "purged" ? (
-          <div className="card">
-            <div className="empty">
-              <div className="empty-icon is-success">
-                <AdminIcon name="check" size={24} />
-              </div>
-              <h3>Deleted permanently</h3>
-              <p>
-                The article, its Draft and all Publications are gone. Its media
-                files were not touched. Formerly public slugs answer{" "}
-                <strong>410 Gone</strong> and can never be used again.
-              </p>
-            </div>
-          </div>
+        ) : trashActionState === "restored" ? (
+          <Alert status="success" role="status">
+            <Alert.Content>
+              <Alert.Title>{m.trash_restored_title()}</Alert.Title>
+              <Alert.Description>
+                {m.trash_restored_description()}
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : trashActionState === "purged" && !showPurgedOutcome ? (
+          <Alert status="success" role="status">
+            <Alert.Content>
+              <Alert.Title>{m.trash_purged_title()}</Alert.Title>
+              <Alert.Description>
+                {m.trash_purged_description()}
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
         ) : trashActionState === "purge-error" ? (
           <Alert status="danger" role="alert">
             <Alert.Content>
-              <Alert.Title>Unable to permanently purge Article</Alert.Title>
+              <Alert.Title>{m.trash_purge_error_title()}</Alert.Title>
               <Alert.Description>
-                Briefly did not confirm the destructive operation. The Article
-                remains in Trash and can be retried safely.
+                {m.trash_purge_error_description()}
               </Alert.Description>
             </Alert.Content>
           </Alert>
         ) : trashActionState === "restore-error" ? (
           <Alert status="danger" role="alert">
             <Alert.Content>
-              <Alert.Title>Unable to restore Article</Alert.Title>
+              <Alert.Title>{m.trash_restore_error_title()}</Alert.Title>
               <Alert.Description>
-                Briefly did not confirm the restore. The Article remains in
-                Trash; reload the Trash view and try again.
+                {m.trash_restore_error_description()}
               </Alert.Description>
             </Alert.Content>
           </Alert>
         ) : null}
 
-        {trashViewState === "loading" ? (
-          <div className="card card-pad row" role="status">
-            <Spinner aria-label="Loading Trash" />
-            <span>Loading Trash…</span>
+        {showPurgedOutcome ? (
+          <div className="card">
+            <div className="empty">
+              <div className="empty-icon is-success">
+                <AdminIcon name="check" size={24} />
+              </div>
+              <h3>{m.trash_purged_title()}</h3>
+              <p>{m.trash_purged_description()}</p>
+              <div className="empty-actions">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onPress={() => void navigate({ to: "/admin/articles" })}
+                >
+                  {m.trash_back_to_articles()}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : trashViewState === "loading" ? (
+          <div className={`card card-pad ${styles.loadingRow}`} role="status">
+            <Spinner aria-label={m.trash_loading_label()} />
+            <span>{m.trash_loading()}</span>
           </div>
         ) : trashViewState === "error" ? (
           <div className="card">
@@ -101,14 +174,11 @@ export function TrashView({
               <div className="empty-icon is-danger">
                 <AdminIcon name="alert" size={24} />
               </div>
-              <h3>Couldn’t load Trash</h3>
-              <p>
-                The request failed. Nothing was changed — this is only a display
-                problem.
-              </p>
+              <h3>{m.trash_load_failed_title()}</h3>
+              <p>{m.trash_load_failed_description()}</p>
               <div className="empty-actions">
                 <Button type="button" onPress={() => void reloadTrashView()}>
-                  Retry
+                  {m.trash_retry()}
                 </Button>
               </div>
             </div>
@@ -119,134 +189,151 @@ export function TrashView({
               <div className="empty-icon">
                 <AdminIcon name="trash" size={24} />
               </div>
-              <h3>Trash is empty</h3>
-              <p>
-                Articles you move to Trash appear here with their full history
-                intact, waiting to be restored or permanently deleted.
-              </p>
+              <h3>{m.trash_empty_title()}</h3>
+              <p>{m.trash_empty_description()}</p>
+              <div className="empty-actions">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onPress={() => void navigate({ to: "/admin/articles" })}
+                >
+                  {m.trash_back_to_articles()}
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
           <div className="card">
-            <ul className="article-list" aria-label="Articles in Trash">
-              {trashedArticles.map((article) => (
-                <li key={article.id} className="article-row no-cover">
-                  <div className="article-main">
-                    <div className="article-title-line">
-                      <span
-                        className={`article-title${article.title ? "" : " untitled"}`}
-                      >
-                        {article.title || "Untitled Article"}
-                      </span>
-                      <StatusChip variant="default" dot>
-                        {article.publicationCount > 0
-                          ? "Was published"
-                          : "Never published"}
-                      </StatusChip>
-                    </div>
-                    <span className="article-meta">
-                      <span className="m">
-                        Trashed{" "}
-                        <time
-                          dateTime={new Date(article.trashedAt).toISOString()}
+            <ul className={styles.list} aria-label={m.trash_list_label()}>
+              {trashedArticles.map((article) => {
+                const title = displayTitle(article);
+                return (
+                  <li key={article.id} className={styles.row}>
+                    <div className={styles.rowMain}>
+                      <div className={styles.titleLine}>
+                        <span
+                          className={`${styles.title}${article.title ? "" : ` ${styles.untitled}`}`}
                         >
-                          {new Date(article.trashedAt).toLocaleString()}
-                        </time>
+                          {title}
+                        </span>
+                        <StatusChip variant="default" dot>
+                          {article.publicationCount > 0
+                            ? m.trash_was_published()
+                            : m.trash_never_published()}
+                        </StatusChip>
+                      </div>
+                      <span className={styles.meta}>
+                        <span>
+                          {m.trash_trashed_at({
+                            when: formatTrashedAt(article.trashedAt),
+                          })}
+                        </span>
+                        <span>
+                          {m.trash_draft_version({
+                            version: String(article.draftVersion),
+                          })}
+                        </span>
+                        <span>
+                          {article.publicationCount === 1
+                            ? m.trash_retained_publications({
+                                count: String(article.publicationCount),
+                              })
+                            : m.trash_retained_publications_plural({
+                                count: String(article.publicationCount),
+                              })}
+                        </span>
                       </span>
-                      <span className="m">Draft v{article.draftVersion}</span>
-                      <span className="m">
-                        {article.publicationCount} retained Publication
-                        {article.publicationCount === 1 ? "" : "s"}
-                      </span>
-                    </span>
-                  </div>
-                  <div className="article-side">
-                    <Button
-                      size="sm"
-                      type="button"
-                      variant="secondary"
-                      aria-label={`Restore ${article.title || article.id} from Trash`}
-                      isDisabled={articleSelectionDisabled}
-                      isPending={trashActionState === "restoring"}
-                      onPress={() => setRestoreTarget(article)}
-                    >
-                      Restore
-                    </Button>
-                    <Button
-                      size="sm"
-                      type="button"
-                      variant="danger-soft"
-                      aria-label={`Permanently purge ${article.title || article.id}`}
-                      isDisabled={articleSelectionDisabled}
-                      isPending={trashActionState === "purging"}
-                      onPress={() => setPurgeTarget(article)}
-                    >
-                      Delete permanently…
-                    </Button>
-                  </div>
-                </li>
-              ))}
+                    </div>
+                    <div className={styles.side}>
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="secondary"
+                        aria-label={m.trash_restore_article({ title })}
+                        isDisabled={articleSelectionDisabled}
+                        isPending={trashActionState === "restoring"}
+                        onPress={(event) => {
+                          const target = event.target;
+                          restoreTriggerRef.current =
+                            target instanceof HTMLElement ? target : null;
+                          setRestoreTarget(article);
+                        }}
+                      >
+                        {m.trash_restore()}
+                      </Button>
+                      <Button
+                        size="sm"
+                        type="button"
+                        variant="danger-soft"
+                        aria-label={m.trash_purge_article({ title })}
+                        isDisabled={articleSelectionDisabled}
+                        isPending={trashActionState === "purging"}
+                        onPress={(event) => {
+                          const target = event.target;
+                          purgeTriggerRef.current =
+                            target instanceof HTMLElement ? target : null;
+                          setPurgeTarget(article);
+                        }}
+                      >
+                        {m.trash_delete_permanently()}
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
 
-        {trashedArticles.length > 0 ? (
+        {!showPurgedOutcome && trashedArticles.length > 0 ? (
           <div className="card card-pad">
-            <h2
-              style={{
-                fontSize: "var(--text-small)",
-                fontWeight: 650,
-                marginBottom: "var(--space-3)",
-              }}
-            >
-              Three different verbs
-            </h2>
-            <div className="stack" style={{ gap: "var(--space-2)" }}>
-              <p className="small muted">
-                <StatusChip variant="warning">Unpublish</StatusChip> Article
-                stays in the normal list — Draft and history kept, republish
-                anytime.
+            <h2 className={styles.verbsTitle}>{m.trash_verbs_title()}</h2>
+            <div className={styles.verbsStack}>
+              <p className={`small muted ${styles.verbLine}`}>
+                <StatusChip variant="warning">
+                  {m.trash_verb_unpublish()}
+                </StatusChip>
+                {m.trash_verb_unpublish_description()}
               </p>
-              <p className="small muted">
-                <StatusChip variant="default">Move to Trash</StatusChip> Article
-                leaves the normal list and goes offline — restorable, always
-                returns unpublished.
+              <p className={`small muted ${styles.verbLine}`}>
+                <StatusChip variant="default">{m.trash_verb_move()}</StatusChip>
+                {m.trash_verb_move_description()}
               </p>
-              <p className="small muted">
-                <StatusChip variant="danger">Delete permanently</StatusChip>{" "}
-                Only possible here in Trash. Cannot be undone.
+              <p className={`small muted ${styles.verbLine}`}>
+                <StatusChip variant="danger">{m.trash_verb_purge()}</StatusChip>
+                {m.trash_verb_purge_description()}
               </p>
             </div>
           </div>
         ) : null}
       </div>
 
-      {/* ===== Restore confirmation ===== */}
       <AlertDialog.Backdrop
         isOpen={restoreTarget !== null}
         onOpenChange={(open) => {
-          if (!open) setRestoreTarget(null);
+          if (!open) {
+            setRestoreTarget(null);
+            queueMicrotask(() => restoreTriggerRef.current?.focus());
+          }
         }}
       >
         <AlertDialog.Container>
           <AlertDialog.Dialog>
             <AlertDialog.Header>
               <AlertDialog.Heading>
-                Restore this Article from Trash?
+                {m.trash_restore_heading()}
               </AlertDialog.Heading>
             </AlertDialog.Header>
             <AlertDialog.Body>
               <p>
-                Restore {restoreTarget?.title || restoreTarget?.id} to normal
-                administration? Its Draft and Publication history remain intact
-                and editable, but it will have no Current Publication. You must
-                explicitly publish it again before anonymous Article endpoints
-                can see it.
+                {m.trash_restore_body({
+                  title: restoreTarget ? displayTitle(restoreTarget) : "",
+                })}
               </p>
             </AlertDialog.Body>
             <AlertDialog.Footer>
               <Button type="button" variant="secondary" slot="close">
-                Cancel
+                {m.trash_cancel()}
               </Button>
               <Button
                 type="button"
@@ -256,51 +343,74 @@ export function TrashView({
                   restoreTarget && void restoreArticleFromTrash(restoreTarget)
                 }
               >
-                Restore Article
+                {m.trash_restore_confirm()}
               </Button>
             </AlertDialog.Footer>
           </AlertDialog.Dialog>
         </AlertDialog.Container>
       </AlertDialog.Backdrop>
 
-      {/* ===== Permanent purge confirmation ===== */}
       <AlertDialog.Backdrop
         isOpen={purgeTarget !== null}
         onOpenChange={(open) => {
-          if (!open) setPurgeTarget(null);
+          if (!open) {
+            setPurgeTarget(null);
+            queueMicrotask(() => purgeTriggerRef.current?.focus());
+          }
         }}
       >
         <AlertDialog.Container>
           <AlertDialog.Dialog>
             <AlertDialog.Header>
               <AlertDialog.Heading>
-                Permanently purge this Article?
+                {m.trash_purge_heading()}
               </AlertDialog.Heading>
             </AlertDialog.Header>
             <AlertDialog.Body>
-              <p>
-                Permanently purge Article ID {purgeTarget?.id}? This cannot be
-                undone. Its Draft and all Publication history, including title,
-                body, summary, tags, Byline, language, and rendered HTML, will
-                be deleted and cannot be restored. Formerly public slugs remain
-                reserved and return 410 Gone. Asset objects are not deleted
-                automatically.
+              <p className={`small ${styles.purgeWarning}`}>
+                {m.trash_purge_warning({
+                  title: purgeTarget ? displayTitle(purgeTarget) : "",
+                })}
               </p>
+              <ul className={`small muted ${styles.purgePoints}`}>
+                <li>{m.trash_purge_point_content()}</li>
+                <li>{m.trash_purge_point_media()}</li>
+                <li>{m.trash_purge_point_tombstone()}</li>
+              </ul>
+              <div className={styles.confirmField}>
+                <Label htmlFor={confirmInputId}>
+                  {purgeTarget && purgeTarget.title.length > 0
+                    ? m.trash_purge_type_title({ title: purgeTarget.title })
+                    : m.trash_purge_type_id()}
+                </Label>
+                <Input
+                  fullWidth
+                  id={confirmInputId}
+                  value={purgeConfirmation}
+                  autoComplete="off"
+                  placeholder={expectedConfirmation}
+                  onChange={(event) =>
+                    setPurgeConfirmation(event.currentTarget.value)
+                  }
+                />
+              </div>
             </AlertDialog.Body>
             <AlertDialog.Footer>
               <Button type="button" variant="secondary" slot="close">
-                Cancel — keep Article
+                {m.trash_purge_cancel()}
               </Button>
               <Button
                 type="button"
                 variant="danger"
                 slot="close"
-                isDisabled={articleSelectionDisabled}
-                onPress={() =>
-                  purgeTarget && void purgeArticleFromTrash(purgeTarget)
-                }
+                isDisabled={articleSelectionDisabled || !purgeConfirmed}
+                aria-disabled={!purgeConfirmed}
+                onPress={() => {
+                  if (!purgeTarget || !purgeConfirmed) return;
+                  void purgeArticleFromTrash(purgeTarget, purgeConfirmation);
+                }}
               >
-                Confirm permanent purge
+                {m.trash_purge_confirm()}
               </Button>
             </AlertDialog.Footer>
           </AlertDialog.Dialog>

@@ -1374,14 +1374,17 @@ export function useArticleWorkspace() {
     }
   }
 
-  async function purgeArticleFromTrash(article: ArticleTrashEntry) {
+  async function purgeArticleFromTrash(
+    article: ArticleTrashEntry,
+    confirmationTitle: string,
+  ) {
     if (articleSelectionDisabled || trashLifecyclePendingRef.current) return;
     trashLifecyclePendingRef.current = true;
     setTrashActionState("purging");
     try {
       const response = await getApiClient()
         .admin.trash.articles({ articleId: article.id })
-        .delete({ confirmationArticleId: article.id });
+        .delete({ confirmationTitle });
       if (response.status !== 200 || !response.data) {
         setTrashActionState("purge-error");
         return;

@@ -84,14 +84,14 @@ async function trashArticle(cookie: string, articleId: string) {
 function purgeArticle(
   cookie: string,
   articleId: string,
-  confirmationArticleId = articleId,
+  confirmationTitle: string,
 ) {
   return SELF.fetch(
     `http://briefly.test/api/admin/trash/articles/${articleId}`,
     {
       method: "DELETE",
       headers: { cookie, "content-type": "application/json" },
-      body: JSON.stringify({ confirmationArticleId }),
+      body: JSON.stringify({ confirmationTitle }),
     },
   );
 }
@@ -132,7 +132,7 @@ describe("Article purge", () => {
     await saveDraft(cookie, article.id, 3, "never-public", "Private revision");
     await trashArticle(cookie, article.id);
 
-    const purged = await purgeArticle(cookie, article.id);
+    const purged = await purgeArticle(cookie, article.id, "Private revision");
     expect(purged.status).toBe(200);
     expect(await purged.json()).toEqual({ id: article.id, purged: true });
 
@@ -198,21 +198,22 @@ describe("Article purge", () => {
     );
   }, 30_000);
 
-  it("requires authentication, Trash state, and an exact Article identity confirmation", async () => {
+  it("requires authentication, Trash state, and an exact title confirmation", async () => {
     const cookie = await initializeAndSignIn();
     const article = await createArticle(cookie);
+    await saveDraft(cookie, article.id, 1, "confirm-title", "Exact Title");
     const endpoint = `http://briefly.test/api/admin/trash/articles/${article.id}`;
     const request = (
       headers: Record<string, string>,
-      confirmationArticleId: string,
+      confirmationTitle: string,
     ) =>
       SELF.fetch(endpoint, {
         method: "DELETE",
         headers: { ...headers, "content-type": "application/json" },
-        body: JSON.stringify({ confirmationArticleId }),
+        body: JSON.stringify({ confirmationTitle }),
       });
 
-    const anonymous = await request({}, article.id);
+    const anonymous = await request({}, "Exact Title");
     expect(anonymous.status).toBe(401);
     expect(anonymous.headers.get("cache-control")).toBe("no-store");
     expect(await anonymous.json()).toEqual({
@@ -220,7 +221,7 @@ describe("Article purge", () => {
       code: "AUTHENTICATION_REQUIRED",
     });
 
-    const notTrashed = await request({ cookie }, article.id);
+    const notTrashed = await request({ cookie }, "Exact Title");
     expect(notTrashed.status).toBe(404);
     expect(await notTrashed.json()).toEqual({
       status: "error",
@@ -228,12 +229,15 @@ describe("Article purge", () => {
     });
 
     await trashArticle(cookie, article.id);
-    const wrongConfirmation = await request(
-      { cookie },
-      "00000000-0000-4000-8000-000000000000",
-    );
+    const wrongConfirmation = await request({ cookie }, "Wrong Title");
     expect(wrongConfirmation.status).toBe(409);
     expect(await wrongConfirmation.json()).toEqual({
+      status: "error",
+      code: "ARTICLE_PURGE_CONFIRMATION_REQUIRED",
+    });
+    const emptyConfirmation = await request({ cookie }, "");
+    expect(emptyConfirmation.status).toBe(409);
+    expect(await emptyConfirmation.json()).toEqual({
       status: "error",
       code: "ARTICLE_PURGE_CONFIRMATION_REQUIRED",
     });
@@ -244,6 +248,27 @@ describe("Article purge", () => {
         })
       ).status,
     ).toBe(200);
+
+    const confirmed = await request({ cookie }, "Exact Title");
+    expect(confirmed.status).toBe(200);
+    expect(await confirmed.json()).toEqual({ id: article.id, purged: true });
+  }, 30_000);
+
+  it("rejects empty confirmation for a blank-title Article and accepts its identity", async () => {
+    const cookie = await initializeAndSignIn();
+    const article = await createArticle(cookie);
+    await trashArticle(cookie, article.id);
+
+    const emptyConfirmation = await purgeArticle(cookie, article.id, "");
+    expect(emptyConfirmation.status).toBe(409);
+    expect(await emptyConfirmation.json()).toEqual({
+      status: "error",
+      code: "ARTICLE_PURGE_CONFIRMATION_REQUIRED",
+    });
+
+    const confirmed = await purgeArticle(cookie, article.id, article.id);
+    expect(confirmed.status).toBe(200);
+    expect(await confirmed.json()).toEqual({ id: article.id, purged: true });
   }, 30_000);
 
   it("removes all content and references while retaining only minimal tombstones and the R2 object", async () => {
@@ -307,7 +332,7 @@ describe("Article purge", () => {
     await publish(cookie, article.id, 3, firstPublicationId);
     await trashArticle(cookie, article.id);
 
-    const purged = await purgeArticle(cookie, article.id);
+    const purged = await purgeArticle(cookie, article.id, "Secret title two");
     expect(purged.status).toBe(200);
 
     for (const table of [
@@ -366,7 +391,7 @@ describe("Article purge", () => {
        END`,
     ).run();
 
-    const purge = () => purgeArticle(cookie, article.id);
+    const purge = () => purgeArticle(cookie, article.id, "Atomic title");
     const failed = await purge();
     expect(failed.status).toBe(500);
     expect(await failed.json()).toEqual({
@@ -412,7 +437,7 @@ describe("Article purge", () => {
 
     const concurrent = await createArticle(cookie);
     const [purged, concurrentClaim] = await Promise.all([
-      purgeArticle(cookie, original.id),
+      purgeArticle(cookie, original.id, "Original"),
       SELF.fetch(
         `http://briefly.test/api/admin/articles/${concurrent.id}/draft`,
         {
@@ -487,11 +512,12 @@ describe("Article purge", () => {
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain('<main class="page" id="admin-main">');
-    expect(html).toContain('<h1 class="page-title">Trash</h1>');
+    expect(html).toContain('id="admin-main"');
+    expect(html).toContain("Trash");
     expect(html).toContain(
       "Trashed articles keep their Draft, all Publications, slug records",
     );
     expect(html).toContain("Nothing here is public.");
+    expect(html).toContain("Recovery and permanent removal");
   }, 30_000);
 });

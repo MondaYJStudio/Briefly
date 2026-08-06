@@ -1,0 +1,137 @@
+@reference "tailwindcss";
+
+.page {
+  @apply flex min-w-0 flex-1 flex-col;
+  padding: var(--space-8) var(--space-10) var(--space-16);
+  max-width: 72rem;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.pageHead {
+  @apply mb-8 flex flex-wrap items-end justify-between;
+  gap: var(--space-4);
+}
+
+.pageTitle {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: var(--leading-tight);
+}
+
+.pageDesc {
+  color: var(--foreground-muted);
+  margin-top: var(--space-2);
+  max-width: 46rem;
+}
+
+.stack {
+  @apply flex flex-col;
+  gap: var(--space-4);
+}
+
+.loadingRow {
+  @apply flex items-center;
+  gap: var(--space-3);
+}
+
+.verbsTitle {
+  font-size: var(--text-small);
+  font-weight: 650;
+  margin-bottom: var(--space-3);
+}
+
+.verbsStack {
+  @apply flex flex-col;
+  gap: var(--space-2);
+}
+
+.verbLine {
+  @apply flex flex-wrap items-start;
+  gap: var(--space-2);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  @apply flex flex-wrap items-start justify-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--divider);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.rowMain {
+  @apply min-w-0 flex-1;
+}
+
+.titleLine {
+  @apply flex flex-wrap items-center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.title {
+  font-weight: 650;
+  font-size: var(--text-medium);
+  letter-spacing: -0.01em;
+}
+
+.untitled {
+  color: var(--foreground-muted);
+  font-style: italic;
+}
+
+.meta {
+  @apply flex flex-wrap;
+  gap: var(--space-3);
+  color: var(--foreground-muted);
+  font-size: var(--text-small);
+}
+
+.side {
+  @apply flex flex-wrap items-center shrink-0;
+  gap: var(--space-2);
+}
+
+.purgeWarning {
+  font-weight: 600;
+}
+
+.purgePoints {
+  padding-left: 1.2rem;
+  line-height: 1.9;
+  margin-top: var(--space-3);
+}
+
+.confirmField {
+  @apply flex flex-col;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+@media (max-width: 860px) {
+  .page {
+    padding: var(--space-5) var(--space-4) var(--space-10);
+  }
+
+  .row {
+    @apply flex-col;
+  }
+
+  .side {
+    width: 100%;
+  }
+
+  .side :global(button) {
+    flex: 1;
+  }
+}
