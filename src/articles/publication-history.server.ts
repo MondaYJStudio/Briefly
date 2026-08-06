@@ -23,9 +23,11 @@ import {
   ARTICLE_TAG_MAXIMUM_LENGTH,
   ARTICLE_TAGS_MAXIMUM_COUNT,
   ARTICLE_TITLE_MAXIMUM_LENGTH,
+  type AdminArticleListItem,
   type Article,
   type ArticleCoverUsage,
   type ArticleDocument,
+  type ArticleLifecycleProjection,
   type ArticlePublicationHistory,
 } from "./articles";
 import type { PublicationRestorationIssue } from "./publication-restoration";
@@ -477,9 +479,15 @@ async function articleHasUnpublishedChanges(
   article: Article,
 ): Promise<boolean> {
   try {
-    const latest = await readPublicationSource(database, article.id);
-    if (!latest) return false;
-    const converted = convertPublicationSource(latest);
+    const source = article.currentPublicationId
+      ? await readPublicationSource(
+          database,
+          article.id,
+          article.currentPublicationId,
+        )
+      : await readPublicationSource(database, article.id);
+    if (!source) return false;
+    const converted = convertPublicationSource(source);
     if (!converted.ok) return true;
     const settings = await readSiteSettings(database);
     const metadata = resolveArticleMetadata(settings, article.draft);
@@ -492,6 +500,137 @@ async function articleHasUnpublishedChanges(
   } catch {
     return true;
   }
+}
+
+function lifecycleProjectionForArticle(
+  article: Article,
+  publicationCount: number,
+  divergesFromCurrent: boolean,
+): ArticleLifecycleProjection {
+  if (article.currentPublicationId === null) {
+    return publicationCount === 0 ? "draft" : "unpublished";
+  }
+  return divergesFromCurrent ? "changes-pending" : "published";
+}
+
+/**
+ * Derive the Articles workspace lifecycle projection for a list page in one
+ * Site Settings read plus batched Publication lookups — never one history
+ * request per row.
+ */
+export async function projectAdminArticles(
+  database: D1Database,
+  articles: Article[],
+): Promise<AdminArticleListItem[]> {
+  if (articles.length === 0) return [];
+
+  const articleIds = articles.map((article) => article.id);
+  const countPlaceholders = articleIds.map(() => "?").join(", ");
+  const { results: countRows } = await database
+    .prepare(
+      `SELECT article_id AS articleId, COUNT(*) AS publicationCount
+       FROM publication
+       WHERE article_id IN (${countPlaceholders})
+       GROUP BY article_id`,
+    )
+    .bind(...articleIds)
+    .all<{ articleId: string; publicationCount: number }>();
+  const publicationCountByArticleId = new Map(
+    countRows.map((row) => [row.articleId, Number(row.publicationCount)]),
+  );
+
+  const currentPublicationIds = [
+    ...new Set(
+      articles
+        .map((article) => article.currentPublicationId)
+        .filter((id): id is string => id !== null),
+    ),
+  ];
+  const currentById = new Map<string, PublicationSource>();
+  if (currentPublicationIds.length > 0) {
+    const publicationPlaceholders = currentPublicationIds
+      .map(() => "?")
+      .join(", ");
+    const { results: publicationRows } = await database
+      .prepare(
+        `SELECT publication.id, publication.article_id,
+                publication.publication_number, publication.title,
+                publication.slug, publication.summary, publication.tags,
+                publication.byline, publication.language, publication.cover,
+                publication.document_schema_version, publication.document
+         FROM publication
+         WHERE publication.id IN (${publicationPlaceholders})`,
+      )
+      .bind(...currentPublicationIds)
+      .all<PublicationSourceRow>();
+    const { results: referenceRows } = await database
+      .prepare(
+        `SELECT publication_id AS publicationId, asset_id, public_asset_id,
+                asset_lifecycle_state
+         FROM publication_asset_reference
+         WHERE publication_id IN (${publicationPlaceholders})
+         ORDER BY publication_id, asset_id`,
+      )
+      .bind(...currentPublicationIds)
+      .all<PublicationReferenceRow & { publicationId: string }>();
+    const referencesByPublicationId = new Map<
+      string,
+      PublicationReferenceRow[]
+    >();
+    for (const row of referenceRows) {
+      const list = referencesByPublicationId.get(row.publicationId) ?? [];
+      list.push({
+        asset_id: row.asset_id,
+        public_asset_id: row.public_asset_id,
+        asset_lifecycle_state: row.asset_lifecycle_state,
+      });
+      referencesByPublicationId.set(row.publicationId, list);
+    }
+    for (const row of publicationRows) {
+      currentById.set(row.id, {
+        row,
+        references: referencesByPublicationId.get(row.id) ?? [],
+      });
+    }
+  }
+
+  const settings = await readSiteSettings(database);
+
+  return articles.map((article) => {
+    const publicationCount = publicationCountByArticleId.get(article.id) ?? 0;
+    let divergesFromCurrent = false;
+    if (article.currentPublicationId !== null) {
+      const source = currentById.get(article.currentPublicationId);
+      if (!source) {
+        divergesFromCurrent = true;
+      } else {
+        try {
+          const converted = convertPublicationSource(source);
+          if (!converted.ok) {
+            divergesFromCurrent = true;
+          } else {
+            const metadata = resolveArticleMetadata(settings, article.draft);
+            divergesFromCurrent = !draftMatchesPublication(
+              article,
+              converted.draft,
+              metadata.byline,
+              metadata.language,
+            );
+          }
+        } catch {
+          divergesFromCurrent = true;
+        }
+      }
+    }
+    return {
+      ...article,
+      lifecycleProjection: lifecycleProjectionForArticle(
+        article,
+        publicationCount,
+        divergesFromCurrent,
+      ),
+    };
+  });
 }
 
 export async function listArticlePublicationHistory(
