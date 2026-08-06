@@ -1,6 +1,6 @@
 import { Alert, Button, Form } from "@heroui/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
 import {
   AuthenticationField,
@@ -13,6 +13,23 @@ function SignIn() {
   const [state, setState] = useState<
     "ready" | "submitting" | "error" | "offline"
   >("ready");
+  const [setupAvailable, setSetupAvailable] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/installation", {
+      headers: { accept: "application/json" },
+    })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const result = (await response.json()) as { initialized: boolean };
+        if (active) setSetupAvailable(!result.initialized);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,7 +59,11 @@ function SignIn() {
     <AuthenticationSurface
       title="Sign in"
       description="The single administrator signs in here. Readers never see this page."
-      footerLink={{ href: "/setup", label: "First-run setup" }}
+      footerLink={
+        setupAvailable
+          ? { href: "/setup", label: "First-run setup" }
+          : undefined
+      }
     >
       <Form className="space-y-5" onSubmit={submit}>
         {state === "error" ? (

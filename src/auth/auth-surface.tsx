@@ -12,7 +12,7 @@ export function AuthenticationSurface({
   title: string;
   description: string;
   children: ReactNode;
-  footerLink: Readonly<{ href: string; label: string }>;
+  footerLink?: Readonly<{ href: string; label: string }>;
   showHeader?: boolean;
   showDescription?: boolean;
 }>) {
@@ -43,12 +43,14 @@ export function AuthenticationSurface({
         ) : null}
         {children}
       </Surface>
-      <p className="mt-5 text-center text-xs text-default-500">
-        Briefly ·{" "}
-        <a className="authentication-link font-medium" href={footerLink.href}>
-          {footerLink.label}
-        </a>
-      </p>
+      {footerLink ? (
+        <p className="mt-5 text-center text-xs text-default-500">
+          Briefly ·{" "}
+          <a className="authentication-link font-medium" href={footerLink.href}>
+            {footerLink.label}
+          </a>
+        </p>
+      ) : null}
     </main>
   );
 }
