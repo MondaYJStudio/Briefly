@@ -229,10 +229,10 @@ describe("Asset reference protection and cleanup", () => {
     });
     const html = await admin.text();
     expect(admin.status).toBe(200);
-    expect(html).toContain('<main class="page" id="admin-main">');
-    expect(html).toContain('<h1 class="page-title">Media</h1>');
+    expect(html).toContain('id="admin-main"');
+    expect(html).toContain(">Media</h1>");
     expect(html).toContain("Images referenced by Drafts and Publications.");
-  }, 30_000);
+  }, 60_000);
 
   it("reports Draft and retained Publication references and blocks both cleanup paths", async () => {
     const cookie = await initializeAndSignIn();

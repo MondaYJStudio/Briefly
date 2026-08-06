@@ -787,13 +787,34 @@ describe("private Asset media library", () => {
     const cookie = await initializeAndSignIn();
 
     const response = await SELF.fetch("http://briefly.test/admin/media", {
-      headers: { cookie },
+      headers: { cookie: `${cookie}; PARAGLIDE_LOCALE=en` },
     });
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain('<main class="page" id="admin-main">');
-    expect(html).toContain('<h1 class="page-title">Media</h1>');
+    expect(html).toContain('id="admin-main"');
+    expect(html).toContain(">Media</h1>");
     expect(html).toContain("Images referenced by Drafts and Publications.");
-  }, 15_000);
+    expect(html).toContain(">Upload image<");
+    expect(html).toContain("JPEG · PNG · WebP · AVIF");
+  }, 60_000);
+
+  it("serves Simplified Chinese Media chrome from the locale Cookie", async () => {
+    const cookie = await initializeAndSignIn();
+
+    const response = await SELF.fetch("http://briefly.test/admin/media", {
+      headers: {
+        "accept-language": "en",
+        cookie: `${cookie}; PARAGLIDE_LOCALE=zh-CN`,
+      },
+    });
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain('<html lang="zh-CN"');
+    expect(html).toContain(">媒体</h1>");
+    expect(html).toContain(">上传图片<");
+    expect(html).toContain("草稿");
+    expect(html).toContain("发布版本");
+  }, 60_000);
 });

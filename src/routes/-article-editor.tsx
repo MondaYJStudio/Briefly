@@ -24,8 +24,13 @@ import {
 import type { PublicationIssue } from "../articles/publication-workflow";
 import type { VideoProviderFacts } from "../articles/video-embeds";
 import type { AssetLibraryEntry, ReadyAsset } from "../assets/assets";
+import {
+  VerifiedAssetPicker,
+  type VerifiedAssetPickerState,
+} from "../assets/verified-asset-picker";
 import { AdminIcon } from "../components/admin/icons";
 import { publicationIssuesForSurface } from "../components/admin/publication-issues";
+import { m } from "../paraglide/messages.js";
 import { getApiClient } from "./api.$";
 
 export interface ArticleEditorProps {
@@ -369,7 +374,7 @@ export function ArticleEditor({
           type="button"
           variant="ghost"
           onPress={() => setActivePanel("media")}
-          aria-label="Insert image"
+          aria-label={m.insert_image()}
         >
           <AdminIcon name="image" size={16} />
         </Button>
@@ -523,7 +528,8 @@ export function ArticleEditor({
       </EditorToolModal>
 
       <EditorToolModal
-        title="Insert image"
+        title={m.insert_image()}
+        closeLabel={m.close_insert_image_dialog()}
         isOpen={activePanel === "media"}
         isWide
         onOpenChange={(open) => setActivePanel(open ? "media" : null)}
@@ -560,12 +566,14 @@ function PublicationGuidance({
 
 function EditorToolModal({
   title,
+  closeLabel,
   isOpen,
   isWide = false,
   onOpenChange,
   children,
 }: Readonly<{
   title: string;
+  closeLabel?: string;
   isOpen: boolean;
   isWide?: boolean;
   onOpenChange: (open: boolean) => void;
@@ -582,7 +590,7 @@ function EditorToolModal({
             <div className="briefly-drawer-head">
               <Modal.Heading>{title}</Modal.Heading>
               <Modal.CloseTrigger
-                aria-label={`Close ${title.toLowerCase()} dialog`}
+                aria-label={closeLabel ?? `Close ${title.toLowerCase()} dialog`}
               />
             </div>
           </Modal.Header>
@@ -832,9 +840,6 @@ function ArticleVideoAuthoring({
   );
 }
 
-type AssetAuthoringState =
-  "error" | "loading" | "ready" | "uploaded" | "uploading";
-
 interface FigureUsage {
   pos: number;
   nodeSize: number;
@@ -878,10 +883,8 @@ function ArticleAssetAuthoring({
 }) {
   const [assets, setAssets] = useState<ReadyAsset[]>([]);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
-  const [state, setState] = useState<AssetAuthoringState>("loading");
+  const [state, setState] = useState<VerifiedAssetPickerState>("loading");
   const [statusMessage, setStatusMessage] = useState("");
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [sourceTab, setSourceTab] = useState<"library" | "upload">("library");
   const [coverAlt, setCoverAlt] = useState(cover?.alt ?? "");
   const [figureAlt, setFigureAlt] = useState("");
   const [figureCaption, setFigureCaption] = useState("");
@@ -921,29 +924,23 @@ function ArticleAssetAuthoring({
 
   useEffect(() => setCoverAlt(cover?.alt ?? ""), [cover]);
 
-  async function uploadSelectedFile() {
-    if (!uploadFile) {
-      setStatusMessage("Choose an image before uploading.");
-      return;
-    }
+  async function uploadSelectedFile(file: File) {
     setState("uploading");
-    setStatusMessage("Uploading and verifying image…");
+    setStatusMessage(m.uploading_and_verifying_image());
     try {
-      const response = await getApiClient().admin.assets.post({
-        file: uploadFile,
-      });
+      const response = await getApiClient().admin.assets.post({ file });
       if (response.status !== 201 || !response.data)
         throw new Error("Upload failed");
       setAssets((current) => [response.data, ...current]);
       setSelectedAssetId(response.data.id);
-      setUploadFile(null);
-      setSourceTab("library");
       setStatusMessage(
-        `${response.data.originalFilename} uploaded and selected.`,
+        m.filename_uploaded_and_selected({
+          filename: response.data.originalFilename,
+        }),
       );
       setState("uploaded");
     } catch {
-      setStatusMessage("The image could not be uploaded or verified.");
+      setStatusMessage(m.image_upload_verify_failed());
       setState("error");
     }
   }
@@ -951,20 +948,18 @@ function ArticleAssetAuthoring({
   function useSelectedAsCover() {
     const alt = coverAlt.trim();
     if (!selected || alt.length === 0) {
-      setStatusMessage(
-        "Select an Asset and enter meaningful cover alternative text.",
-      );
+      setStatusMessage(m.select_asset_and_cover_alt());
       return;
     }
     onCoverChange({ assetId: selected.id, alt });
-    setStatusMessage(`${selected.originalFilename} is the Draft cover.`);
+    setStatusMessage(
+      m.filename_is_draft_cover({ filename: selected.originalFilename }),
+    );
   }
 
   function insertFigure() {
     if (!selected || (!figureDecorative && figureAlt.trim().length === 0)) {
-      setStatusMessage(
-        "Select an Asset and describe the figure, or mark it decorative.",
-      );
+      setStatusMessage(m.select_asset_and_describe_figure());
       return;
     }
     editor
@@ -983,7 +978,11 @@ function ArticleAssetAuthoring({
     setFigureAlt("");
     setFigureCaption("");
     setFigureDecorative(false);
-    setStatusMessage(`${selected.originalFilename} inserted as a figure.`);
+    setStatusMessage(
+      m.filename_inserted_as_figure({
+        filename: selected.originalFilename,
+      }),
+    );
   }
 
   function updateFigure(pos: number, changes: Record<string, unknown>) {
@@ -1001,7 +1000,7 @@ function ArticleAssetAuthoring({
     editor.view.dispatch(
       editor.state.tr.delete(figure.pos, figure.pos + figure.nodeSize),
     );
-    setStatusMessage("Figure removed from the Draft.");
+    setStatusMessage(m.figure_removed_from_draft());
   }
 
   return (
@@ -1009,7 +1008,7 @@ function ArticleAssetAuthoring({
       {coverPublicationIssues.length > 0 ? (
         <Alert status="danger" role="alert">
           <Alert.Content>
-            <Alert.Title>Cover needs attention</Alert.Title>
+            <Alert.Title>{m.cover_needs_attention()}</Alert.Title>
             <Alert.Description>
               <PublicationGuidance issues={coverPublicationIssues} />
             </Alert.Description>
@@ -1019,7 +1018,7 @@ function ArticleAssetAuthoring({
       {assetPublicationIssues.length > 0 ? (
         <Alert status="danger" role="alert">
           <Alert.Content>
-            <Alert.Title>Referenced Asset needs attention</Alert.Title>
+            <Alert.Title>{m.referenced_asset_needs_attention()}</Alert.Title>
             <Alert.Description>
               <PublicationGuidance issues={assetPublicationIssues} />
             </Alert.Description>
@@ -1027,17 +1026,12 @@ function ArticleAssetAuthoring({
         </Alert>
       ) : null}
       <div className="space-y-1">
-        <p className="text-sm text-default-500">
-          Select or upload verified Assets from the library, then describe each
-          use in this Article. Alt text is set per-figure — the same Asset can
-          carry different descriptions in different contexts. Decorative figures
-          save an empty alt value and are skipped by assistive technology.
-        </p>
+        <p className="text-sm text-default-500">{m.asset_authoring_intro()}</p>
       </div>
       {state === "error" ? (
         <Alert status="danger" role="alert">
           <Alert.Content>
-            <Alert.Title>Asset authoring needs attention</Alert.Title>
+            <Alert.Title>{m.asset_authoring_needs_attention()}</Alert.Title>
             <Alert.Description>{statusMessage}</Alert.Description>
           </Alert.Content>
         </Alert>
@@ -1050,136 +1044,24 @@ function ArticleAssetAuthoring({
           {statusMessage}
         </p>
       ) : null}
-      <div className="tabs-line-list" role="tablist" aria-label="Image source">
-        <button
-          className="tab-line"
-          id="article-image-library-tab"
-          type="button"
-          role="tab"
-          aria-selected={sourceTab === "library"}
-          aria-controls="article-image-library-panel"
-          onClick={() => setSourceTab("library")}
-        >
-          Library
-        </button>
-        <button
-          className="tab-line"
-          id="article-image-upload-tab"
-          type="button"
-          role="tab"
-          aria-selected={sourceTab === "upload"}
-          aria-controls="article-image-upload-panel"
-          onClick={() => setSourceTab("upload")}
-        >
-          Upload new
-        </button>
-      </div>
 
-      {sourceTab === "upload" ? (
-        <section
-          className="space-y-3"
-          id="article-image-upload-panel"
-          role="tabpanel"
-          aria-labelledby="article-image-upload-tab"
-        >
-          <Label htmlFor="articleAssetUpload">Upload a verified image</Label>
-          <Input
-            fullWidth
-            id="articleAssetUpload"
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/avif"
-            onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
-          />
-          <p className="text-sm text-default-500">
-            JPEG, PNG, WebP, or AVIF · up to 8 MiB.
-          </p>
-          <Button
-            type="button"
-            isPending={state === "uploading"}
-            onPress={uploadSelectedFile}
-          >
-            Upload and select image
-          </Button>
-        </section>
-      ) : (
-        <section
-          className="space-y-4"
-          id="article-image-library-panel"
-          role="tabpanel"
-          aria-labelledby="article-image-library-tab"
-        >
-          {state === "loading" ? (
-            <p role="status">Loading reusable Assets…</p>
-          ) : assets.length === 0 ? (
-            <div className="empty image-picker-empty">
-              <AdminIcon name="image" size={24} />
-              <p>No reusable Assets yet.</p>
-              <Button
-                size="sm"
-                type="button"
-                variant="secondary"
-                onPress={() => setSourceTab("upload")}
-              >
-                Upload your first image
-              </Button>
-            </div>
-          ) : (
-            <ul
-              className="picker-grid"
-              aria-label="Assets available to this Draft"
-            >
-              {assets.map((asset) => (
-                <li key={asset.id}>
-                  <button
-                    className="media-cell"
-                    type="button"
-                    aria-pressed={asset.id === selectedAssetId}
-                    onClick={() => {
-                      setSelectedAssetId(asset.id);
-                      setStatusMessage(`${asset.originalFilename} selected.`);
-                    }}
-                  >
-                    <span className="thumb">
-                      <img src={`/media/private/${asset.id}`} alt="" />
-                    </span>
-                    <span className="cell-meta">
-                      <span className="fname">{asset.originalFilename}</span>
-                      <span className="fmeta">
-                        {asset.width} × {asset.height}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {selected ? (
-            <div className="picker-summary" aria-label="Selected Asset">
-              <img
-                className="mini"
-                src={`/media/private/${selected.id}`}
-                alt=""
-              />
-              <div className="grow">
-                <div className="small picker-summary-name">
-                  {selected.originalFilename}
-                </div>
-                <div className="small faint">
-                  {selected.mimeType.replace("image/", "").toUpperCase()} ·{" "}
-                  {selected.width} × {selected.height} ·{" "}
-                  {selected.byteSize.toLocaleString()} bytes
-                </div>
-              </div>
-              <span className="chip chip-primary">Selected</span>
-            </div>
-          ) : null}
-        </section>
-      )}
+      <VerifiedAssetPicker
+        assets={assets}
+        selectedAssetId={selectedAssetId}
+        state={state === "error" ? "ready" : state}
+        uploading={state === "uploading"}
+        onSelect={(asset) => {
+          setSelectedAssetId(asset.id);
+          setStatusMessage(
+            m.filename_selected({ filename: asset.originalFilename }),
+          );
+        }}
+        onUpload={uploadSelectedFile}
+      />
 
       <section className="space-y-3" aria-labelledby="cover-authoring-heading">
         <h5 id="cover-authoring-heading" className="font-medium">
-          Optional cover
+          {m.optional_cover()}
         </h5>
         {cover ? (
           <img
@@ -1188,7 +1070,7 @@ function ArticleAssetAuthoring({
             alt={cover.alt}
           />
         ) : null}
-        <Label htmlFor="articleCoverAlt">Cover alternative text</Label>
+        <Label htmlFor="articleCoverAlt">{m.cover_alternative_text()}</Label>
         <Input
           fullWidth
           id="articleCoverAlt"
@@ -1201,8 +1083,8 @@ function ArticleAssetAuthoring({
         <div className="flex flex-wrap gap-2">
           <Button type="button" onPress={useSelectedAsCover}>
             {cover
-              ? "Replace cover with selected Asset"
-              : "Use selected Asset as cover"}
+              ? m.replace_cover_with_selected_asset()
+              : m.use_selected_asset_as_cover()}
           </Button>
           <Button
             type="button"
@@ -1211,19 +1093,19 @@ function ArticleAssetAuthoring({
             onPress={() => {
               onCoverChange(null);
               setCoverAlt("");
-              setStatusMessage("Cover removed from the Draft.");
+              setStatusMessage(m.cover_removed_from_draft());
             }}
           >
-            Remove cover
+            {m.remove_cover()}
           </Button>
         </div>
       </section>
 
       <section className="space-y-3" aria-labelledby="new-figure-heading">
         <h5 id="new-figure-heading" className="font-medium">
-          Insert figure
+          {m.insert_figure()}
         </h5>
-        <Label htmlFor="newFigureAlt">Figure alternative text</Label>
+        <Label htmlFor="newFigureAlt">{m.figure_alternative_text()}</Label>
         <Input
           fullWidth
           id="newFigureAlt"
@@ -1231,7 +1113,7 @@ function ArticleAssetAuthoring({
           value={figureDecorative ? "" : figureAlt}
           onChange={(event) => setFigureAlt(event.target.value)}
         />
-        <Label htmlFor="newFigureCaption">Figure caption (optional)</Label>
+        <Label htmlFor="newFigureCaption">{m.figure_caption_optional()}</Label>
         <TextArea
           fullWidth
           id="newFigureCaption"
@@ -1251,28 +1133,30 @@ function ArticleAssetAuthoring({
               if (event.target.checked) setFigureAlt("");
             }}
           />
-          Decorative figure (saved with empty alternative text)
+          {m.decorative_figure_empty_alt()}
         </label>
         <Button type="button" onPress={insertFigure}>
-          Insert selected Asset as figure
+          {m.insert_selected_asset_as_figure()}
         </Button>
       </section>
 
       {figures.length > 0 ? (
-        <ol className="space-y-4" aria-label="Figures in this Draft">
+        <ol className="space-y-4" aria-label={m.figures_in_this_draft()}>
           {figures.map((figure, index) => (
             <li
               key={`${figure.pos}:${figure.assetId}`}
               className="space-y-2 rounded-lg border border-default-200 p-3"
             >
-              <p className="font-medium">Figure {index + 1}</p>
+              <p className="font-medium">
+                {m.figure_number({ number: index + 1 })}
+              </p>
               <img
                 className="max-h-40 w-full object-contain"
                 src={`/media/private/${figure.assetId}`}
                 alt=""
               />
               <Label htmlFor={`figureAlt-${figure.pos}`}>
-                Alternative text
+                {m.alternative_text()}
               </Label>
               <Input
                 fullWidth
@@ -1283,7 +1167,9 @@ function ArticleAssetAuthoring({
                   updateFigure(figure.pos, { alt: event.target.value })
                 }
               />
-              <Label htmlFor={`figureCaption-${figure.pos}`}>Caption</Label>
+              <Label htmlFor={`figureCaption-${figure.pos}`}>
+                {m.caption()}
+              </Label>
               <TextArea
                 fullWidth
                 id={`figureCaption-${figure.pos}`}
@@ -1309,7 +1195,7 @@ function ArticleAssetAuthoring({
                     })
                   }
                 />
-                Decorative figure
+                {m.decorative_figure()}
               </label>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -1320,21 +1206,21 @@ function ArticleAssetAuthoring({
                     updateFigure(figure.pos, { assetId: selected.id })
                   }
                 >
-                  Replace with selected Asset
+                  {m.replace_with_selected_asset()}
                 </Button>
                 <Button
                   type="button"
                   variant="secondary"
                   onPress={() => removeFigure(figure)}
                 >
-                  Remove figure
+                  {m.remove_figure()}
                 </Button>
               </div>
             </li>
           ))}
         </ol>
       ) : (
-        <p className="text-sm text-default-500">No figures in this Draft.</p>
+        <p className="text-sm text-default-500">{m.no_figures_in_draft()}</p>
       )}
     </div>
   );

@@ -277,6 +277,13 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
       "aria-current",
       "page",
     );
+    await expect(page.getByRole("heading", { name: "Media" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Upload image" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Media library" }),
+    ).toBeVisible();
 
     await page.getByRole("link", { name: "Trash" }).click();
     await expect(page).toHaveURL(/\/admin\/trash$/);
@@ -317,6 +324,10 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
       .toBe("zh-CN");
     await expect(page.getByRole("link", { name: "文章" })).toBeVisible();
     await expect(page.getByText("当前登录", { exact: true })).toBeVisible();
+    await page.getByRole("link", { name: "媒体" }).click();
+    await expect(page.getByRole("heading", { name: "媒体" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "上传图片" })).toBeVisible();
+    await page.getByRole("link", { name: "文章" }).click();
     await page
       .getByRole("button", {
         name: `设置与账户菜单 — ${administratorEmail}`,
@@ -452,6 +463,47 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await expect(
       page.getByRole("button", { name: "Publish", exact: true }),
     ).toBeEnabled();
+  });
+
+  await test.step("Media library drawer shows references and blocks cleanup", async () => {
+    const editorUrl = page.url();
+    await page.getByRole("link", { name: "Media" }).click();
+    await expect(page).toHaveURL(/\/admin\/media$/);
+    const assetCell = page
+      .getByRole("list", { name: "Managed Assets" })
+      .getByRole("button")
+      .filter({ hasText: "critical-journey.png" });
+    await assetCell.click();
+    const details = page.getByRole("dialog", { name: "Asset details" });
+    await expect(details).toBeVisible();
+    await expect(
+      details.getByText("Draft refs", { exact: true }),
+    ).toBeVisible();
+    await expect(details.getByText(/1 Draft/)).toBeVisible();
+    await expect(
+      details.getByText("Referenced — cleanup is blocked"),
+    ).toBeVisible();
+    await expect(
+      details.getByRole("button", { name: "Clean up Asset" }),
+    ).toBeDisabled();
+    await details.getByRole("button", { name: "Close asset details" }).click();
+    await expect(details).toHaveCount(0);
+    await expect(assetCell).toBeFocused();
+
+    await page.getByRole("button", { name: "Upload image" }).click();
+    const uploadDialog = page.getByRole("dialog", { name: "Upload image" });
+    await expect(uploadDialog).toBeVisible();
+    await uploadDialog.getByLabel("Upload verified image").setInputFiles({
+      name: "not-an-image.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("not an image"),
+    });
+    await uploadDialog.getByRole("button", { name: "Upload" }).click();
+    await expect(page.getByRole("alert")).toContainText(
+      "Image was not accepted",
+    );
+    await page.goto(editorUrl);
+    await expect(page.getByLabel("Article body")).toBeVisible();
   });
 
   await test.step("preview only the saved private Draft", async () => {
