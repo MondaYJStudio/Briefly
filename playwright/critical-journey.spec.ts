@@ -304,6 +304,8 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await expect(page.getByLabel("Email")).toHaveValue(administratorEmail);
     await expect(page).toHaveURL(/\/admin\/articles$/);
     await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "Account" })).toHaveCount(0);
+    await expect(identityMenu()).toBeFocused();
 
     await identityMenu().click();
     await page.getByRole("menuitem", { name: "Appearance, Light" }).click();
@@ -328,6 +330,17 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await expect(page.getByRole("heading", { name: "媒体" })).toBeVisible();
     await expect(page.getByRole("button", { name: "上传图片" })).toBeVisible();
     await page.getByRole("link", { name: "文章" }).click();
+    await page
+      .getByRole("button", {
+        name: `设置与账户菜单 — ${administratorEmail}`,
+      })
+      .click();
+    await page.getByRole("menuitem", { name: "站点设置" }).click();
+    await expect(page.getByRole("dialog", { name: "站点设置" })).toBeVisible();
+    await expect(
+      page.getByText("公开内容的默认值", { exact: false }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
     await page
       .getByRole("button", {
         name: `设置与账户菜单 — ${administratorEmail}`,

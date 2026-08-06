@@ -238,6 +238,70 @@ describe("sole Administrator authentication", () => {
     );
   });
 
+  it("denies password changes with the wrong current password without mutating sessions", async () => {
+    expect((await initialize()).status).toBe(201);
+    const cookie = cookieFrom(await signIn());
+
+    const response = await SELF.fetch(
+      "http://briefly.test/api/auth/change-password",
+      {
+        method: "POST",
+        headers: {
+          cookie,
+          "content-type": "application/json",
+          origin: "http://briefly.test",
+        },
+        body: JSON.stringify({
+          currentPassword: "definitely-not-the-current-password",
+          newPassword: "a replacement password that is long enough",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      status: "error",
+      code: "PASSWORD_CHANGE_DENIED",
+    });
+    expect(
+      (
+        await createApiClient(
+          "http://briefly.test",
+          SELF.fetch.bind(SELF) as typeof fetch,
+        ).admin.session.get({ headers: { cookie } })
+      ).status,
+    ).toBe(200);
+    expect((await signIn()).status).toBe(200);
+  });
+
+  it("denies undersized replacement passwords without distinguishing the failure mode", async () => {
+    expect((await initialize()).status).toBe(201);
+    const cookie = cookieFrom(await signIn());
+
+    const response = await SELF.fetch(
+      "http://briefly.test/api/auth/change-password",
+      {
+        method: "POST",
+        headers: {
+          cookie,
+          "content-type": "application/json",
+          origin: "http://briefly.test",
+        },
+        body: JSON.stringify({
+          currentPassword: administrator.password,
+          newPassword: "too-short",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      status: "error",
+      code: "PASSWORD_CHANGE_DENIED",
+    });
+    expect((await signIn()).status).toBe(200);
+  });
+
   it("revokes the submitting and every other session after an authenticated password change", async () => {
     expect((await initialize()).status).toBe(201);
     const submittingCookie = cookieFrom(await signIn());

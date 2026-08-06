@@ -8,9 +8,18 @@ import {
 } from "../auth/auth-surface";
 import { m } from "../paraglide/messages.js";
 
-export const Route = createFileRoute("/admin_/login")({ component: SignIn });
+export const Route = createFileRoute("/admin_/login")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    notice:
+      search.notice === "password-updated"
+        ? ("password-updated" as const)
+        : undefined,
+  }),
+  component: SignIn,
+});
 
 function SignIn() {
+  const { notice } = Route.useSearch();
   const [state, setState] = useState<
     "ready" | "submitting" | "error" | "offline"
   >("ready");
@@ -65,6 +74,16 @@ function SignIn() {
       }
     >
       <Form className="space-y-5" onSubmit={submit}>
+        {notice === "password-updated" ? (
+          <Alert status="success" role="status">
+            <Alert.Content>
+              <Alert.Title>{m.password_updated()}</Alert.Title>
+              <Alert.Description>
+                {m.password_updated_notice()}
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : null}
         {state === "error" ? (
           <Alert status="danger" role="alert">
             <Alert.Content>
