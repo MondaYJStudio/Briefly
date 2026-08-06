@@ -7,8 +7,9 @@ import {
   AuthenticationSurface,
 } from "../auth/auth-surface";
 import { cloudflareWorkerSettingsHref } from "../auth/authentication-presentation";
+import { m } from "../paraglide/messages.js";
 
-export const Route = createFileRoute("/setup")({ component: Setup });
+export const Route = createFileRoute("/admin_/setup")({ component: Setup });
 
 type SetupState = "checking" | "ready" | "submitting" | "success" | "error";
 
@@ -27,7 +28,7 @@ function Setup() {
         const result = (await response.json()) as { initialized: boolean };
         if (!active) return;
         if (result.initialized) {
-          globalThis.location.replace("/sign-in");
+          globalThis.location.replace("/admin/login");
         } else {
           setState("ready");
         }
@@ -63,19 +64,17 @@ function Setup() {
 
   return (
     <AuthenticationSurface
-      title={state === "success" ? "Briefly is ready" : "First-run setup"}
+      title={state === "success" ? m.briefly_ready() : m.setup()}
       description={
-        state === "success"
-          ? "The admin account was created. The one-time setup code is now permanently disabled."
-          : "Create the single administrator for this site."
+        state === "success" ? m.setup_success() : m.setup_description()
       }
-      footerLink={{ href: "/sign-in", label: "Sign in" }}
+      footerLink={{ href: "/admin/login", label: m.sign_in() }}
       showHeader={state !== "success"}
     >
       {state === "checking" ? (
         <div className="flex items-center gap-3" role="status">
-          <Spinner aria-label="Checking installation status" />
-          <span>Checking installation status…</span>
+          <Spinner aria-label={m.setup_checking_label()} />
+          <span>{m.setup_checking()}</span>
         </div>
       ) : state === "success" ? (
         <div className="authentication-empty" role="status">
@@ -93,16 +92,13 @@ function Setup() {
               <path d="M20 6 9 17l-5-5" />
             </svg>
           </div>
-          <h1>Briefly is ready</h1>
-          <p>
-            The admin account was created. The one-time setup code is now
-            permanently disabled.
-          </p>
+          <h1>{m.briefly_ready()}</h1>
+          <p>{m.setup_success()}</p>
           <Button
             fullWidth
-            onPress={() => globalThis.location.assign("/sign-in")}
+            onPress={() => globalThis.location.assign("/admin/login")}
           >
-            Continue to sign in
+            {m.continue_sign_in()}
           </Button>
         </div>
       ) : (
@@ -110,19 +106,19 @@ function Setup() {
           {state === "error" ? (
             <Alert status="danger" role="alert">
               <Alert.Content>
-                <Alert.Title>Initialization failed</Alert.Title>
+                <Alert.Title>{m.setup_failed()}</Alert.Title>
                 <Alert.Description>
-                  Check the supplied values or try again later.
+                  {m.setup_failed_description()}
                 </Alert.Description>
               </Alert.Content>
             </Alert>
           ) : null}
           <AuthenticationField
             id="setupSecret"
-            label="Setup code"
+            label={m.setup_code()}
             type="password"
             autoComplete="off"
-            placeholder="Enter setup code"
+            placeholder={m.enter_setup_code()}
             monospace
             labelEnd={
               cloudflareSettingsHref ? (
@@ -132,29 +128,29 @@ function Setup() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Get code
+                  {m.get_code()}
                 </a>
               ) : null
             }
           />
           <AuthenticationField
             id="email"
-            label="Admin email"
+            label={m.admin_email()}
             type="email"
             autoComplete="username"
             placeholder="you@example.com"
           />
           <AuthenticationField
             id="password"
-            label="Password"
+            label={m.password()}
             type="password"
             autoComplete="new-password"
             minLength={12}
             maxLength={128}
-            helperText="Minimum 12 characters. This signs in the only admin account."
+            helperText={m.minimum_password()}
           />
           <Button fullWidth type="submit" isPending={state === "submitting"}>
-            Initialize Briefly
+            {m.initialize()}
           </Button>
         </Form>
       )}

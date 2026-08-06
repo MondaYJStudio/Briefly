@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 
 import stylesheet from "../styles.css?url";
+import { getLocale } from "../paraglide/runtime.js";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -46,7 +47,7 @@ function RootComponent() {
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang={getLocale()}>
       <head>
         <HeadContent />
       </head>

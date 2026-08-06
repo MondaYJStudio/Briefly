@@ -7,8 +7,11 @@ import {
   AuthenticationSurface,
 } from "../auth/auth-surface";
 import { cloudflareWorkerSettingsHref } from "../auth/authentication-presentation";
+import { m } from "../paraglide/messages.js";
 
-export const Route = createFileRoute("/recover")({ component: Recover });
+export const Route = createFileRoute("/admin_/recovery")({
+  component: Recover,
+});
 
 type RecoveryState = "ready" | "submitting" | "success" | "error";
 
@@ -41,13 +44,11 @@ function Recover() {
 
   return (
     <AuthenticationSurface
-      title={state === "success" ? "Password reset" : "Emergency recovery"}
+      title={state === "success" ? m.password_reset() : m.recovery()}
       description={
-        state === "success"
-          ? "All existing sessions have been revoked — sign in again with the new password."
-          : "Locked out? Reset the admin password with the Recovery Secret from your deployment environment."
+        state === "success" ? m.sessions_revoked() : m.recovery_description()
       }
-      footerLink={{ href: "/sign-in", label: "Sign in" }}
+      footerLink={{ href: "/admin/login", label: m.sign_in() }}
       showHeader={state !== "success"}
       showDescription={state === "ready"}
     >
@@ -68,25 +69,19 @@ function Recover() {
                 <path d="M20 6 9 17l-5-5" />
               </svg>
             </div>
-            <h1>Password reset</h1>
-            <p>
-              All existing sessions have been revoked — sign in again with the
-              new password.
-            </p>
+            <h1>{m.password_reset()}</h1>
+            <p>{m.sessions_revoked()}</p>
           </div>
           <Alert status="warning" role="note" className="mt-4 mb-5">
             <Alert.Content>
-              <Alert.Description>
-                Rotate or remove RECOVERY_SECRET from your environment as soon
-                as possible — anyone holding it can reset this account.
-              </Alert.Description>
+              <Alert.Description>{m.rotate_secret()}</Alert.Description>
             </Alert.Content>
           </Alert>
           <Button
             fullWidth
-            onPress={() => globalThis.location.assign("/sign-in")}
+            onPress={() => globalThis.location.assign("/admin/login")}
           >
-            Continue to sign in
+            {m.continue_sign_in()}
           </Button>
         </div>
       ) : (
@@ -94,20 +89,19 @@ function Recover() {
           {state === "error" ? (
             <Alert status="danger" role="alert">
               <Alert.Content>
-                <Alert.Title>Recovery Secret rejected</Alert.Title>
+                <Alert.Title>{m.recovery_rejected()}</Alert.Title>
                 <Alert.Description>
-                  Check the value in your deployment environment. Nothing was
-                  changed.
+                  {m.recovery_rejected_description()}
                 </Alert.Description>
               </Alert.Content>
             </Alert>
           ) : null}
           <AuthenticationField
             id="recoverySecret"
-            label="Recovery Secret"
+            label={m.recovery_secret()}
             type="password"
             autoComplete="off"
-            placeholder="Enter recovery secret"
+            placeholder={m.enter_recovery_secret()}
             monospace
             invalid={state === "error"}
             labelEnd={
@@ -118,32 +112,30 @@ function Recover() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Set code
+                  {m.set_code()}
                 </a>
               ) : null
             }
           />
           <AuthenticationField
             id="newPassword"
-            label="New password"
+            label={m.new_password()}
             type="password"
             autoComplete="new-password"
             minLength={12}
             maxLength={128}
             placeholder={
-              state === "error" ? "Minimum 12 characters" : undefined
+              state === "error" ? m.minimum_password_placeholder() : undefined
             }
-            helperText={
-              state === "ready" ? "Minimum 12 characters." : undefined
-            }
+            helperText={state === "ready" ? m.minimum_password() : undefined}
           />
           <Button fullWidth type="submit" isPending={state === "submitting"}>
-            Reset password
+            {m.reset_password()}
           </Button>
           <p className="text-center text-sm text-default-500">
-            Remembered it?{" "}
-            <a className="authentication-link font-medium" href="/sign-in">
-              Back to sign in
+            {m.remembered()}{" "}
+            <a className="authentication-link font-medium" href="/admin/login">
+              {m.back_to_sign_in()}
             </a>
           </p>
         </Form>

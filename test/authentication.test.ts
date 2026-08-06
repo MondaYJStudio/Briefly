@@ -501,7 +501,11 @@ describe("sole Administrator authentication", () => {
       headers: { cookie },
     });
     expect(protectedResponse.status).toBe(200);
-    expect(protectedResponse.data).toEqual({ authenticated: true });
+    expect(protectedResponse.data).toEqual({
+      authenticated: true,
+      email: administrator.email,
+      initials: "AD",
+    });
 
     const signOutResponse = await SELF.fetch(
       "http://briefly.test/api/auth/sign-out",
@@ -862,7 +866,7 @@ describe("sole Administrator authentication", () => {
     });
     expect(anonymousResponse.status).toBe(302);
     expect(anonymousResponse.headers.get("location")).toBe(
-      "http://briefly.test/setup",
+      "http://briefly.test/admin/setup",
     );
 
     expect((await initialize()).status).toBe(201);
@@ -872,7 +876,7 @@ describe("sole Administrator authentication", () => {
     );
     expect(initializedAnonymousResponse.status).toBe(302);
     expect(initializedAnonymousResponse.headers.get("location")).toBe(
-      "http://briefly.test/sign-in",
+      "http://briefly.test/admin/login",
     );
 
     const cookie = cookieFrom(await signIn());
@@ -891,12 +895,15 @@ describe("sole Administrator authentication", () => {
     );
     expect(authenticatedDestination.status).toBe(200);
     const authenticatedHtml = await authenticatedDestination.text();
-    expect(authenticatedHtml).toContain("Administrator session");
+    expect(authenticatedHtml).toContain("Signed in as");
+    expect(authenticatedHtml).toContain(administrator.email);
     expect(authenticatedHtml).toContain(
-      "Settings and account menu — Administrator",
+      `Settings and account menu — ${administrator.email}`,
     );
 
-    const recoveryResponse = await SELF.fetch("http://briefly.test/recover");
+    const recoveryResponse = await SELF.fetch(
+      "http://briefly.test/admin/recovery",
+    );
     const recoveryHtml = await recoveryResponse.text();
     expect(recoveryResponse.status).toBe(200);
     expect(recoveryHtml).toContain("Emergency recovery");
@@ -904,4 +911,35 @@ describe("sole Administrator authentication", () => {
     expect(recoveryHtml).toContain('name="recoverySecret"');
     expect(recoveryHtml).toContain('name="newPassword"');
   }, 30_000);
+
+  it("negotiates the Interface Locale from cookies before preferred language", async () => {
+    const preferredResponse = await SELF.fetch(
+      "http://briefly.test/admin/login",
+      { headers: { "accept-language": "zh-CN,zh;q=0.9,en;q=0.5" } },
+    );
+    expect(preferredResponse.status).toBe(200);
+    const preferredHtml = await preferredResponse.text();
+    expect(preferredHtml).toContain('<html lang="zh-CN"');
+    expect(preferredHtml).toContain("管理员在此登录");
+
+    const cookieResponse = await SELF.fetch("http://briefly.test/admin/login", {
+      headers: {
+        "accept-language": "zh-CN",
+        cookie: "PARAGLIDE_LOCALE=en",
+      },
+    });
+    const cookieHtml = await cookieResponse.text();
+    expect(cookieHtml).toContain('<html lang="en"');
+    expect(cookieHtml).toContain("The single administrator signs in here");
+  });
+
+  it("does not retain the previous authentication page paths", async () => {
+    for (const path of ["/setup", "/sign-in", "/recover"]) {
+      const response = await SELF.fetch(`http://briefly.test${path}`, {
+        redirect: "manual",
+      });
+      expect(response.status).toBe(404);
+      expect(response.headers.get("location")).toBeNull();
+    }
+  });
 });

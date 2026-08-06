@@ -18,6 +18,7 @@ export type AdminIconName =
   | "divider"
   | "external"
   | "eye"
+  | "globe"
   | "history"
   | "image"
   | "italic"
@@ -64,6 +65,8 @@ const STROKE_ICONS: Record<Exclude<AdminIconName, "more">, string> = {
   external:
     "M15 3h6v6|M10 14 21 3|M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6",
   eye: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z|M12 12m-3 0a3 3 0 1 0 6 0 3 3 0 1 0-6 0",
+  globe:
+    "M12 12m-9 0a9 9 0 1 0 18 0 9 9 0 1 0-18 0|M3 12h18|M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18",
   history: "M3 3v5h5|M3.05 13A9 9 0 1 0 6 5.3L3 8|M12 7v5l4 2",
   image:
     "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z|M9 9m-2 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0|m21 15-4.5-4.5L6 21",

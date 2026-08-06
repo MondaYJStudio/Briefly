@@ -1,5 +1,7 @@
 import { Input, Label, Surface } from "@heroui/react";
 import type { ReactNode } from "react";
+import { getLocale, locales, setLocale } from "../paraglide/runtime.js";
+import { m } from "../paraglide/messages.js";
 
 export function AuthenticationSurface({
   title,
@@ -18,6 +20,22 @@ export function AuthenticationSurface({
 }>) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-4 py-6">
+      <div className="mb-3 flex w-full max-w-[23rem] justify-end">
+        <label className="text-xs text-default-500">
+          <span className="sr-only">{m.interface_language()}</span>
+          <select
+            aria-label={m.interface_language()}
+            className="rounded border border-default-200 bg-transparent px-2 py-1"
+            value={getLocale()}
+            onChange={(event) =>
+              setLocale(event.target.value as (typeof locales)[number])
+            }
+          >
+            <option value="en">English</option>
+            <option value="zh-CN">简体中文</option>
+          </select>
+        </label>
+      </div>
       <div className="mb-6 flex items-center justify-center gap-2 text-lg font-semibold tracking-tight">
         <span
           aria-hidden="true"

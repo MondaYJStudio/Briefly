@@ -120,7 +120,7 @@ Briefly 需要两个彼此独立、至少 32 个字符的随机值：`BETTER_AUT
 
 自托管时，点击本页顶部的 Deploy to Cloudflare 按钮即可。Cloudflare 会克隆这个公开仓库，要求填写两个密钥，自动创建 D1 数据库和私有 R2 存储桶，执行已提交的 D1 迁移，然后部署 Worker。请为两个密钥分别生成至少 32 个字符的随机值，并暂时保留 `SETUP_SECRET`，直到首次设置完成。
 
-部署成功后，直接打开 Cloudflare 显示的 Worker 地址。第一次访问 `/admin` 会自动进入 `/setup`；填写管理员邮箱和密码，再粘贴部署表单中的同一个 `SETUP_SECRET`。使用 Cloudflare 自动分配的 `workers.dev` 地址时，无需填写 `APP_ORIGIN`。
+部署成功后，直接打开 Cloudflare 显示的 Worker 地址。第一次访问 `/admin` 会自动进入 `/admin/setup`；填写管理员邮箱和密码，再粘贴部署表单中的同一个 `SETUP_SECRET`。使用 Cloudflare 自动分配的 `workers.dev` 地址时，无需填写 `APP_ORIGIN`。
 
 一键部署要求 Cloudflare 能公开读取本仓库（或你的公开 fork）。使用固定自定义域名的项目维护者应配置 `wrangler.jsonc` 中的 `production` 占位值，并按 [OPERATIONS.zh-CN.md](OPERATIONS.zh-CN.md) 走受保护的 GitHub Actions 发布流程：先构建、再迁移，迁移成功后部署，最后执行只读 `GET /health` 探测。
 

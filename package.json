@@ -31,12 +31,13 @@
     }
   },
   "scripts": {
+    "paraglide:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy cookie preferredLanguage baseLocale --emit-ts-declarations --no-emit-git-ignore",
     "dev": "CLOUDFLARE_ENV=local vite dev",
     "build": "vite build && node scripts/verify-client-boundary.mjs",
     "build:production": "CLOUDFLARE_ENV=production vite build && node scripts/verify-client-boundary.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p test/tsconfig.json && tsc --noEmit -p playwright/tsconfig.json",
-    "test": "vitest run",
+    "typecheck": "pnpm paraglide:compile && tsc --noEmit && tsc --noEmit -p test/tsconfig.json && tsc --noEmit -p playwright/tsconfig.json",
+    "test": "pnpm paraglide:compile && vitest run",
     "test:e2e": "playwright test",
     "test:e2e:server": "node scripts/playwright-server.mjs",
     "test:watch": "vitest",
@@ -56,6 +57,7 @@
   "dependencies": {
     "@elysiajs/eden": "1.4.9",
     "@heroui/react": "3.2.2",
+    "@inlang/paraglide-js": "2.23.1",
     "@jsquash/avif": "2.1.1",
     "@jsquash/jpeg": "1.6.0",
     "@jsquash/png": "3.1.1",
@@ -82,6 +84,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.47.0",
     "@cloudflare/vitest-pool-workers": "0.18.8",
+    "@inlang/plugin-message-format": "4.4.0",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "24.13.3",
     "@types/react": "19.2.17",
@@ -89,8 +92,8 @@
     "@vitejs/plugin-react": "6.0.4",
     "drizzle-kit": "0.31.10",
     "js-yaml": "4.3.0",
-    "prettier": "3.9.6",
     "playwright": "1.61.1",
+    "prettier": "3.9.6",
     "tailwindcss": "4.3.3",
     "typescript": "5.9.3",
     "vite": "8.1.5",

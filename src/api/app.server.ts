@@ -29,6 +29,7 @@ import {
 } from "../articles/publications.server";
 import { recognizeVideoEmbed } from "../articles/video-embeds";
 import { cleanupAsset, listAssets, uploadAsset } from "../assets/assets.server";
+import { administratorInitialsFromEmail } from "../auth/administrator-identity";
 import {
   initializeAdministrator,
   installationIsInitialized,
@@ -291,7 +292,15 @@ function createApi(getBindings: () => RuntimeBindings) {
         );
       }
 
-      return Response.json({ authenticated: true }, { headers });
+      const email = result.response.user.email;
+      return Response.json(
+        {
+          authenticated: true,
+          email,
+          initials: administratorInitialsFromEmail(email),
+        },
+        { headers },
+      );
     })
     .get(
       "/admin/site-settings",

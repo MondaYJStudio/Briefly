@@ -11,14 +11,14 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
-import { Route as RecoverRouteImport } from './routes/recover'
-import { Route as SetupRouteImport } from './routes/setup'
-import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as ZhCNRouteImport } from './routes/zh-CN'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminArticlesRouteImport } from './routes/admin/articles'
 import { Route as AdminMediaRouteImport } from './routes/admin/media'
 import { Route as AdminTrashRouteImport } from './routes/admin/trash'
+import { Route as AdminLoginRouteImport } from './routes/admin_.login'
+import { Route as AdminRecoveryRouteImport } from './routes/admin_.recovery'
+import { Route as AdminSetupRouteImport } from './routes/admin_.setup'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
 import { Route as ArticlesSlugRouteImport } from './routes/articles/$slug'
 import { Route as MediaPublicAssetIdRouteImport } from './routes/media.$publicAssetId'
@@ -34,21 +34,6 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RecoverRoute = RecoverRouteImport.update({
-  id: '/recover',
-  path: '/recover',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SetupRoute = SetupRouteImport.update({
-  id: '/setup',
-  path: '/setup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SignInRoute = SignInRouteImport.update({
-  id: '/sign-in',
-  path: '/sign-in',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ZhCNRoute = ZhCNRouteImport.update({
@@ -75,6 +60,21 @@ const AdminTrashRoute = AdminTrashRouteImport.update({
   id: '/trash',
   path: '/trash',
   getParentRoute: () => AdminRoute,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin_/login',
+  path: '/admin/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRecoveryRoute = AdminRecoveryRouteImport.update({
+  id: '/admin_/recovery',
+  path: '/admin/recovery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSetupRoute = AdminSetupRouteImport.update({
+  id: '/admin_/setup',
+  path: '/admin/setup',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSplatRoute = ApiSplatRouteImport.update({
   id: '/api/$',
@@ -110,13 +110,13 @@ const MediaPrivateAssetIdRoute = MediaPrivateAssetIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/recover': typeof RecoverRoute
-  '/setup': typeof SetupRoute
-  '/sign-in': typeof SignInRoute
   '/zh-CN': typeof ZhCNRoute
   '/admin/articles': typeof AdminArticlesRouteWithChildren
   '/admin/media': typeof AdminMediaRoute
   '/admin/trash': typeof AdminTrashRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/admin/recovery': typeof AdminRecoveryRoute
+  '/admin/setup': typeof AdminSetupRoute
   '/api/$': typeof ApiSplatRoute
   '/articles/$slug': typeof ArticlesSlugRoute
   '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
@@ -127,12 +127,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/recover': typeof RecoverRoute
-  '/setup': typeof SetupRoute
-  '/sign-in': typeof SignInRoute
   '/zh-CN': typeof ZhCNRoute
   '/admin/media': typeof AdminMediaRoute
   '/admin/trash': typeof AdminTrashRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/admin/recovery': typeof AdminRecoveryRoute
+  '/admin/setup': typeof AdminSetupRoute
   '/api/$': typeof ApiSplatRoute
   '/articles/$slug': typeof ArticlesSlugRoute
   '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
@@ -145,13 +145,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/recover': typeof RecoverRoute
-  '/setup': typeof SetupRoute
-  '/sign-in': typeof SignInRoute
   '/zh-CN': typeof ZhCNRoute
   '/admin/articles': typeof AdminArticlesRouteWithChildren
   '/admin/media': typeof AdminMediaRoute
   '/admin/trash': typeof AdminTrashRoute
+  '/admin_/login': typeof AdminLoginRoute
+  '/admin_/recovery': typeof AdminRecoveryRoute
+  '/admin_/setup': typeof AdminSetupRoute
   '/api/$': typeof ApiSplatRoute
   '/articles/$slug': typeof ArticlesSlugRoute
   '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
@@ -165,13 +165,13 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
-    | '/recover'
-    | '/setup'
-    | '/sign-in'
     | '/zh-CN'
     | '/admin/articles'
     | '/admin/media'
     | '/admin/trash'
+    | '/admin/login'
+    | '/admin/recovery'
+    | '/admin/setup'
     | '/api/$'
     | '/articles/$slug'
     | '/media/$publicAssetId'
@@ -182,12 +182,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/recover'
-    | '/setup'
-    | '/sign-in'
     | '/zh-CN'
     | '/admin/media'
     | '/admin/trash'
+    | '/admin/login'
+    | '/admin/recovery'
+    | '/admin/setup'
     | '/api/$'
     | '/articles/$slug'
     | '/media/$publicAssetId'
@@ -199,13 +199,13 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
-    | '/recover'
-    | '/setup'
-    | '/sign-in'
     | '/zh-CN'
     | '/admin/articles'
     | '/admin/media'
     | '/admin/trash'
+    | '/admin_/login'
+    | '/admin_/recovery'
+    | '/admin_/setup'
     | '/api/$'
     | '/articles/$slug'
     | '/media/$publicAssetId'
@@ -218,10 +218,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
-  RecoverRoute: typeof RecoverRoute
-  SetupRoute: typeof SetupRoute
-  SignInRoute: typeof SignInRoute
   ZhCNRoute: typeof ZhCNRoute
+  AdminLoginRoute: typeof AdminLoginRoute
+  AdminRecoveryRoute: typeof AdminRecoveryRoute
+  AdminSetupRoute: typeof AdminSetupRoute
   ApiSplatRoute: typeof ApiSplatRoute
   ArticlesSlugRoute: typeof ArticlesSlugRoute
   MediaPublicAssetIdRoute: typeof MediaPublicAssetIdRoute
@@ -242,27 +242,6 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/recover': {
-      id: '/recover'
-      path: '/recover'
-      fullPath: '/recover'
-      preLoaderRoute: typeof RecoverRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/setup': {
-      id: '/setup'
-      path: '/setup'
-      fullPath: '/setup'
-      preLoaderRoute: typeof SetupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sign-in': {
-      id: '/sign-in'
-      path: '/sign-in'
-      fullPath: '/sign-in'
-      preLoaderRoute: typeof SignInRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/zh-CN': {
@@ -299,6 +278,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/trash'
       preLoaderRoute: typeof AdminTrashRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/admin_/login': {
+      id: '/admin_/login'
+      path: '/admin/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/recovery': {
+      id: '/admin_/recovery'
+      path: '/admin/recovery'
+      fullPath: '/admin/recovery'
+      preLoaderRoute: typeof AdminRecoveryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/setup': {
+      id: '/admin_/setup'
+      path: '/admin/setup'
+      fullPath: '/admin/setup'
+      preLoaderRoute: typeof AdminSetupRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/$': {
       id: '/api/$'
@@ -378,10 +378,10 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
-  RecoverRoute: RecoverRoute,
-  SetupRoute: SetupRoute,
-  SignInRoute: SignInRoute,
   ZhCNRoute: ZhCNRoute,
+  AdminLoginRoute: AdminLoginRoute,
+  AdminRecoveryRoute: AdminRecoveryRoute,
+  AdminSetupRoute: AdminSetupRoute,
   ApiSplatRoute: ApiSplatRoute,
   ArticlesSlugRoute: ArticlesSlugRoute,
   MediaPublicAssetIdRoute: MediaPublicAssetIdRoute,

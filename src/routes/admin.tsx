@@ -2,6 +2,7 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { getApiClient } from "./api.$";
+import { loadAdministratorIdentity } from "../auth/load-administrator-identity";
 import {
   AdminShell,
   type AdminDrawerKind,
@@ -13,10 +14,14 @@ import { SettingsDrawer } from "../components/admin/settings-drawer";
 import type { SiteSettings } from "../site-settings/site-settings";
 
 export const Route = createFileRoute("/admin")({
+  loader: async () => ({
+    identity: await loadAdministratorIdentity(),
+  }),
   component: AdminLayout,
 });
 
 function AdminLayout() {
+  const { identity } = Route.useLoaderData();
   const [drawer, setDrawer] = useState<AdminDrawerKind | null>(null);
   const [theme, setTheme] = useState<AdminTheme>("light");
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
@@ -84,7 +89,7 @@ function AdminLayout() {
         body: JSON.stringify({}),
       });
       if (response.ok) {
-        globalThis.location.replace("/sign-in");
+        globalThis.location.replace("/admin/login");
       } else {
         setSignOutState("error");
       }
@@ -95,9 +100,11 @@ function AdminLayout() {
 
   return (
     <AdminShell
+      identity={identity}
       theme={theme}
       mobileNavigationOpen={mobileNavigationOpen}
       signOutPending={signOutState === "submitting"}
+      signOutError={signOutState === "error"}
       onToggleTheme={toggleTheme}
       onOpenDrawer={openDrawer}
       onSignOut={() => void signOut()}
@@ -116,6 +123,7 @@ function AdminLayout() {
       <AccountDrawer
         open={drawer === "account"}
         onOpenChange={(open) => setDrawer(open ? "account" : null)}
+        email={identity.email}
         onSignOut={() => void signOut()}
         signOutState={signOutState}
       />

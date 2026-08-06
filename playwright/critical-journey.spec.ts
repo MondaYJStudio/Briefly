@@ -61,11 +61,58 @@ test("the sign-in page hides first-run setup after initialization", async ({
     });
   });
 
-  await page.goto("/sign-in");
+  await page.goto("/admin/login");
 
   await expect(page.getByRole("link", { name: "First-run setup" })).toHaveCount(
     0,
   );
+});
+
+test("Interface Locale fallback and switching keep SSR and hydration aligned", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    baseURL: playwrightBaseUrl,
+    locale: "zh-CN",
+  });
+  const page = await context.newPage();
+  const hydrationErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && /hydration/i.test(message.text())) {
+      hydrationErrors.push(message.text());
+    }
+  });
+
+  const response = await page.goto("/admin/login");
+  expect(await response?.text()).toContain('<html lang="zh-CN"');
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  await expect(page.getByRole("heading", { name: "登录" })).toBeVisible();
+
+  await page.getByLabel("界面语言").selectOption("en");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+
+  const cookieContext = await browser.newContext({
+    baseURL: playwrightBaseUrl,
+    locale: "zh-CN",
+  });
+  await cookieContext.addCookies([
+    { name: "PARAGLIDE_LOCALE", value: "en", url: playwrightBaseUrl },
+  ]);
+  const cookiePage = await cookieContext.newPage();
+  await cookiePage.goto("/admin/login");
+  await expect(cookiePage.locator("html")).toHaveAttribute("lang", "en");
+  await expect(
+    cookiePage.getByRole("heading", { name: "Sign in" }),
+  ).toBeVisible();
+  await cookieContext.close();
+  expect(await context.cookies()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ name: "PARAGLIDE_LOCALE", value: "en" }),
+    ]),
+  );
+  expect(hydrationErrors).toEqual([]);
+  await context.close();
 });
 
 test("the recovery surface restores invalid and successful states", async ({
@@ -77,7 +124,7 @@ test("the recovery surface restores invalid and successful states", async ({
       body: JSON.stringify({ status: "error", code: "RECOVERY_DENIED" }),
     });
   });
-  await page.goto("/recover");
+  await page.goto("/admin/recovery");
   await page.getByLabel("Recovery Secret").fill("wrong-secret");
   await page.getByLabel("New password").fill("a-valid-password");
   await page.getByRole("button", { name: "Reset password" }).click();
@@ -141,7 +188,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
   });
 
   await test.step("show the restored sign-in and recovery surfaces", async () => {
-    await page.goto("/sign-in");
+    await page.goto("/admin/login");
     await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Emergency recovery" }),
@@ -153,7 +200,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
       page.getByText("Briefly · First-run setup", { exact: true }),
     ).toBeVisible();
 
-    await page.goto("/recover");
+    await page.goto("/admin/recovery");
     await expect(
       page.getByRole("heading", { name: "Emergency recovery" }),
     ).toBeVisible();
@@ -168,7 +215,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
   });
 
   await test.step("initialize the sole Administrator through the visible setup flow", async () => {
-    await page.goto("/setup");
+    await page.goto("/admin/setup");
     await expect(
       page.getByRole("heading", { name: "First-run setup" }),
     ).toBeVisible();
@@ -186,7 +233,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
       page.getByRole("heading", { name: "Briefly is ready" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Continue to sign in" }).click();
-    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page).toHaveURL(/\/admin\/login$/);
     await page.waitForLoadState("networkidle");
   });
 
@@ -194,14 +241,127 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page.getByLabel("Email").fill(administratorEmail);
     await page.getByLabel("Password").fill(administratorPassword);
     await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByText(administratorEmail, { exact: true })).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Administrator session" }),
+      page.getByRole("button", {
+        name: `Settings and account menu — ${administratorEmail}`,
+      }),
     ).toBeVisible();
+    await expect(page.getByText("AD", { exact: true })).toBeVisible();
 
     await anonymousPage.goto("/admin");
-    await expect(anonymousPage).toHaveURL(/\/sign-in$/);
+    await expect(anonymousPage).toHaveURL(/\/admin\/login$/);
     const anonymousSession = await anonymous.request.get("/api/admin/session");
     expect(anonymousSession.status()).toBe(401);
+  });
+
+  await test.step("admin shell navigation, drawers, locale, theme, and breakpoints", async () => {
+    const identityMenu = () =>
+      page.getByRole("button", {
+        name: `Settings and account menu — ${administratorEmail}`,
+      });
+
+    await expect(
+      page.getByRole("navigation", { name: "Content sections" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Articles" }),
+    ).toHaveAttribute("aria-current", "page");
+
+    await page.getByRole("link", { name: "Media" }).click();
+    await expect(page).toHaveURL(/\/admin\/media$/);
+    await expect(page.getByRole("link", { name: "Media" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+
+    await page.getByRole("link", { name: "Trash" }).click();
+    await expect(page).toHaveURL(/\/admin\/trash$/);
+
+    await page.getByRole("link", { name: "Articles" }).click();
+    await expect(page).toHaveURL(/\/admin\/articles$/);
+
+    await identityMenu().click();
+    await page.getByRole("menuitem", { name: "Settings…" }).click();
+    await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
+    await expect(page).toHaveURL(/\/admin\/articles$/);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "Settings" })).toHaveCount(
+      0,
+    );
+
+    await identityMenu().click();
+    await page.getByRole("menuitem", { name: "Account…" }).click();
+    await expect(page.getByRole("dialog", { name: "Account" })).toBeVisible();
+    await expect(page.getByLabel("Email")).toHaveValue(administratorEmail);
+    await expect(page).toHaveURL(/\/admin\/articles$/);
+    await page.keyboard.press("Escape");
+
+    await identityMenu().click();
+    await page.getByRole("menuitem", { name: "Dark mode" }).click();
+    await expect
+      .poll(async () => page.locator("html").getAttribute("data-theme"))
+      .toBe("dark");
+    await identityMenu().click();
+    await page.getByRole("menuitem", { name: "Light mode" }).click();
+    await expect
+      .poll(async () => page.locator("html").getAttribute("data-theme"))
+      .toBe("light");
+
+    await identityMenu().click();
+    await page.getByRole("menuitem", { name: "简体中文" }).click();
+    await expect
+      .poll(async () => page.locator("html").getAttribute("lang"))
+      .toBe("zh-CN");
+    await expect(page.getByRole("link", { name: "文章" })).toBeVisible();
+    await expect(page.getByText("当前登录", { exact: true })).toBeVisible();
+    await page
+      .getByRole("button", {
+        name: `设置与账户菜单 — ${administratorEmail}`,
+      })
+      .click();
+    await page.getByRole("menuitem", { name: "English" }).click();
+    await expect
+      .poll(async () => page.locator("html").getAttribute("lang"))
+      .toBe("en");
+    await expect(page.getByText("Signed in as", { exact: true })).toBeVisible();
+
+    await page.setViewportSize({ width: 860, height: 900 });
+    await expect(
+      page.getByRole("button", { name: "Open navigation" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Open navigation" }).click();
+    await expect(
+      page.getByRole("button", { name: "Close navigation" }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(
+      page.getByRole("button", { name: "Close navigation" }),
+    ).not.toBeVisible();
+
+    await page.setViewportSize({ width: 861, height: 900 });
+    await expect(
+      page.getByRole("button", { name: "Open navigation" }),
+    ).not.toBeVisible();
+    await expect(
+      page.getByRole("navigation", { name: "Content sections" }),
+    ).toBeVisible();
+
+    await page.setViewportSize({ width: 1025, height: 900 });
+    await expect(
+      page.getByRole("navigation", { name: "Content sections" }),
+    ).toBeVisible();
+
+    await page.goto("/admin/login");
+    await expect(
+      page.getByRole("navigation", { name: "Content sections" }),
+    ).toHaveCount(0);
+    await page.goto("/admin/articles");
+    await expect(
+      page.getByRole("button", {
+        name: `Settings and account menu — ${administratorEmail}`,
+      }),
+    ).toBeVisible();
   });
 
   await test.step("hydrate Tiptap only on the client and warn before discarding unsaved work", async () => {
@@ -971,17 +1131,17 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     );
     await page
       .getByRole("button", {
-        name: "Settings and account menu — Administrator",
+        name: `Settings and account menu — ${administratorEmail}`,
       })
       .click();
     await page.getByRole("menuitem", { name: "Sign out" }).click();
     const request = await signOutRequest;
     expect(request.headers()["content-type"]).toBe("application/json");
     expect(request.postDataJSON()).toEqual({});
-    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page).toHaveURL(/\/admin\/login$/);
 
     await page.goto("/admin");
-    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page).toHaveURL(/\/admin\/login$/);
     expect((await page.request.get("/api/admin/session")).status()).toBe(401);
   });
 

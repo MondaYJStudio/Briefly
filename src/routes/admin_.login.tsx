@@ -6,8 +6,9 @@ import {
   AuthenticationField,
   AuthenticationSurface,
 } from "../auth/auth-surface";
+import { m } from "../paraglide/messages.js";
 
-export const Route = createFileRoute("/sign-in")({ component: SignIn });
+export const Route = createFileRoute("/admin_/login")({ component: SignIn });
 
 function SignIn() {
   const [state, setState] = useState<
@@ -57,46 +58,38 @@ function SignIn() {
 
   return (
     <AuthenticationSurface
-      title="Sign in"
-      description="The single administrator signs in here. Readers never see this page."
+      title={m.sign_in()}
+      description={m.admin_description()}
       footerLink={
-        setupAvailable
-          ? { href: "/setup", label: "First-run setup" }
-          : undefined
+        setupAvailable ? { href: "/admin/setup", label: m.setup() } : undefined
       }
     >
       <Form className="space-y-5" onSubmit={submit}>
         {state === "error" ? (
           <Alert status="danger" role="alert">
             <Alert.Content>
-              <Alert.Title>Incorrect email or password</Alert.Title>
-              <Alert.Description>
-                Try again. This message stays the same whether the email exists
-                or not.
-              </Alert.Description>
+              <Alert.Title>{m.incorrect_credentials()}</Alert.Title>
+              <Alert.Description>{m.generic_credentials()}</Alert.Description>
             </Alert.Content>
           </Alert>
         ) : state === "offline" ? (
           <Alert status="warning" role="alert">
             <Alert.Content>
-              <Alert.Title>You appear to be offline</Alert.Title>
-              <Alert.Description>
-                Signing in needs a connection to your Briefly server. Your input
-                is kept.
-              </Alert.Description>
+              <Alert.Title>{m.offline()}</Alert.Title>
+              <Alert.Description>{m.offline_description()}</Alert.Description>
             </Alert.Content>
           </Alert>
         ) : null}
         <AuthenticationField
           id="email"
-          label="Email"
+          label={m.email()}
           type="email"
           autoComplete="username"
           placeholder="you@example.com"
         />
         <AuthenticationField
           id="password"
-          label="Password"
+          label={m.password()}
           type="password"
           autoComplete="current-password"
           minLength={12}
@@ -109,12 +102,12 @@ function SignIn() {
           isPending={state === "submitting"}
           isDisabled={state === "offline"}
         >
-          Sign in
+          {m.sign_in()}
         </Button>
         <p className="text-center text-sm text-default-500">
-          Lost access?{" "}
-          <a className="authentication-link font-medium" href="/recover">
-            Emergency recovery
+          {m.lost_access()}{" "}
+          <a className="authentication-link font-medium" href="/admin/recovery">
+            {m.recovery_link()}
           </a>
         </p>
       </Form>

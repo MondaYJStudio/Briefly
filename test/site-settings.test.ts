@@ -235,8 +235,10 @@ describe("site identity and Byline defaults", () => {
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain("Administrator session");
-    expect(html).toContain("Settings and account menu — Administrator");
-    expect(html).not.toContain(administrator.email);
+    expect(html).toContain("Signed in as");
+    expect(html).toContain(administrator.email);
+    expect(html).toContain(
+      `Settings and account menu — ${administrator.email}`,
+    );
   }, 15_000);
 });

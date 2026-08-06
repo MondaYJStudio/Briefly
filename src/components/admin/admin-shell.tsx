@@ -1,16 +1,26 @@
-import { Dropdown, Separator } from "@heroui/react";
+import { Alert, Dropdown, Separator } from "@heroui/react";
 import { Link, useMatchRoute } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 
+import { getLocale, setLocale } from "../../paraglide/runtime.js";
+import { m } from "../../paraglide/messages.js";
 import { AdminIcon } from "./icons";
+import styles from "./admin-shell.module.css";
 
 export type AdminDrawerKind = "settings" | "account";
 export type AdminTheme = "light" | "dark";
 
+export interface AdministratorIdentity {
+  email: string;
+  initials: string;
+}
+
 interface AdminShellProps {
+  identity: AdministratorIdentity;
   theme: AdminTheme;
   mobileNavigationOpen: boolean;
   signOutPending: boolean;
+  signOutError: boolean;
   onToggleTheme: () => void;
   onOpenDrawer: (drawer: AdminDrawerKind) => void;
   onSignOut: () => void;
@@ -19,24 +29,26 @@ interface AdminShellProps {
 }
 
 const NAV_ITEMS: ReadonlyArray<{
-  to: string;
+  to: "/admin/articles" | "/admin/media" | "/admin/trash";
   icon: "articles" | "media" | "trash";
-  label: string;
+  label: () => string;
 }> = [
-  { to: "/admin/articles", icon: "articles", label: "Articles" },
-  { to: "/admin/media", icon: "media", label: "Media" },
-  { to: "/admin/trash", icon: "trash", label: "Trash" },
+  { to: "/admin/articles", icon: "articles", label: () => m.articles() },
+  { to: "/admin/media", icon: "media", label: () => m.media() },
+  { to: "/admin/trash", icon: "trash", label: () => m.trash() },
 ];
 
 /**
  * Admin shell: persistent left rail (Articles / Media / Trash) with the
- * identity menu in the footer — Settings, Account, theme and sign-out live
- * there, exactly as the prototype specifies.
+ * identity menu in the footer — Settings, Account, theme, locale and sign-out
+ * live there, matching the approved administration shell.
  */
 export function AdminShell({
+  identity,
   theme,
   mobileNavigationOpen,
   signOutPending,
+  signOutError,
   onToggleTheme,
   onOpenDrawer,
   onSignOut,
@@ -47,40 +59,51 @@ export function AdminShell({
   const editingArticle = Boolean(
     matchRoute({ to: "/admin/articles/$articleId", fuzzy: true }),
   );
+  const locale = getLocale();
+  const { email, initials } = identity;
+
+  useEffect(() => {
+    if (!mobileNavigationOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onMobileNavigationChange(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileNavigationOpen, onMobileNavigationChange]);
 
   return (
     <div
-      className={`briefly-theme shell${editingArticle ? " editor-shell" : ""}`}
+      className={`briefly-theme ${styles.shell}${editingArticle ? ` ${styles.editorShell}` : ""}`}
       data-theme={theme}
     >
       <a
         className="skip-link"
         href={editingArticle ? "#canvas" : "#admin-main"}
       >
-        Skip to content
+        {m.skip_to_content()}
       </a>
 
       <aside
-        className={`sidebar${mobileNavigationOpen ? " is-open" : ""}`}
-        aria-label="Admin navigation"
+        className={`${styles.sidebar}${mobileNavigationOpen ? ` ${styles.sidebarOpen}` : ""}`}
+        aria-label={m.admin_navigation()}
       >
         <Link
           to="/admin/articles"
-          className="sidebar-brand"
+          className={styles.sidebarBrand}
           onClick={() => onMobileNavigationChange(false)}
         >
-          <span className="logo-mark" aria-hidden="true">
+          <span className={styles.logoMark} aria-hidden="true">
             B
           </span>
           Briefly
         </Link>
 
-        <nav aria-label="Content sections">
+        <nav className={styles.nav} aria-label={m.content_sections()}>
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.to}
               to={item.to}
-              className="nav-item"
+              className={styles.navItem}
               aria-current={
                 matchRoute({
                   to: item.to,
@@ -92,75 +115,90 @@ export function AdminShell({
               onClick={() => onMobileNavigationChange(false)}
             >
               <AdminIcon name={item.icon} />
-              {item.label}
+              {item.label()}
             </Link>
           ))}
         </nav>
 
-        <div className="sidebar-footer">
-          <h2 className="session-label">Administrator session</h2>
+        <div className={styles.sidebarFooter}>
+          {signOutError ? (
+            <Alert
+              status="danger"
+              role="alert"
+              className={styles.signOutError}
+            >
+              <Alert.Content>
+                <Alert.Title>{m.sign_out_failed()}</Alert.Title>
+                <Alert.Description>
+                  {m.sign_out_failed_description()}
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          ) : null}
           <Dropdown.Root>
             <Dropdown.Trigger
-              className="admin-id"
-              aria-label="Settings and account menu — Administrator"
+              className={styles.adminId}
+              aria-label={m.settings_and_account_menu({ email })}
             >
-              <span className="avatar" aria-hidden="true">
-                AD
+              <span className={styles.avatar} aria-hidden="true">
+                {initials}
               </span>
-              <span className="meta">
-                <span className="label" style={{ display: "block" }}>
-                  Signed in as
-                </span>
-                <span className="email" style={{ display: "block" }}>
-                  Administrator
-                </span>
+              <span className={styles.meta}>
+                <span className={styles.metaLabel}>{m.signed_in_as()}</span>
+                <span className={styles.email}>{email}</span>
               </span>
-              <AdminIcon
-                name="chevron"
-                size={14}
-                style={{ marginLeft: "auto", color: "var(--foreground-faint)" }}
-              />
+              <AdminIcon name="chevron" size={14} className={styles.chevron} />
             </Dropdown.Trigger>
             <Dropdown.Popover placement="top start">
               <Dropdown.Menu
-                aria-label="Settings and account"
+                aria-label={m.settings_and_account()}
                 disabledKeys={signOutPending ? ["sign-out"] : []}
                 onAction={(key) => {
                   if (key === "settings") onOpenDrawer("settings");
                   else if (key === "account") onOpenDrawer("account");
                   else if (key === "theme") onToggleTheme();
-                  else if (key === "sign-out") onSignOut();
+                  else if (key === "locale") {
+                    setLocale(locale === "en" ? "zh-CN" : "en");
+                  } else if (key === "sign-out") onSignOut();
                 }}
               >
-                <Dropdown.Item id="settings" textValue="Settings">
-                  <span className="row" style={{ gap: "0.75rem" }}>
+                <Dropdown.Item id="settings" textValue={m.settings_menu()}>
+                  <span className={styles.menuRow}>
                     <AdminIcon name="settings" size={16} />
-                    Settings…
+                    {m.settings_menu()}
                   </span>
                 </Dropdown.Item>
-                <Dropdown.Item id="account" textValue="Account">
-                  <span className="row" style={{ gap: "0.75rem" }}>
+                <Dropdown.Item id="account" textValue={m.account_menu()}>
+                  <span className={styles.menuRow}>
                     <AdminIcon name="account" size={16} />
-                    Account…
+                    {m.account_menu()}
                   </span>
                 </Dropdown.Item>
                 <Separator />
-                <Dropdown.Item id="theme" textValue="Toggle theme">
-                  <span className="row" style={{ gap: "0.75rem" }}>
+                <Dropdown.Item id="theme" textValue={m.toggle_theme()}>
+                  <span className={styles.menuRow}>
                     <AdminIcon
                       name={theme === "light" ? "moon" : "sun"}
                       size={16}
                     />
-                    {theme === "light" ? "Dark mode" : "Light mode"}
+                    {theme === "light" ? m.dark_mode() : m.light_mode()}
+                  </span>
+                </Dropdown.Item>
+                <Dropdown.Item id="locale" textValue={m.interface_language()}>
+                  <span className={styles.menuRow}>
+                    <AdminIcon name="globe" size={16} />
+                    {locale === "en"
+                      ? m.switch_to_zh_cn()
+                      : m.switch_to_english()}
                   </span>
                 </Dropdown.Item>
                 <Separator />
                 <Dropdown.Item
                   id="sign-out"
-                  textValue="Sign out"
+                  textValue={m.sign_out()}
                   className="text-danger"
                 >
-                  Sign out
+                  {m.sign_out()}
                 </Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown.Popover>
@@ -169,20 +207,19 @@ export function AdminShell({
       </aside>
 
       <button
-        className={`scrim${mobileNavigationOpen ? " is-open" : ""}`}
+        className={`${styles.scrim}${mobileNavigationOpen ? ` ${styles.scrimOpen}` : ""}`}
         type="button"
-        aria-label="Close navigation"
+        aria-label={m.close_navigation()}
         tabIndex={mobileNavigationOpen ? 0 : -1}
         onClick={() => onMobileNavigationChange(false)}
       />
 
-      <div className="main">
-        <div className="mobile-bar">
+      <div className={styles.main}>
+        <div className={styles.mobileBar}>
           <button
-            className="nav-item"
-            style={{ width: "auto", padding: "0.5rem" }}
+            className={`${styles.navItem} ${styles.mobileNavButton}`}
             type="button"
-            aria-label="Open navigation"
+            aria-label={m.open_navigation()}
             onClick={() => onMobileNavigationChange(true)}
           >
             <AdminIcon name="menu" size={20} />
