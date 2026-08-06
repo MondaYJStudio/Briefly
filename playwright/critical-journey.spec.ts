@@ -241,7 +241,9 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page.getByLabel("Email").fill(administratorEmail);
     await page.getByLabel("Password").fill(administratorPassword);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByText(administratorEmail, { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(administratorEmail, { exact: true }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", {
         name: `Settings and account menu — ${administratorEmail}`,
@@ -264,9 +266,10 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await expect(
       page.getByRole("navigation", { name: "Content sections" }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Articles" }),
-    ).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "Articles" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
 
     await page.getByRole("link", { name: "Media" }).click();
     await expect(page).toHaveURL(/\/admin\/media$/);
@@ -286,9 +289,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
     await expect(page).toHaveURL(/\/admin\/articles$/);
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog", { name: "Settings" })).toHaveCount(
-      0,
-    );
+    await expect(page.getByRole("dialog", { name: "Settings" })).toHaveCount(0);
 
     await identityMenu().click();
     await page.getByRole("menuitem", { name: "Account" }).click();
@@ -743,6 +744,98 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     );
     expect(republished.html).toContain(publicMediaUrl);
     expect(publicationPosts).toHaveLength(2);
+  });
+
+  await test.step("Articles workspace projects lifecycle filters, row actions, and non-destructive list failure", async () => {
+    await page.goto("/admin/articles");
+    await expect(
+      page.getByRole("heading", { name: "Articles", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("tab", { name: /Changes pending/ }),
+    ).toBeVisible();
+    await expect(page.getByRole("tab", { name: /^All / })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /^Published / })).toBeVisible();
+    await expect(
+      page.getByRole("tab", { name: /^Unpublished / }),
+    ).toBeVisible();
+
+    await page.getByRole("tab", { name: /Changes pending/ }).click();
+    await expect(
+      page.getByText("Changes pending", { exact: true }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: new RegExp(`${postPublishDraftTitle} · Draft v`),
+      }),
+    ).toBeVisible();
+
+    await page
+      .getByRole("button", {
+        name: `More actions for ${postPublishDraftTitle}`,
+      })
+      .click();
+    await expect(
+      page.getByRole("menuitem", { name: "Edit", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("menuitem", { name: "Preview saved Draft" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("menuitem", { name: "Republish", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("menuitem", { name: "Unpublish", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("menuitem", { name: "Move to Trash" }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await page
+      .getByRole("button", {
+        name: `Settings and account menu — ${administratorEmail}`,
+      })
+      .click();
+    await page.getByRole("menuitem", { name: "Interface language" }).hover();
+    await page.getByRole("menuitem", { name: "简体中文" }).click();
+    await expect
+      .poll(async () => page.locator("html").getAttribute("lang"))
+      .toBe("zh-CN");
+    await expect(
+      page.getByRole("tab", { name: /有待发布的修改/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("有待发布的修改", { exact: true }).first(),
+    ).toBeVisible();
+    await page
+      .getByRole("button", {
+        name: `设置与账户菜单 — ${administratorEmail}`,
+      })
+      .click();
+    await page.getByRole("menuitem", { name: "界面语言" }).hover();
+    await page.getByRole("menuitem", { name: "English" }).click();
+    await expect
+      .poll(async () => page.locator("html").getAttribute("lang"))
+      .toBe("en");
+
+    await page.route("**/api/admin/articles", async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({ status: 503, body: "Articles unavailable" });
+        return;
+      }
+      await route.continue();
+    });
+    await page.getByRole("button", { name: "Reload Articles" }).click();
+    await expect(page.getByText("Unable to load Articles")).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: new RegExp(`${postPublishDraftTitle} · Draft v`),
+      }),
+    ).toBeVisible();
+    await page.unroute("**/api/admin/articles");
+    await page.getByRole("button", { name: "Reload Articles" }).click();
+    await expect(page.getByText("Unable to load Articles")).toHaveCount(0);
   });
 
   await test.step("target canonical Publication Issues at their authoring surfaces", async () => {

@@ -5,6 +5,7 @@ dist/
 coverage/
 playwright-report/
 test-results/
+src/paraglide/
 
 # Local environment and Cloudflare state
 .env

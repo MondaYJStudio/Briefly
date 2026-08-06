@@ -47,6 +47,18 @@ export interface Article {
   draft: ArticleDraft;
 }
 
+/**
+ * Server-derived Articles workspace presentation. Not a persisted domain
+ * status — computed from Publication history and effective Draft divergence
+ * (including inherited Site Settings metadata) against the Current Publication.
+ */
+export type ArticleLifecycleProjection =
+  "draft" | "published" | "changes-pending" | "unpublished";
+
+export interface AdminArticleListItem extends Article {
+  lifecycleProjection: ArticleLifecycleProjection;
+}
+
 export interface ArticleTrashEntry {
   id: string;
   title: string;

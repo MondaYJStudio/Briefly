@@ -1,27 +1,58 @@
 import { Alert, Button, Dropdown, Tooltip } from "@heroui/react";
 import { useMemo, useState } from "react";
 
-import type { Article } from "../../articles/articles";
+import type {
+  Article,
+  ArticleLifecycleProjection,
+} from "../../articles/articles";
+import { m } from "../../paraglide/messages.js";
 import { AdminIcon } from "./icons";
+import styles from "./articles-view.module.css";
 import { StatusChip } from "./status-chip";
-import type { ArticleWorkspace } from "./use-article-workspace";
+import {
+  articleLifecycleProjection,
+  type ArticleWorkspace,
+} from "./use-article-workspace";
 
-type ArticleFilter =
-  "all" | "with-current-publication" | "without-current-publication";
+type ArticleFilter = "all" | ArticleLifecycleProjection;
 
 function articleVisible(article: Article, filter: ArticleFilter): boolean {
-  if (filter === "with-current-publication") {
-    return article.currentPublicationId !== null;
+  if (filter === "all") return true;
+  return articleLifecycleProjection(article) === filter;
+}
+
+function lifecycleChip(projection: ArticleLifecycleProjection) {
+  switch (projection) {
+    case "published":
+      return (
+        <StatusChip variant="success" dot>
+          {m.lifecycle_published()}
+        </StatusChip>
+      );
+    case "changes-pending":
+      return (
+        <StatusChip variant="warning" dot>
+          {m.lifecycle_changes_pending()}
+        </StatusChip>
+      );
+    case "unpublished":
+      return (
+        <StatusChip variant="default" dot>
+          {m.lifecycle_unpublished()}
+        </StatusChip>
+      );
+    case "draft":
+      return (
+        <StatusChip variant="default" dot>
+          {m.lifecycle_draft()}
+        </StatusChip>
+      );
   }
-  if (filter === "without-current-publication") {
-    return article.currentPublicationId === null;
-  }
-  return true;
 }
 
 /**
- * Articles index: page head, status filter tabs, future-search marker and the
- * article rows with cover, status chip, metadata and a per-row action menu.
+ * Articles index: page head, lifecycle filter tabs, future-search marker and
+ * article rows with cover, lifecycle chip, metadata and a per-row action menu.
  */
 export function ArticlesView({
   workspace,
@@ -34,201 +65,225 @@ export function ArticlesView({
   onOpen: (article: Article) => void;
   onPreview: (article: Article) => void;
 }>) {
-  const { articles, state, selected, articleSelectionDisabled } = workspace;
+  const {
+    articles,
+    state,
+    selected,
+    articleSelectionDisabled,
+    listError,
+    createError,
+    listActionPendingId,
+    reloadArticles,
+    publishListedArticle,
+    unpublishListedArticle,
+    moveListedArticleToTrash,
+  } = workspace;
   const [filter, setFilter] = useState<ArticleFilter>("all");
 
-  const counts = useMemo(
-    () => ({
+  const counts = useMemo(() => {
+    const next = {
       all: articles.length,
-      withCurrentPublication: articles.filter(
-        (article) => article.currentPublicationId !== null,
-      ).length,
-      withoutCurrentPublication: articles.filter(
-        (article) => article.currentPublicationId === null,
-      ).length,
-    }),
-    [articles],
-  );
+      draft: 0,
+      published: 0,
+      "changes-pending": 0,
+      unpublished: 0,
+    };
+    for (const article of articles) {
+      next[articleLifecycleProjection(article)] += 1;
+    }
+    return next;
+  }, [articles]);
   const visible = articles.filter((article) => articleVisible(article, filter));
+  const creating = state === "creating";
+  const loadingEmpty = state === "loading" && articles.length === 0;
+  const failedEmpty = state === "failed" && articles.length === 0;
 
   return (
-    <main className="page" id="admin-main">
-      <header className="page-head">
+    <main className={styles.page} id="admin-main">
+      <header className={styles.pageHead}>
         <div>
-          <h1 className="page-title">Articles</h1>
-          <p className="page-desc">
-            Each article has one living Draft. Publishing freezes an immutable
-            Publication — editing never touches what’s live.
-          </p>
+          <h1 className={styles.pageTitle}>{m.articles()}</h1>
+          <p className={styles.pageDesc}>{m.articles_page_description()}</p>
         </div>
-        <div className="page-actions">
+        <div className={styles.pageActions}>
+          {!loadingEmpty ? (
+            <Button
+              type="button"
+              variant="ghost"
+              aria-label={m.reload_articles()}
+              isDisabled={creating || articleSelectionDisabled}
+              onPress={() => void reloadArticles({ soft: articles.length > 0 })}
+            >
+              {m.retry()}
+            </Button>
+          ) : null}
           <Button
             type="button"
-            aria-label="Create Article Draft"
-            isPending={state === "creating"}
-            isDisabled={
-              articleSelectionDisabled ||
-              state === "loading" ||
-              state === "creating"
-            }
+            aria-label={m.create_article_draft()}
+            isPending={creating}
+            isDisabled={articleSelectionDisabled || loadingEmpty || creating}
             onPress={onCreate}
           >
             <AdminIcon name="plus" size={16} />
-            New article
+            {m.new_article()}
           </Button>
         </div>
       </header>
 
-      {state === "loading" && articles.length === 0 ? (
-        <ArticleListSkeleton />
-      ) : state === "failed" && articles.length === 0 ? (
-        <Alert status="danger" role="alert">
+      {listError && articles.length > 0 ? (
+        <Alert status="danger" role="alert" className={styles.feedback}>
           <Alert.Content>
-            <Alert.Title>Unable to load Articles</Alert.Title>
+            <Alert.Title>{m.articles_load_failed()}</Alert.Title>
             <Alert.Description>
-              Reload this page to retry. No local or public Article state was
-              changed.
+              {m.articles_load_failed_description()}
+            </Alert.Description>
+          </Alert.Content>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onPress={() => void reloadArticles({ soft: true })}
+          >
+            {m.retry()}
+          </Button>
+        </Alert>
+      ) : null}
+
+      {createError ? (
+        <Alert status="danger" role="alert" className={styles.feedback}>
+          <Alert.Content>
+            <Alert.Title>{m.articles_create_failed()}</Alert.Title>
+            <Alert.Description>
+              {m.articles_create_failed_description()}
             </Alert.Description>
           </Alert.Content>
         </Alert>
-      ) : articles.length === 0 && state !== "failed" ? (
-        <div className="card">
-          <div className="empty">
-            <div className="empty-icon">
+      ) : null}
+
+      {loadingEmpty ? (
+        <ArticleListSkeleton />
+      ) : failedEmpty ? (
+        <Alert status="danger" role="alert">
+          <Alert.Content>
+            <Alert.Title>{m.articles_load_failed()}</Alert.Title>
+            <Alert.Description>
+              {m.articles_load_failed_description()}
+            </Alert.Description>
+          </Alert.Content>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onPress={() => void reloadArticles()}
+          >
+            {m.retry()}
+          </Button>
+        </Alert>
+      ) : articles.length === 0 ? (
+        <div className={styles.card}>
+          <div className={styles.empty}>
+            <div className={styles.emptyIcon}>
               <AdminIcon name="articles" size={24} />
             </div>
-            <h3>No articles yet</h3>
-            <p>
-              Your first article starts as a private Draft. Nothing goes live
-              until you publish it — deliberately.
-            </p>
-            <div className="empty-actions">
+            <h3>{m.articles_empty_title()}</h3>
+            <p>{m.articles_empty_description()}</p>
+            <div className={styles.emptyActions}>
               <Button
                 type="button"
-                isPending={state === "creating"}
-                isDisabled={
-                  articleSelectionDisabled ||
-                  state === "loading" ||
-                  state === "creating"
-                }
+                isPending={creating}
+                isDisabled={articleSelectionDisabled || creating}
                 onPress={onCreate}
               >
-                Write your first article
+                {m.write_first_article()}
               </Button>
             </div>
           </div>
         </div>
-      ) : articles.length === 0 ? null : (
+      ) : (
         <>
-          <div className="row-between wrap mb-4">
+          <div className={styles.toolbar}>
             <div
-              className="tabs-line-list"
+              className={styles.tabs}
               role="tablist"
-              aria-label="Filter by status"
-              style={{ borderBottom: 0 }}
+              aria-label={m.filter_by_lifecycle()}
             >
               {(
                 [
-                  ["all", "All", counts.all],
+                  ["all", m.filter_all(), counts.all],
+                  ["published", m.lifecycle_published(), counts.published],
                   [
-                    "with-current-publication",
-                    "Published",
-                    counts.withCurrentPublication,
+                    "unpublished",
+                    m.lifecycle_unpublished(),
+                    counts.unpublished,
                   ],
                   [
-                    "without-current-publication",
-                    "Unpublished",
-                    counts.withoutCurrentPublication,
+                    "changes-pending",
+                    m.lifecycle_changes_pending(),
+                    counts["changes-pending"],
                   ],
                 ] as const
               ).map(([id, label, count]) => (
                 <button
                   key={id}
-                  className="tab-line"
+                  className={styles.tab}
                   type="button"
                   role="tab"
                   aria-selected={filter === id}
                   aria-controls="article-panel"
                   onClick={() => setFilter(id)}
                 >
-                  {label} <span className="count">{count}</span>
+                  {label} <span className={styles.count}>{count}</span>
                 </button>
               ))}
             </div>
             <Tooltip.Root delay={500}>
               <Tooltip.Trigger
-                className="input-group"
-                style={{
-                  width: "16rem",
-                  position: "relative",
-                  display: "flex",
-                  alignItems: "center",
-                }}
-                aria-label="Search articles — planned future capability"
+                className={styles.searchMarker}
+                aria-label={m.search_articles_future()}
               >
                 <AdminIcon
                   name="search"
                   size={16}
-                  style={{
-                    position: "absolute",
-                    left: "0.75rem",
-                    color: "var(--foreground-faint)",
-                    pointerEvents: "none",
-                  }}
+                  className={styles.searchIcon}
                 />
                 <input
-                  className="input"
+                  className={styles.searchInput}
                   type="search"
-                  placeholder="Search articles"
+                  placeholder={m.search_articles_placeholder()}
                   disabled
                   aria-disabled="true"
-                  aria-describedby="search-note"
-                  style={{
-                    width: "100%",
-                    background: "var(--content2)",
-                    border: "1.5px solid transparent",
-                    borderRadius: "var(--radius-m)",
-                    padding: "0.5rem 0.75rem 0.5rem 2.25rem",
-                    height: "2.5rem",
-                    font: "inherit",
-                    color: "inherit",
-                  }}
                 />
               </Tooltip.Trigger>
-              <Tooltip.Content>
-                Full-text search is a future capability — not in this version
-              </Tooltip.Content>
+              <Tooltip.Content>{m.search_articles_future()}</Tooltip.Content>
             </Tooltip.Root>
           </div>
-          <p className="small faint mb-4" id="search-note">
-            Search is shown for layout only — it is a planned future capability,
-            not implemented in this version.
-          </p>
 
           <div
-            className="card"
+            className={styles.card}
             role="tabpanel"
             id="article-panel"
-            aria-label="Article Drafts"
+            aria-label={m.article_drafts_panel()}
           >
-            <ul className="article-list">
+            <ul className={styles.list}>
               {visible.map((article) => (
                 <ArticleRow
                   key={article.id}
                   article={article}
                   isSelected={selected?.id === article.id}
-                  disabled={articleSelectionDisabled}
+                  disabled={
+                    articleSelectionDisabled ||
+                    listActionPendingId === article.id
+                  }
+                  actionPending={listActionPendingId === article.id}
                   onOpen={() => onOpen(article)}
                   onPreview={() => onPreview(article)}
+                  onPublish={() => void publishListedArticle(article)}
+                  onUnpublish={() => void unpublishListedArticle(article)}
+                  onTrash={() => void moveListedArticleToTrash(article)}
                 />
               ))}
               {visible.length === 0 ? (
-                <li
-                  className="small muted"
-                  style={{ padding: "var(--space-6)", textAlign: "center" }}
-                >
-                  No articles match this filter.
-                </li>
+                <li className={styles.filterEmpty}>{m.no_articles_match()}</li>
               ) : null}
             </ul>
           </div>
@@ -242,118 +297,144 @@ function ArticleRow({
   article,
   isSelected,
   disabled,
+  actionPending,
   onOpen,
   onPreview,
+  onPublish,
+  onUnpublish,
+  onTrash,
 }: Readonly<{
   article: Article;
   isSelected: boolean;
   disabled: boolean;
+  actionPending: boolean;
   onOpen: () => void;
   onPreview: () => void;
+  onPublish: () => void;
+  onUnpublish: () => void;
+  onTrash: () => void;
 }>) {
-  const title = article.draft.title || "Untitled Article";
-  const hasCurrentPublication = article.currentPublicationId !== null;
+  const title = article.draft.title || m.untitled_article();
+  const projection = articleLifecycleProjection(article);
   const cover = article.draft.cover;
+  const canUnpublish = article.currentPublicationId !== null;
+  const publishLabel =
+    projection === "published" || projection === "changes-pending"
+      ? m.republish()
+      : m.publish();
+  const unpublishReason = m.unpublish_disabled_no_current_publication();
 
   return (
     <li
-      className={`article-row${cover ? "" : " no-cover"}`}
+      className={`${styles.row}${cover ? "" : ` ${styles.rowNoCover}`}`}
       data-selected={isSelected}
     >
       {cover ? (
         <img
-          className="cover-thumb"
+          className={styles.coverThumb}
           src={`/media/private/${cover.assetId}`}
           alt=""
           loading="lazy"
         />
       ) : null}
       <button
-        className="article-row-button article-main"
+        className={`${styles.rowButton} ${styles.main}`}
         type="button"
-        aria-label={`${title} · Version ${article.draft.version}`}
+        aria-label={`${title} · ${m.draft_version({ version: String(article.draft.version) })}`}
         disabled={disabled}
         onClick={onOpen}
       >
-        <span className="article-title-line">
+        <span className={styles.titleLine}>
           <span
-            className={`article-title${article.draft.title ? "" : " untitled"}`}
+            className={`${styles.title}${article.draft.title ? "" : ` ${styles.titleUntitled}`}`}
           >
             {title}
           </span>
-          {hasCurrentPublication ? (
-            <StatusChip variant="success" dot>
-              Published
-            </StatusChip>
-          ) : (
-            <StatusChip variant="default" dot>
-              Draft
-            </StatusChip>
-          )}
+          {lifecycleChip(projection)}
         </span>
-        <span className="article-slug">
-          {article.draft.slug ? `/${article.draft.slug}` : "No slug yet"}
+        <span className={styles.slug}>
+          {article.draft.slug ? `/${article.draft.slug}` : m.no_slug_yet()}
         </span>
-        <span className="article-meta">
-          <span className="m">Draft v{article.draft.version}</span>
-          <span className="m">
+        <span className={styles.meta}>
+          <span className={styles.metaItem}>
+            {m.draft_version({ version: String(article.draft.version) })}
+          </span>
+          <span className={styles.metaItem}>
             <AdminIcon name="clock" size={12} strokeWidth={2.2} />
-            Edited{" "}
+            {m.edited()}{" "}
             <time dateTime={new Date(article.draft.updatedAt).toISOString()}>
               {new Date(article.draft.updatedAt).toLocaleString()}
             </time>
           </span>
-          <span className="m">
-            {hasCurrentPublication
-              ? "Current Publication selected"
-              : "No Current Publication selected"}
+          <span className={styles.metaItem}>
+            {canUnpublish
+              ? m.current_publication_selected()
+              : m.no_current_publication_selected()}
           </span>
         </span>
       </button>
-      <span className="article-side">
+      <span className={styles.side}>
         <Button
-          className="hide-m"
+          className={styles.editDesktop}
           size="sm"
           type="button"
           variant="ghost"
           isDisabled={disabled}
           onPress={onOpen}
         >
-          Edit
+          {m.edit()}
         </Button>
         <Dropdown.Root>
           <Dropdown.Trigger
-            className="article-menu-trigger"
-            aria-label={`More actions for ${title}`}
-            style={{
-              width: "2rem",
-              height: "2rem",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "var(--radius-s)",
-              background: "none",
-              border: 0,
-              cursor: "pointer",
-              color: "var(--foreground-muted)",
-            }}
+            className={styles.menuTrigger}
+            aria-label={m.more_actions_for({ title })}
+            isDisabled={disabled && !actionPending}
           >
             <AdminIcon name="more" size={18} />
           </Dropdown.Trigger>
           <Dropdown.Popover placement="bottom end">
             <Dropdown.Menu
-              aria-label={`Actions for ${title}`}
-              disabledKeys={disabled ? ["edit", "preview"] : []}
+              aria-label={m.actions_for({ title })}
+              disabledKeys={[
+                ...(disabled ? ["edit", "preview", "publish", "trash"] : []),
+                ...(!canUnpublish || disabled ? ["unpublish"] : []),
+              ]}
               onAction={(key) => {
                 if (key === "edit") onOpen();
                 else if (key === "preview") onPreview();
+                else if (key === "publish") onPublish();
+                else if (key === "unpublish") onUnpublish();
+                else if (key === "trash") onTrash();
               }}
             >
-              <Dropdown.Item id="edit" textValue="Edit">
-                Edit
+              <Dropdown.Item id="edit" textValue={m.edit()}>
+                {m.edit()}
               </Dropdown.Item>
-              <Dropdown.Item id="preview" textValue="Preview saved Draft">
-                Preview saved Draft
+              <Dropdown.Item id="preview" textValue={m.preview_saved_draft()}>
+                {m.preview_saved_draft()}
+              </Dropdown.Item>
+              <Dropdown.Item id="publish" textValue={publishLabel}>
+                {publishLabel}
+              </Dropdown.Item>
+              <Dropdown.Item
+                id="unpublish"
+                textValue={
+                  canUnpublish
+                    ? m.unpublish()
+                    : `${m.unpublish()} — ${unpublishReason}`
+                }
+                aria-label={
+                  canUnpublish
+                    ? m.unpublish()
+                    : `${m.unpublish()}: ${unpublishReason}`
+                }
+              >
+                {canUnpublish
+                  ? m.unpublish()
+                  : `${m.unpublish()} — ${unpublishReason}`}
+              </Dropdown.Item>
+              <Dropdown.Item id="trash" textValue={m.move_to_trash()}>
+                {m.move_to_trash()}
               </Dropdown.Item>
             </Dropdown.Menu>
           </Dropdown.Popover>
@@ -365,16 +446,16 @@ function ArticleRow({
 
 function ArticleListSkeleton() {
   return (
-    <div aria-busy="true" role="status" aria-label="Loading Article Drafts">
-      <div className="row mb-4">
+    <div aria-busy="true" role="status" aria-label={m.loading_article_drafts()}>
+      <div className={styles.toolbar}>
         <div className="skeleton" style={{ width: "22rem", height: "2rem" }} />
       </div>
-      <div className="card">
-        <div className="article-list">
+      <div className={styles.card}>
+        <div className={styles.list}>
           {[40, 55, 35, 48].map((width) => (
-            <div className="article-row" key={width}>
-              <div className="skeleton cover-thumb" />
-              <div className="article-main">
+            <div className={styles.skeletonRow} key={width}>
+              <div className={`skeleton ${styles.coverThumb}`} />
+              <div className={styles.skeletonStack}>
                 <div
                   className="skeleton"
                   style={{ width: `${width}%`, height: "1rem" }}

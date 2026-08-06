@@ -3,12 +3,33 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   ARTICLE_DRAFT_AUTOSAVE_DEBOUNCE_MS,
+  type AdminArticleListItem,
   type Article,
   type ArticleDraftUpdate,
+  type ArticleLifecycleProjection,
   type ArticlePublicationHistory,
   type ArticlePublicationHistoryEntry,
   type ArticleTrashEntry,
 } from "../../articles/articles";
+
+export function articleLifecycleProjection(
+  article: Article,
+): ArticleLifecycleProjection {
+  if (
+    "lifecycleProjection" in article &&
+    typeof (article as AdminArticleListItem).lifecycleProjection === "string"
+  ) {
+    return (article as AdminArticleListItem).lifecycleProjection;
+  }
+  return article.currentPublicationId !== null ? "published" : "draft";
+}
+
+function withLifecycleProjection(
+  article: Article,
+  lifecycleProjection: ArticleLifecycleProjection,
+): AdminArticleListItem {
+  return { ...article, lifecycleProjection };
+}
 import {
   isPublicationRestorationIssue,
   type PublicationRestorationIssue,
@@ -229,6 +250,11 @@ export function useArticleWorkspace() {
   >("loading");
   const [trashActionState, setTrashActionState] =
     useState<TrashActionState>("ready");
+  const [listError, setListError] = useState(false);
+  const [createError, setCreateError] = useState(false);
+  const [listActionPendingId, setListActionPendingId] = useState<string | null>(
+    null,
+  );
   const [selected, setSelected] = useState<Article | null>(null);
   const [state, setState] = useState<WorkspaceState>("loading");
   const [isOnline, setIsOnline] = useState(
@@ -330,6 +356,36 @@ export function useArticleWorkspace() {
     resetPreview();
   }
 
+  async function reloadArticles(options: { soft?: boolean } = {}) {
+    const soft = options.soft === true;
+    if (!soft && selectedRef.current === null) {
+      setState((current) =>
+        current === "failed" || current === "ready" ? "loading" : current,
+      );
+    }
+    try {
+      const response = await getApiClient().admin.articles.get();
+      if (response.status !== 200 || !response.data)
+        throw new Error("Articles unavailable");
+      const listed = response.data.articles as AdminArticleListItem[];
+      setArticles(listed);
+      setListError(false);
+      setState((current) =>
+        selectedRef.current === null &&
+        (current === "loading" || current === "failed")
+          ? "ready"
+          : current,
+      );
+    } catch {
+      setListError(true);
+      setState((current) =>
+        current === "loading" && selectedRef.current === null
+          ? "failed"
+          : current,
+      );
+    }
+  }
+
   useEffect(() => {
     let active = true;
     void getApiClient()
@@ -338,15 +394,17 @@ export function useArticleWorkspace() {
         if (response.status !== 200 || !response.data)
           throw new Error("Articles unavailable");
         if (active) {
+          const listed = response.data.articles as AdminArticleListItem[];
           setArticles((current) => [
             ...current,
-            ...response.data.articles.filter(
+            ...listed.filter(
               (serverArticle) =>
                 !current.some(
                   (localArticle) => localArticle.id === serverArticle.id,
                 ),
             ),
           ]);
+          setListError(false);
           setState((current) =>
             current === "loading" && selectedRef.current === null
               ? "ready"
@@ -356,6 +414,7 @@ export function useArticleWorkspace() {
       })
       .catch(() => {
         if (active) {
+          setListError(true);
           setState((current) =>
             current === "loading" && selectedRef.current === null
               ? "failed"
@@ -380,26 +439,109 @@ export function useArticleWorkspace() {
 
   async function createDraft(): Promise<Article | null> {
     if (lifecycleActionPending) return null;
+    setCreateError(false);
     setState("creating");
     setIssues([]);
     try {
       const response = await getApiClient().admin.articles.post();
       if (response.status !== 201 || !response.data)
         throw new Error("Article creation failed");
+      const created = withLifecycleProjection(response.data, "draft");
       setArticles((current) => [
-        response.data,
-        ...current.filter((article) => article.id !== response.data.id),
+        created,
+        ...current.filter((article) => article.id !== created.id),
       ]);
-      selectServerDraft(response.data);
+      selectServerDraft(created);
       setConflictCopy(null);
       setState("ready");
       setPublishState("ready");
       setPublicationAction(null);
       setTrashActionState("ready");
-      return response.data;
+      return created;
     } catch {
-      setState("failed");
+      setCreateError(true);
+      setState((current) => (current === "creating" ? "ready" : current));
       return null;
+    }
+  }
+
+  async function publishListedArticle(article: Article): Promise<boolean> {
+    if (lifecycleActionPending || listActionPendingId !== null) return false;
+    setListActionPendingId(article.id);
+    try {
+      const response = await getApiClient()
+        .admin.articles({ articleId: article.id })
+        .publications.post({
+          draftVersion: article.draft.version,
+          expectedCurrentPublicationId: article.currentPublicationId,
+        });
+      if (response.status !== 201 || !response.data) return false;
+      await reloadArticles({ soft: true });
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setListActionPendingId(null);
+    }
+  }
+
+  async function unpublishListedArticle(article: Article): Promise<boolean> {
+    if (
+      !article.currentPublicationId ||
+      lifecycleActionPending ||
+      listActionPendingId !== null
+    ) {
+      return false;
+    }
+    setListActionPendingId(article.id);
+    try {
+      const response = await getApiClient()
+        .admin.articles({ articleId: article.id })
+        ["current-publication"].delete();
+      if (response.status !== 200 || !response.data) return false;
+      setArticles((current) =>
+        current.map((row) =>
+          row.id === article.id
+            ? withLifecycleProjection(
+                { ...row, currentPublicationId: null },
+                "unpublished",
+              )
+            : row,
+        ),
+      );
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setListActionPendingId(null);
+    }
+  }
+
+  async function moveListedArticleToTrash(article: Article): Promise<boolean> {
+    if (
+      articleSelectionDisabled ||
+      lifecycleActionPending ||
+      listActionPendingId !== null ||
+      trashLifecyclePendingRef.current
+    ) {
+      return false;
+    }
+    setListActionPendingId(article.id);
+    trashLifecyclePendingRef.current = true;
+    try {
+      const response = await getApiClient()
+        .admin.articles({ articleId: article.id })
+        .trash.post();
+      if (response.status !== 200 || !response.data) return false;
+      setArticles((current) => current.filter((row) => row.id !== article.id));
+      if (selectedRef.current?.id === article.id) clearSelectedArticle();
+      await reloadTrashView();
+      return true;
+    } catch {
+      return false;
+    } finally {
+      trashLifecyclePendingRef.current = false;
+      setListActionPendingId(null);
     }
   }
 
@@ -1271,6 +1413,9 @@ export function useArticleWorkspace() {
     editorGeneration,
     // state
     state,
+    listError,
+    createError,
+    listActionPendingId,
     trashViewState,
     trashActionState,
     previewState,
@@ -1307,7 +1452,11 @@ export function useArticleWorkspace() {
     loadPublicationHistory,
     restoreFromHistory,
     clearSelectedArticle,
+    reloadArticles,
     reloadTrashView,
+    publishListedArticle,
+    unpublishListedArticle,
+    moveListedArticleToTrash,
     moveSelectedArticleToTrash,
     restoreArticleFromTrash,
     purgeArticleFromTrash,
