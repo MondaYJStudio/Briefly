@@ -88,7 +88,8 @@ test("Interface Locale fallback and switching keep SSR and hydration aligned", a
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
   await expect(page.getByRole("heading", { name: "登录" })).toBeVisible();
 
-  await page.getByLabel("界面语言").selectOption("en");
+  await page.getByLabel("界面语言").click();
+  await page.getByRole("menuitem", { name: "English" }).click();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 
