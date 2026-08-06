@@ -4,6 +4,8 @@ import {
   Drawer,
   Form,
   Input,
+  ListBox,
+  Select,
   Spinner,
   TextArea,
 } from "@heroui/react";
@@ -19,13 +21,13 @@ import { getApiClient } from "../../routes/api.$";
 import {
   BYLINE_NAME_MAXIMUM_LENGTH,
   BYLINE_URL_MAXIMUM_LENGTH,
-  LANGUAGE_TAG_MAXIMUM_LENGTH,
   SITE_DESCRIPTION_MAXIMUM_LENGTH,
   SITE_NAME_MAXIMUM_LENGTH,
   type SiteSettings,
 } from "../../site-settings/site-settings";
 import { AdminIcon } from "./icons";
 import { SettingsField } from "./fields";
+import { LANGUAGE_OPTIONS } from "./language-options";
 
 interface SettingsDrawerProps {
   open: boolean;
@@ -138,6 +140,20 @@ export function SettingsDrawer({
 
   const disabled = state === "submitting";
   const hasValidation = issues.length > 0;
+  const languageOptions = LANGUAGE_OPTIONS.some(
+    (language) => language.id === settings?.defaultLanguage,
+  )
+    ? LANGUAGE_OPTIONS
+    : settings
+      ? [
+          {
+            id: settings.defaultLanguage,
+            label: settings.defaultLanguage,
+            detail: settings.defaultLanguage,
+          },
+          ...LANGUAGE_OPTIONS,
+        ]
+      : LANGUAGE_OPTIONS;
 
   return (
     <Drawer.Backdrop isOpen={open} onOpenChange={onOpenChange}>
@@ -351,41 +367,53 @@ export function SettingsDrawer({
                     <SettingsField
                       label="Default language"
                       htmlFor="defaultLanguage"
-                      optional="BCP 47"
-                      description={
-                        <>
-                          A BCP 47 tag such as <span className="mono">en</span>,{" "}
-                          <span className="mono">en-US</span> or{" "}
-                          <span className="mono">zh-Hans</span>.
-                        </>
-                      }
                       issues={
                         issueByPath.has("defaultLanguage")
                           ? [issueByPath.get("defaultLanguage")!]
                           : []
                       }
                     >
-                      <Input
+                      <Select
                         fullWidth
-                        className="font-mono"
                         id="defaultLanguage"
                         name="defaultLanguage"
-                        required
-                        maxLength={LANGUAGE_TAG_MAXIMUM_LENGTH}
                         aria-invalid={issueByPath.has("defaultLanguage")}
                         aria-describedby={
                           issueByPath.has("defaultLanguage")
                             ? "defaultLanguage-error"
                             : undefined
                         }
-                        value={settings.defaultLanguage}
-                        onChange={(e) =>
+                        selectedKey={settings.defaultLanguage}
+                        onSelectionChange={(key) => {
+                          if (key === null) return;
                           update({
                             ...settings,
-                            defaultLanguage: e.target.value,
-                          })
-                        }
-                      />
+                            defaultLanguage: String(key),
+                          });
+                        }}
+                      >
+                        <Select.Trigger className="briefly-language-trigger">
+                          <Select.Value />
+                          <Select.Indicator />
+                        </Select.Trigger>
+                        <Select.Popover>
+                          <ListBox aria-label="Default language options">
+                            {languageOptions.map((language) => (
+                              <ListBox.Item
+                                key={language.id}
+                                id={language.id}
+                                className="briefly-language-option"
+                                textValue={`${language.label} (${language.detail})`}
+                              >
+                                <span>{language.label}</span>
+                                <span className="briefly-select-detail mono">
+                                  {language.detail}
+                                </span>
+                              </ListBox.Item>
+                            ))}
+                          </ListBox>
+                        </Select.Popover>
+                      </Select>
                     </SettingsField>
                   </div>
                 </SettingsCard>

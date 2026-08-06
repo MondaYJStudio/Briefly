@@ -1484,6 +1484,24 @@ html[data-theme="dark"],
   opacity: 0.6;
   pointer-events: none;
 }
+.briefly-language-trigger {
+  min-height: 2.75rem;
+  padding-block: var(--space-2);
+}
+.briefly-language-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 2.5rem;
+}
+.briefly-select-detail {
+  margin-left: auto;
+  color: var(--foreground-faint);
+  font-size: var(--text-tiny);
+}
+.briefly-language-trigger .briefly-select-detail {
+  display: none;
+}
 .briefly-menu-note {
   font-size: 0.75rem;
   color: var(--foreground-faint, #71717a);
