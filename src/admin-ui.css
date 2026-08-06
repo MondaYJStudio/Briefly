@@ -334,6 +334,11 @@ html[data-theme="dark"],
   margin: 0;
 }
 .doc figure img {
+  display: block;
+  max-width: 100%;
+  max-height: min(28rem, 55vh);
+  width: auto;
+  height: auto;
   border-radius: var(--radius-m);
   border: 1px solid var(--border);
 }
