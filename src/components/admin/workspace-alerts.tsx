@@ -1,5 +1,6 @@
 import { Alert, Button, TextArea } from "@heroui/react";
 
+import { m } from "../../paraglide/messages.js";
 import { publicationIssueGuidance } from "./publication-issues";
 import type { ArticleWorkspace } from "./use-article-workspace";
 import styles from "./workspace-alerts.module.css";
@@ -38,22 +39,18 @@ export function WorkspaceAlerts({
       {trashActionState === "restored" ? (
         <Alert status="success" role="status">
           <Alert.Content>
-            <Alert.Title>Article restored as unpublished</Alert.Title>
+            <Alert.Title>{m.alert_article_restored_unpublished()}</Alert.Title>
             <Alert.Description>
-              Its Draft and Publication history are intact. It has no Current
-              Publication and remains unavailable from public endpoints until
-              you explicitly publish it again.
+              {m.alert_article_restored_unpublished_description()}
             </Alert.Description>
           </Alert.Content>
         </Alert>
       ) : trashActionState === "trash-error" ? (
         <Alert status="danger" role="alert">
           <Alert.Content>
-            <Alert.Title>Unable to move Article to Trash</Alert.Title>
+            <Alert.Title>{m.alert_unable_move_to_trash()}</Alert.Title>
             <Alert.Description>
-              Briefly did not confirm the transition. The prior Article and
-              public visibility state remain authoritative; reload and try
-              again.
+              {m.alert_unable_move_to_trash_description()}
             </Alert.Description>
           </Alert.Content>
         </Alert>
@@ -62,16 +59,16 @@ export function WorkspaceAlerts({
       {blocker.status === "blocked" ? (
         <Alert status="warning" role="alert">
           <Alert.Content>
-            <Alert.Title>Unsaved local changes</Alert.Title>
+            <Alert.Title>{m.alert_unsaved_local_changes()}</Alert.Title>
             <Alert.Description>
-              Leaving now discards changes that the server has not confirmed.
+              {m.alert_unsaved_local_changes_description()}
               <span className={styles.actions}>
                 <Button
                   type="button"
                   variant="secondary"
                   onPress={blocker.reset}
                 >
-                  Stay here
+                  {m.alert_stay_here()}
                 </Button>
                 <Button
                   type="button"
@@ -80,7 +77,7 @@ export function WorkspaceAlerts({
                     blocker.proceed();
                   }}
                 >
-                  Leave without saving
+                  {m.alert_leave_without_saving()}
                 </Button>
               </span>
             </Alert.Description>
@@ -91,15 +88,15 @@ export function WorkspaceAlerts({
       {state === "failed" ? (
         <Alert status="danger" role="alert">
           <Alert.Content>
-            <Alert.Title>Draft save failed</Alert.Title>
+            <Alert.Title>{m.alert_draft_save_failed()}</Alert.Title>
             <Alert.Description>
-              Your current-tab changes are still available but are not durable.
+              {m.alert_draft_save_failed_description()}
               <span className={styles.actions}>
                 <Button
                   type="button"
                   onPress={() => void persistCurrentDraft()}
                 >
-                  Retry save
+                  {m.alert_retry_save()}
                 </Button>
                 <Button
                   type="button"
@@ -107,7 +104,7 @@ export function WorkspaceAlerts({
                   isDisabled={lifecycleActionPending}
                   onPress={reloadDraft}
                 >
-                  Reload server Draft
+                  {m.alert_reload_server_draft()}
                 </Button>
               </span>
             </Alert.Description>
@@ -116,17 +113,16 @@ export function WorkspaceAlerts({
       ) : state === "conflict" ? (
         <Alert status="warning" role="alert">
           <Alert.Content>
-            <Alert.Title>Draft conflict</Alert.Title>
+            <Alert.Title>{m.alert_draft_conflict()}</Alert.Title>
             <Alert.Description>
-              A newer Draft Version is already saved. No automatic rich-text
-              merge or overwrite was attempted.
+              {m.alert_draft_conflict_description()}
               <span className={styles.actions}>
                 <Button
                   type="button"
                   isDisabled={lifecycleActionPending}
                   onPress={retryConflict}
                 >
-                  Deliberately retry local Draft
+                  {m.alert_retry_local_draft()}
                 </Button>
                 <Button
                   type="button"
@@ -134,7 +130,7 @@ export function WorkspaceAlerts({
                   isDisabled={lifecycleActionPending}
                   onPress={reloadDraft}
                 >
-                  Reload server Draft
+                  {m.alert_reload_server_draft()}
                 </Button>
               </span>
             </Alert.Description>
@@ -143,17 +139,16 @@ export function WorkspaceAlerts({
       ) : state === "slug-conflict" ? (
         <Alert status="warning" role="alert">
           <Alert.Content>
-            <Alert.Title>Slug is already claimed</Alert.Title>
+            <Alert.Title>{m.alert_slug_claimed()}</Alert.Title>
             <Alert.Description>
-              Another Article owns this slug. Your local Draft remains visible;
-              choose a different slug to resume autosave.
+              {m.alert_slug_claimed_description()}
             </Alert.Description>
           </Alert.Content>
         </Alert>
       ) : state === "invalid" ? (
         <Alert status="danger" role="alert">
           <Alert.Content>
-            <Alert.Title>Draft is invalid</Alert.Title>
+            <Alert.Title>{m.alert_draft_invalid()}</Alert.Title>
             <Alert.Description>
               <ul className="list-disc pl-5">
                 {issues.map((issue) => (
@@ -165,7 +160,7 @@ export function WorkspaceAlerts({
                 type="button"
                 onPress={() => void persistCurrentDraft()}
               >
-                Retry save
+                {m.alert_retry_save()}
               </Button>
             </Alert.Description>
           </Alert.Content>
@@ -173,16 +168,15 @@ export function WorkspaceAlerts({
       ) : state === "offline" ? (
         <Alert status="warning" role="alert">
           <Alert.Content>
-            <Alert.Title>Offline — Draft not saved</Alert.Title>
+            <Alert.Title>{m.alert_offline_draft_not_saved()}</Alert.Title>
             <Alert.Description>
-              Changes remain only in this tab. Briefly does not promise offline
-              durability or synchronization. Reconnect, then retry.
+              {m.alert_offline_draft_not_saved_description()}
               <Button
                 className={styles.actionTop}
                 type="button"
                 onPress={() => void persistCurrentDraft()}
               >
-                Retry save
+                {m.alert_retry_save()}
               </Button>
             </Alert.Description>
           </Alert.Content>
@@ -192,11 +186,11 @@ export function WorkspaceAlerts({
       {conflictCopy ? (
         <details>
           <summary className={styles.conflictSummary}>
-            Copy the preserved local Draft JSON
+            {m.alert_copy_preserved_draft_json()}
           </summary>
           <TextArea
             className={`${styles.actionTop} font-mono`}
-            aria-label="Preserved unsaved local Draft JSON"
+            aria-label={m.alert_preserved_draft_json_label()}
             readOnly
             value={JSON.stringify(conflictCopy, null, 2)}
           />
@@ -208,18 +202,19 @@ export function WorkspaceAlerts({
           <Alert.Content>
             <Alert.Title>
               {publicationAction === "republished"
-                ? "Article republished"
-                : "Article published"}
+                ? m.alert_article_republished()
+                : m.alert_article_published()}
             </Alert.Title>
             <Alert.Description>
               {publicationAction === "republished"
-                ? "The new immutable Publication is public now; earlier Publications remain unchanged."
-                : "A new immutable Publication is public now."}
+                ? m.alert_article_republished_description()
+                : m.alert_article_published_description()}
               {publicationReceipt ? (
                 <span className={styles.receipt}>
-                  Current Publication {publicationReceipt.publicationId} was
-                  confirmed from saved Draft Version{" "}
-                  {publicationReceipt.draftVersion}.
+                  {m.alert_publication_receipt({
+                    publicationId: publicationReceipt.publicationId,
+                    draftVersion: String(publicationReceipt.draftVersion),
+                  })}
                 </span>
               ) : null}
             </Alert.Description>
@@ -228,7 +223,7 @@ export function WorkspaceAlerts({
       ) : publishState === "invalid" ? (
         <Alert status="danger" role="alert">
           <Alert.Content>
-            <Alert.Title>Publication validation failed</Alert.Title>
+            <Alert.Title>{m.alert_publication_validation_failed()}</Alert.Title>
             <Alert.Description>
               <ul className="list-disc pl-5">
                 {publicationIssues.map((issue) => (
@@ -243,13 +238,11 @@ export function WorkspaceAlerts({
       ) : publishState === "conflict" ? (
         <Alert status="warning" role="alert">
           <Alert.Content>
-            <Alert.Title>Publication conflict</Alert.Title>
+            <Alert.Title>{m.alert_publication_conflict()}</Alert.Title>
             <Alert.Description>
-              The saved Draft Version or observed Current Publication changed.
-              Briefly did not retry the command.
               {publicationReconciliationState === "reconciled"
-                ? " Briefly reread the authoritative Article and public state. Review the refreshed state before publishing again."
-                : " Briefly could not fully reread the authoritative Article and public state. Reload it before publishing again."}
+                ? m.alert_publication_conflict_reconciled()
+                : m.alert_publication_conflict_unreconciled()}
               {publicationReconciliationState === "reconciled" ? (
                 <Button
                   className={styles.actionTop}
@@ -257,7 +250,7 @@ export function WorkspaceAlerts({
                   variant="secondary"
                   onPress={acknowledgePublicationReconciliation}
                 >
-                  Continue with refreshed state
+                  {m.alert_continue_refreshed_state()}
                 </Button>
               ) : (
                 <Button
@@ -266,7 +259,7 @@ export function WorkspaceAlerts({
                   variant="secondary"
                   onPress={reloadDraft}
                 >
-                  Reload Article state
+                  {m.alert_reload_article_state()}
                 </Button>
               )}
             </Alert.Description>
@@ -275,16 +268,15 @@ export function WorkspaceAlerts({
       ) : publishState === "not-completed" ? (
         <Alert status="warning" role="alert">
           <Alert.Content>
-            <Alert.Title>Publication was not completed</Alert.Title>
+            <Alert.Title>{m.alert_publication_not_completed()}</Alert.Title>
             <Alert.Description>
-              The server confirmed that this Publish command made no public
-              change. Briefly will not retry it automatically.
+              {m.alert_publication_not_completed_description()}
               <Button
                 className={styles.actionTop}
                 type="button"
                 onPress={() => void retryPublishDraft()}
               >
-                Retry this Publish command
+                {m.alert_retry_publish_command()}
               </Button>
             </Alert.Description>
           </Alert.Content>
@@ -292,10 +284,9 @@ export function WorkspaceAlerts({
       ) : publishState === "reconciling" ? (
         <Alert status="warning" role="status">
           <Alert.Content>
-            <Alert.Title>Checking publication state</Alert.Title>
+            <Alert.Title>{m.alert_checking_publication_state()}</Alert.Title>
             <Alert.Description>
-              The Publish command is not being repeated. Briefly is rereading
-              the Article and its public state.
+              {m.alert_checking_publication_state_description()}
             </Alert.Description>
           </Alert.Content>
         </Alert>
@@ -305,13 +296,13 @@ export function WorkspaceAlerts({
           <Alert.Content>
             <Alert.Title>
               {publishState === "state-unconfirmed"
-                ? "Publication outcome needs review"
-                : "Publish connection was interrupted"}
+                ? m.alert_publication_outcome_needs_review()
+                : m.alert_publish_connection_interrupted()}
             </Alert.Title>
             <Alert.Description>
               {publicationReconciliationState === "reconciled"
-                ? "Briefly reread the Article and its public endpoint. Review the refreshed Current Publication before issuing another Publish command."
-                : "Briefly could not fully reread the Article and public endpoint. Reload the authoritative Article state before issuing another Publish command."}
+                ? m.alert_publish_outcome_reconciled()
+                : m.alert_publish_outcome_unreconciled()}
               {publicationReconciliationState === "reconciled" ? (
                 <Button
                   className={styles.actionTop}
@@ -319,7 +310,7 @@ export function WorkspaceAlerts({
                   variant="secondary"
                   onPress={acknowledgePublicationReconciliation}
                 >
-                  Continue with refreshed state
+                  {m.alert_continue_refreshed_state()}
                 </Button>
               ) : (
                 <Button
@@ -328,7 +319,7 @@ export function WorkspaceAlerts({
                   variant="secondary"
                   onPress={reloadDraft}
                 >
-                  Reload Article state
+                  {m.alert_reload_article_state()}
                 </Button>
               )}
             </Alert.Description>
@@ -337,17 +328,16 @@ export function WorkspaceAlerts({
       ) : publishState === "error" ? (
         <Alert status="danger" role="alert">
           <Alert.Content>
-            <Alert.Title>Unable to publish Article</Alert.Title>
+            <Alert.Title>{m.alert_unable_to_publish()}</Alert.Title>
             <Alert.Description>
-              Briefly could not classify this failure safely. Reload the Article
-              state before trying another command.
+              {m.alert_unable_to_publish_description()}
               <Button
                 className={styles.actionTop}
                 type="button"
                 variant="secondary"
                 onPress={reloadDraft}
               >
-                Reload Article state
+                {m.alert_reload_article_state()}
               </Button>
             </Alert.Description>
           </Alert.Content>
@@ -357,21 +347,18 @@ export function WorkspaceAlerts({
       {unpublishState === "unpublished" ? (
         <Alert status="success" role="status">
           <Alert.Content>
-            <Alert.Title>Article unpublished</Alert.Title>
+            <Alert.Title>{m.alert_article_unpublished()}</Alert.Title>
             <Alert.Description>
-              This Article is private now: it has no Current Publication and is
-              unavailable from public content endpoints. Its Draft and
-              Publication history remain intact, and it can be published again.
+              {m.alert_article_unpublished_description()}
             </Alert.Description>
           </Alert.Content>
         </Alert>
       ) : unpublishState === "error" ? (
         <Alert status="danger" role="alert">
           <Alert.Content>
-            <Alert.Title>Unable to unpublish Article</Alert.Title>
+            <Alert.Title>{m.alert_unable_to_unpublish()}</Alert.Title>
             <Alert.Description>
-              Briefly did not confirm withdrawal. The existing Current
-              Publication remains public; reload and try again.
+              {m.alert_unable_to_unpublish_description()}
             </Alert.Description>
           </Alert.Content>
         </Alert>

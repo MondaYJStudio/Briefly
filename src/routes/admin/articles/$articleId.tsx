@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { EditorView } from "../../../components/admin/editor-view";
 import pageStyles from "../../../components/admin/articles-view.module.css";
+import { m } from "../../../paraglide/messages.js";
 import { useArticlesRouteContext } from "./-context";
 
 export const Route = createFileRoute("/admin/articles/$articleId")({
@@ -48,9 +49,9 @@ function ArticleEditorRoute() {
         {loadState === "failed" ? (
           <Alert status="danger" role="alert">
             <Alert.Content>
-              <Alert.Title>Article unavailable</Alert.Title>
+              <Alert.Title>{m.article_unavailable()}</Alert.Title>
               <Alert.Description>
-                The Article may have moved to Trash, or the request failed.
+                {m.article_unavailable_description()}
               </Alert.Description>
               <Button
                 className={pageStyles.actionTop}
@@ -58,7 +59,7 @@ function ArticleEditorRoute() {
                 variant="secondary"
                 onPress={() => void navigate({ to: "/admin/articles" })}
               >
-                Back to Articles
+                {m.back_to_articles()}
               </Button>
             </Alert.Content>
           </Alert>
@@ -67,8 +68,8 @@ function ArticleEditorRoute() {
             className={`${pageStyles.card} ${pageStyles.cardPad} ${pageStyles.loadingRow}`}
             role="status"
           >
-            <Spinner aria-label="Loading Article editor" />
-            <span>Loading Article editor…</span>
+            <Spinner aria-label={m.loading_article_editor()} />
+            <span>{m.loading_article_editor_ellipsis()}</span>
           </div>
         )}
       </main>

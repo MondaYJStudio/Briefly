@@ -173,17 +173,17 @@ describe("Publication Workflow", () => {
       code: "PUBLICATION_INVALID",
       issues: [
         {
-          code: "REQUIRED",
+          code: "BODY_REQUIRED",
           path: "draft.document.doc",
           message: "Substantive body content is required for publication.",
         },
         {
-          code: "REQUIRED",
+          code: "SLUG_REQUIRED",
           path: "draft.slug",
           message: "A slug is required for publication.",
         },
         {
-          code: "REQUIRED",
+          code: "TITLE_REQUIRED",
           path: "draft.title",
           message: "A title is required for publication.",
         },
@@ -213,7 +213,7 @@ describe("Publication Workflow", () => {
             .run(),
         issues: [
           {
-            code: "INVALID",
+            code: "PERSISTED_FIELD_INVALID",
             path: "draft.document",
             message: "The saved Draft document is invalid.",
           },
@@ -229,7 +229,7 @@ describe("Publication Workflow", () => {
             .run(),
         issues: [
           {
-            code: "INVALID",
+            code: "PERSISTED_FIELD_INVALID",
             path: "draft.byline",
             message: "The saved Draft byline is invalid.",
           },
@@ -270,7 +270,7 @@ describe("Publication Workflow", () => {
             .run(),
         issues: [
           {
-            code: "UNSAFE",
+            code: "UNSAFE_LINK",
             path: "draft.document.doc.content.0.content.0.marks.0.attrs.href",
             message: "The saved Draft contains an unsafe link.",
           },
@@ -300,7 +300,7 @@ describe("Publication Workflow", () => {
             .run(),
         issues: [
           {
-            code: "UNSUPPORTED",
+            code: "UNSUPPORTED_NODE",
             path: "draft.document.doc.content.0.type",
             message: "The saved Draft contains an unsupported Document node.",
           },
@@ -316,7 +316,7 @@ describe("Publication Workflow", () => {
             .run(),
         issues: [
           {
-            code: "INVALID",
+            code: "PERSISTED_FIELD_INVALID",
             path: "draft.cover",
             message: "The saved Draft cover is invalid.",
           },
@@ -355,7 +355,7 @@ describe("Publication Workflow", () => {
             .run(),
         issues: [
           {
-            code: "UNAVAILABLE",
+            code: "ASSET_NOT_RESOLVED",
             path: `draft.assets.${unavailableAssetId}`,
             message: "A referenced Asset is unavailable for publication.",
           },
@@ -398,7 +398,7 @@ describe("Publication Workflow", () => {
             .run(),
         issues: [
           {
-            code: "INVALID",
+            code: "INVALID_DOCUMENT_STRUCTURE",
             path: "draft.document.doc",
             message: "The saved Draft Document structure is invalid.",
           },
@@ -520,12 +520,12 @@ describe("Publication Workflow", () => {
       code: "PUBLICATION_INVALID",
       issues: [
         {
-          code: "INVALID",
+          code: "BYLINE_INVALID",
           path: "draft.byline",
           message: "A valid Byline is required for publication.",
         },
         {
-          code: "INVALID",
+          code: "LANGUAGE_INVALID",
           path: "draft.language",
           message: "A valid language is required for publication.",
         },
@@ -594,7 +594,7 @@ describe("Publication Workflow", () => {
       code: "PUBLICATION_INVALID",
       issues: [
         {
-          code: "UNAVAILABLE",
+          code: "ASSET_NOT_RESOLVED",
           path: `draft.assets.${asset.id}`,
           message: "A referenced Asset is unavailable for publication.",
         },
@@ -666,7 +666,7 @@ describe("Publication Workflow", () => {
       code: "PUBLICATION_INVALID",
       issues: [
         {
-          code: "UNSAFE",
+          code: "INVALID_ASSET_RESOLUTION",
           path: `draft.assets.${asset.id}`,
           message: "A referenced Asset has unsafe delivery facts.",
         },
@@ -704,7 +704,7 @@ describe("Publication Workflow", () => {
       code: "PUBLICATION_INVALID",
       issues: [
         {
-          code: "UNAVAILABLE",
+          code: "ASSET_NOT_RESOLVED",
           path: `draft.assets.${asset.id}`,
           message: "A referenced Asset is unavailable for publication.",
         },

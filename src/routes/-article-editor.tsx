@@ -29,7 +29,10 @@ import {
   type VerifiedAssetPickerState,
 } from "../assets/verified-asset-picker";
 import { AdminIcon } from "../components/admin/icons";
-import { publicationIssuesForSurface } from "../components/admin/publication-issues";
+import {
+  localizePublicationIssue,
+  publicationIssuesForSurface,
+} from "../components/admin/publication-issues";
 import { m } from "../paraglide/messages.js";
 import { getApiClient } from "./api.$";
 import styles from "./article-editor.module.css";
@@ -86,7 +89,7 @@ export function ArticleEditor({
     content: document.doc,
     editorProps: {
       attributes: {
-        "aria-label": "Article body",
+        "aria-label": m.article_body(),
         class: "article-editor__content min-h-64 focus:outline-none",
       },
     },
@@ -107,13 +110,13 @@ export function ArticleEditor({
     if (isDisabled) setActivePanel(null);
   }, [isDisabled]);
 
-  if (!editor) return <p role="status">Preparing the text-rich editor…</p>;
+  if (!editor) return <p role="status">{m.preparing_text_rich_editor()}</p>;
   const activeEditor = editor;
 
   function applyLink() {
     const normalized = link.trim();
     if (!isAllowedArticleLink(normalized)) {
-      setLinkError("Use an absolute HTTP, HTTPS, or mailto link.");
+      setLinkError(m.link_error_absolute());
       return;
     }
     activeEditor
@@ -129,9 +132,7 @@ export function ArticleEditor({
   function applyCodeBlockLanguage() {
     const normalized = language.trim() || "plaintext";
     if (!isAllowedCodeBlockLanguage(normalized)) {
-      setLanguageError(
-        "Use a short language identifier beginning with a letter or number.",
-      );
+      setLanguageError(m.language_identifier_error());
       return;
     }
     if (activeEditor.isActive("codeBlock")) {
@@ -156,7 +157,7 @@ export function ArticleEditor({
       <div
         className={styles.fmtBar}
         role="toolbar"
-        aria-label="Text formatting"
+        aria-label={m.text_formatting()}
       >
         {/* Undo/Redo */}
         <Button
@@ -166,7 +167,7 @@ export function ArticleEditor({
           variant="ghost"
           isDisabled={!activeEditor.can().undo()}
           onPress={() => activeEditor.chain().focus().undo().run()}
-          aria-label="Undo"
+          aria-label={m.undo()}
         >
           <AdminIcon name="undo" size={16} />
         </Button>
@@ -177,7 +178,7 @@ export function ArticleEditor({
           variant="ghost"
           isDisabled={!activeEditor.can().redo()}
           onPress={() => activeEditor.chain().focus().redo().run()}
-          aria-label="Redo"
+          aria-label={m.redo()}
         >
           <AdminIcon name="redo" size={16} />
         </Button>
@@ -187,20 +188,20 @@ export function ArticleEditor({
         <Dropdown.Root>
           <Dropdown.Trigger
             className={styles.fmtStyleTrigger}
-            aria-label="Paragraph style"
+            aria-label={m.paragraph_style()}
           >
             {activeEditor.isActive("heading", { level: 2 })
-              ? "Heading 2"
+              ? m.heading_2()
               : activeEditor.isActive("heading", { level: 3 })
-                ? "Heading 3"
+                ? m.heading_3()
                 : activeEditor.isActive("heading", { level: 4 })
-                  ? "Heading 4"
-                  : "Paragraph"}
+                  ? m.heading_4()
+                  : m.paragraph()}
             <AdminIcon name="chevron-down" size={12} />
           </Dropdown.Trigger>
           <Dropdown.Popover placement="bottom start">
             <Dropdown.Menu
-              aria-label="Paragraph style"
+              aria-label={m.paragraph_style()}
               onAction={(key) => {
                 if (key === "paragraph")
                   activeEditor.chain().focus().setParagraph().run();
@@ -224,17 +225,17 @@ export function ArticleEditor({
                     .run();
               }}
             >
-              <Dropdown.Item id="paragraph" textValue="Paragraph">
-                Paragraph
+              <Dropdown.Item id="paragraph" textValue={m.paragraph()}>
+                {m.paragraph()}
               </Dropdown.Item>
-              <Dropdown.Item id="h2" textValue="Heading 2">
-                <strong className={styles.heading2Sample}>Heading 2</strong>
+              <Dropdown.Item id="h2" textValue={m.heading_2()}>
+                <strong className={styles.heading2Sample}>{m.heading_2()}</strong>
               </Dropdown.Item>
-              <Dropdown.Item id="h3" textValue="Heading 3">
-                <strong>Heading 3</strong>
+              <Dropdown.Item id="h3" textValue={m.heading_3()}>
+                <strong>{m.heading_3()}</strong>
               </Dropdown.Item>
-              <Dropdown.Item id="h4" textValue="Heading 4">
-                <strong className={styles.heading4Sample}>Heading 4</strong>
+              <Dropdown.Item id="h4" textValue={m.heading_4()}>
+                <strong className={styles.heading4Sample}>{m.heading_4()}</strong>
               </Dropdown.Item>
             </Dropdown.Menu>
           </Dropdown.Popover>
@@ -249,7 +250,7 @@ export function ArticleEditor({
           variant="ghost"
           className={activeEditor.isActive("bold") ? "is-pressed" : ""}
           onPress={() => activeEditor.chain().focus().toggleBold().run()}
-          aria-label="Bold"
+          aria-label={m.bold()}
           aria-pressed={activeEditor.isActive("bold")}
         >
           <AdminIcon name="bold" size={16} />
@@ -261,7 +262,7 @@ export function ArticleEditor({
           variant="ghost"
           className={activeEditor.isActive("italic") ? "is-pressed" : ""}
           onPress={() => activeEditor.chain().focus().toggleItalic().run()}
-          aria-label="Italic"
+          aria-label={m.italic()}
           aria-pressed={activeEditor.isActive("italic")}
         >
           <AdminIcon name="italic" size={16} />
@@ -273,7 +274,7 @@ export function ArticleEditor({
           variant="ghost"
           className={activeEditor.isActive("strike") ? "is-pressed" : ""}
           onPress={() => activeEditor.chain().focus().toggleStrike().run()}
-          aria-label="Strikethrough"
+          aria-label={m.strikethrough()}
           aria-pressed={activeEditor.isActive("strike")}
         >
           <AdminIcon name="strike" size={16} />
@@ -285,7 +286,7 @@ export function ArticleEditor({
           variant="ghost"
           className={activeEditor.isActive("code") ? "is-pressed" : ""}
           onPress={() => activeEditor.chain().focus().toggleCode().run()}
-          aria-label="Inline code"
+          aria-label={m.inline_code()}
           aria-pressed={activeEditor.isActive("code")}
         >
           <AdminIcon name="code" size={16} />
@@ -296,7 +297,7 @@ export function ArticleEditor({
           type="button"
           variant="ghost"
           onPress={() => setActivePanel("link")}
-          aria-label="Link"
+          aria-label={m.link()}
           aria-pressed={activeEditor.isActive("link")}
         >
           <AdminIcon name="link" size={16} />
@@ -311,7 +312,7 @@ export function ArticleEditor({
           variant="ghost"
           className={activeEditor.isActive("bulletList") ? "is-pressed" : ""}
           onPress={() => activeEditor.chain().focus().toggleBulletList().run()}
-          aria-label="Bullet list"
+          aria-label={m.bullet_list()}
           aria-pressed={activeEditor.isActive("bulletList")}
         >
           <AdminIcon name="list-ul" size={16} />
@@ -323,7 +324,7 @@ export function ArticleEditor({
           variant="ghost"
           className={activeEditor.isActive("orderedList") ? "is-pressed" : ""}
           onPress={() => activeEditor.chain().focus().toggleOrderedList().run()}
-          aria-label="Numbered list"
+          aria-label={m.numbered_list()}
           aria-pressed={activeEditor.isActive("orderedList")}
         >
           <AdminIcon name="list-ol" size={16} />
@@ -335,7 +336,7 @@ export function ArticleEditor({
           variant="ghost"
           className={activeEditor.isActive("blockquote") ? "is-pressed" : ""}
           onPress={() => activeEditor.chain().focus().toggleBlockquote().run()}
-          aria-label="Blockquote"
+          aria-label={m.blockquote()}
           aria-pressed={activeEditor.isActive("blockquote")}
         >
           <AdminIcon name="quote" size={16} />
@@ -347,7 +348,7 @@ export function ArticleEditor({
           variant="ghost"
           className={activeEditor.isActive("codeBlock") ? "is-pressed" : ""}
           onPress={() => setActivePanel("code")}
-          aria-label="Code block"
+          aria-label={m.code_block()}
           aria-pressed={activeEditor.isActive("codeBlock")}
         >
           <AdminIcon name="code-block" size={16} />
@@ -358,7 +359,7 @@ export function ArticleEditor({
           type="button"
           variant="ghost"
           onPress={() => activeEditor.chain().focus().setHorizontalRule().run()}
-          aria-label="Horizontal rule"
+          aria-label={m.horizontal_rule()}
         >
           <AdminIcon name="divider" size={16} />
         </Button>
@@ -368,7 +369,7 @@ export function ArticleEditor({
           type="button"
           variant="ghost"
           onPress={() => activeEditor.chain().focus().setHardBreak().run()}
-          aria-label="Hard break"
+          aria-label={m.hard_break()}
         >
           <AdminIcon name="break" size={16} />
         </Button>
@@ -389,22 +390,22 @@ export function ArticleEditor({
           type="button"
           variant="ghost"
           onPress={() => setActivePanel("video")}
-          aria-label="Insert video"
+          aria-label={m.insert_video()}
         >
           <AdminIcon name="video" size={16} />
         </Button>
       </div>
       <article
         className="doc article-editor__surface"
-        aria-label="Article writing surface"
+        aria-label={m.article_writing_surface()}
       >
         <label className="visually-hidden" htmlFor="articleTitle">
-          Article title
+          {m.article_title()}
         </label>
         <input
           className="doc-title-input"
           id="articleTitle"
-          placeholder="Article title"
+          placeholder={m.article_title()}
           value={title}
           onChange={(event) => onTitleChange(event.target.value)}
         />
@@ -414,16 +415,16 @@ export function ArticleEditor({
       </article>
 
       <EditorToolModal
-        title="Edit link"
+        title={m.edit_link()}
         isOpen={activePanel === "link"}
         onOpenChange={(open) => setActivePanel(open ? "link" : null)}
       >
         <div className="editor-tool-panel space-y-4">
           <p className="text-sm text-default-500">
-            Only absolute HTTP, HTTPS, and mailto links are allowed.
+            {m.link_panel_description()}
           </p>
           <div className="space-y-2">
-            <Label htmlFor="articleEditorLink">Link URL</Label>
+            <Label htmlFor="articleEditorLink">{m.link_url()}</Label>
             <Input
               fullWidth
               autoFocus
@@ -448,7 +449,7 @@ export function ArticleEditor({
             </p>
           ) : activeEditor.isActive("link") ? (
             <p className="text-sm text-success" role="status">
-              Link is active in selection
+              {m.link_active_in_selection()}
             </p>
           ) : null}
           <div className="editor-tool-actions">
@@ -462,26 +463,28 @@ export function ArticleEditor({
                 setActivePanel(null);
               }}
             >
-              Remove link
+              {m.remove_link()}
             </Button>
             <Button type="button" onPress={applyLink}>
-              Apply link
+              {m.apply_link()}
             </Button>
           </div>
         </div>
       </EditorToolModal>
 
       <EditorToolModal
-        title="Insert code block"
+        title={m.insert_code_block()}
         isOpen={activePanel === "code"}
         onOpenChange={(open) => setActivePanel(open ? "code" : null)}
       >
         <div className="editor-tool-panel space-y-4">
           <p className="text-sm text-default-500">
-            Insert or update a code block with a syntax-highlighting language.
+            {m.code_block_panel_description()}
           </p>
           <div className="space-y-2">
-            <Label htmlFor="articleCodeLanguage">Language identifier</Label>
+            <Label htmlFor="articleCodeLanguage">
+              {m.language_identifier()}
+            </Label>
             <Input
               fullWidth
               autoFocus
@@ -508,21 +511,25 @@ export function ArticleEditor({
           ) : null}
           {activeEditor.isActive("codeBlock") ? (
             <p className="text-sm text-success" role="status">
-              Code block is active — language:{" "}
-              {activeEditor.getAttributes("codeBlock").language || "plaintext"}
+              {m.code_block_active_language({
+                language:
+                  activeEditor.getAttributes("codeBlock").language ||
+                  "plaintext",
+              })}
             </p>
           ) : null}
           <div className="editor-tool-actions">
             <Button type="button" onPress={applyCodeBlockLanguage}>
-              {activeEditor.isActive("codeBlock") ? "Update" : "Insert"} code
-              block
+              {activeEditor.isActive("codeBlock")
+                ? m.update_code_block()
+                : m.insert_code_block_action()}
             </Button>
           </div>
         </div>
       </EditorToolModal>
 
       <EditorToolModal
-        title="Insert video"
+        title={m.insert_video()}
         isOpen={activePanel === "video"}
         onOpenChange={(open) => setActivePanel(open ? "video" : null)}
       >
@@ -559,7 +566,9 @@ function PublicationGuidance({
   return (
     <ul className={styles.issueList} role="alert">
       {issues.map((issue) => (
-        <li key={`${issue.code}:${issue.path}`}>{issue.message}</li>
+        <li key={`${issue.code}:${issue.path}`}>
+          {localizePublicationIssue(issue)}
+        </li>
       ))}
     </ul>
   );
@@ -591,7 +600,9 @@ function EditorToolModal({
             <div className="briefly-drawer-head">
               <Modal.Heading>{title}</Modal.Heading>
               <Modal.CloseTrigger
-                aria-label={closeLabel ?? `Close ${title.toLowerCase()} dialog`}
+                aria-label={
+                  closeLabel ?? m.close_dialog_for({ title: title.toLowerCase() })
+                }
               />
             </div>
           </Modal.Header>
@@ -645,11 +656,11 @@ function ArticleVideoAuthoring({
     setRecognized(null);
     if (/[<>]/u.test(candidate)) {
       setState("invalid");
-      setMessage("Paste a video URL or identifier, not iframe or HTML markup.");
+      setMessage(m.video_paste_url_not_html());
       return;
     }
     setState("recognizing");
-    setMessage("Recognizing supported video provider…");
+    setMessage(m.video_recognizing());
     try {
       const response = await getApiClient().admin[
         "video-embeds"
@@ -659,17 +670,17 @@ function ArticleVideoAuthoring({
         setRecognized(facts);
         setState("recognized");
         setMessage(
-          `Recognized ${facts.provider === "youtube" ? "YouTube" : "Bilibili"} identifier ${facts.id}.`,
+          facts.provider === "youtube"
+            ? m.video_recognized_youtube({ id: facts.id })
+            : m.video_recognized_bilibili({ id: facts.id }),
         );
         return;
       }
       setState("invalid");
-      setMessage(
-        "This is not a supported YouTube or Bilibili URL or identifier. Keep unsupported providers as ordinary links.",
-      );
+      setMessage(m.video_unsupported());
     } catch {
       setState("invalid");
-      setMessage("The video provider could not be recognized. Please retry.");
+      setMessage(m.video_recognize_failed());
     }
   }
 
@@ -677,12 +688,12 @@ function ArticleVideoAuthoring({
     const accessibleTitle = title.trim();
     if (!recognized) {
       setState("invalid");
-      setMessage("Recognize a supported provider before inserting the video.");
+      setMessage(m.video_recognize_before_insert());
       return;
     }
     if (accessibleTitle.length === 0) {
       setState("invalid");
-      setMessage("Enter an understandable iframe title before inserting.");
+      setMessage(m.video_title_required_before_insert());
       return;
     }
     editor
@@ -697,7 +708,7 @@ function ArticleVideoAuthoring({
     setTitle("");
     setRecognized(null);
     setState("ready");
-    setMessage("Structured video embed inserted into the Draft.");
+    setMessage(m.video_embed_inserted());
   }
 
   function updateVideoTitle(video: VideoEmbedUsage, nextTitle: string) {
@@ -715,21 +726,16 @@ function ArticleVideoAuthoring({
     editor.view.dispatch(
       editor.state.tr.delete(video.pos, video.pos + video.nodeSize),
     );
-    setMessage("Video embed removed from the Draft.");
+    setMessage(m.video_embed_removed());
   }
 
   return (
     <div className="editor-tool-panel space-y-4">
       <div className="space-y-1">
-        <p className="text-sm text-default-500">
-          Only YouTube and Bilibili are supported. Paste a URL or video ID —
-          never raw iframe HTML. Structured recognition extracts the platform
-          and identifier; query parameters and iframe privileges are never
-          stored.
-        </p>
+        <p className="text-sm text-default-500">{m.video_panel_description()}</p>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="videoEmbedInput">Video URL or identifier</Label>
+        <Label htmlFor="videoEmbedInput">{m.video_url_or_identifier()}</Label>
         <Input
           fullWidth
           className="font-mono"
@@ -755,7 +761,7 @@ function ArticleVideoAuthoring({
         isPending={state === "recognizing"}
         onPress={recognizeProvider}
       >
-        Recognize provider
+        {m.recognize_provider()}
       </Button>
       {message ? (
         <Alert
@@ -775,14 +781,12 @@ function ArticleVideoAuthoring({
       ) : null}
       {recognized ? (
         <div className="space-y-2">
-          <Label htmlFor="videoEmbedTitle">
-            Accessible iframe title (required)
-          </Label>
+          <Label htmlFor="videoEmbedTitle">{m.accessible_iframe_title()}</Label>
           <Input
             fullWidth
             id="videoEmbedTitle"
             maxLength={200}
-            placeholder="Brief description of the video content"
+            placeholder={m.video_title_placeholder()}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             onKeyDown={(event) => {
@@ -792,10 +796,7 @@ function ArticleVideoAuthoring({
               }
             }}
           />
-          <p className="text-sm text-default-500">
-            Names the embedded player for screen readers. This title is required
-            for accessibility.
-          </p>
+          <p className="text-sm text-default-500">{m.video_title_a11y_note()}</p>
         </div>
       ) : null}
       <Button
@@ -803,20 +804,26 @@ function ArticleVideoAuthoring({
         isDisabled={!recognized || !title.trim()}
         onPress={insertVideo}
       >
-        Insert video embed
+        {m.insert_video_embed()}
       </Button>
 
       {videos.length > 0 ? (
-        <ol className="space-y-3" aria-label="Video embeds in this Draft">
+        <ol className="space-y-3" aria-label={m.video_embeds_in_draft()}>
           {videos.map((video, index) => (
             <li
               key={`${video.pos}:${video.provider}:${video.id}`}
               className="space-y-2 rounded-lg border border-default-200 p-3"
             >
               <p className="font-medium">
-                Video {index + 1} · {video.provider} · {video.id}
+                {m.video_item_label({
+                  number: index + 1,
+                  provider: video.provider,
+                  id: video.id,
+                })}
               </p>
-              <Label htmlFor={`videoTitle-${video.pos}`}>Iframe title</Label>
+              <Label htmlFor={`videoTitle-${video.pos}`}>
+                {m.iframe_title()}
+              </Label>
               <Input
                 fullWidth
                 id={`videoTitle-${video.pos}`}
@@ -831,7 +838,7 @@ function ArticleVideoAuthoring({
                 variant="secondary"
                 onPress={() => removeVideo(video)}
               >
-                Remove video
+                {m.remove_video()}
               </Button>
             </li>
           ))}

@@ -41,6 +41,7 @@ import {
   type PublicationPreview,
   type PublicationReceipt,
 } from "../../articles/publication-workflow";
+import { localizeServerIssueMessage } from "./publication-issues";
 import { getApiClient } from "../../routes/api.$";
 
 export type WorkspaceState =
@@ -678,7 +679,16 @@ export function useArticleWorkspace() {
         );
         setState("conflict");
       } else if (error && "issues" in error) {
-        setIssues(error.issues.map((issue) => issue.message));
+        setIssues(
+          error.issues.map((issue) =>
+            typeof issue === "object" &&
+            issue !== null &&
+            "message" in issue &&
+            typeof issue.message === "string"
+              ? localizeServerIssueMessage(issue.message)
+              : String(issue),
+          ),
+        );
         setState("invalid");
       } else {
         setState("failed");
