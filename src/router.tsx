@@ -1,21 +1,11 @@
 import { createRouter } from "@tanstack/react-router";
 
-import { normalizeLocalePathUrl } from "./locales/locale-path";
+import {
+  isReservedApplicationPath,
+  normalizeLocalePathUrl,
+} from "./locales/locale-path";
 import { deLocalizeUrl, localizeUrl, locales } from "./paraglide/runtime.js";
 import { routeTree } from "./routeTree.gen";
-
-function isPrivatePath(pathname: string): boolean {
-  return (
-    pathname === "/admin" ||
-    pathname.startsWith("/admin/") ||
-    pathname === "/api" ||
-    pathname.startsWith("/api/") ||
-    pathname === "/media" ||
-    pathname.startsWith("/media/") ||
-    pathname === "/health" ||
-    pathname.startsWith("/health/")
-  );
-}
 
 function rewriteInputUrl(url: URL): URL {
   const normalizedUrl = normalizeLocalePathUrl(url);
@@ -31,7 +21,7 @@ function rewriteInputUrl(url: URL): URL {
 }
 
 function rewriteOutputUrl(url: URL): URL {
-  if (isPrivatePath(url.pathname)) {
+  if (isReservedApplicationPath(url.pathname)) {
     return url;
   }
   return localizeUrl(url);

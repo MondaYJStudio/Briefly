@@ -1,6 +1,5 @@
 import { canonicalizeAppLocale } from "./registry";
-
-const RESERVED_APPLICATION_PATHS = ["/api", "/admin", "/media", "/health"];
+import { RESERVED_APPLICATION_PATHS } from "./reserved-paths";
 
 /**
  * Decode and canonicalize a locale-looking first path segment before
@@ -31,7 +30,7 @@ export function normalizeLocalePathUrl(url: URL): URL {
  * Reserved transport/operation paths are intentionally unprefixed. Accept a
  * locale-looking prefix for routing compatibility, but keep it out of locale
  * selection so SSR and browser hydration use the cookie/header policy for
- * `/api`, `/admin`, `/media`, and `/health`.
+ * every reserved application path.
  */
 export function isReservedApplicationPath(pathname: string): boolean {
   const segments = pathname.split("/");
