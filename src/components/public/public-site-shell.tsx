@@ -111,7 +111,9 @@ export function PublicSiteShell({
     // The interior pages reserve h1 for the article title.
     <>
       {variant === "home" ? (
-        <h1 className="masthead__name">{siteName}</h1>
+        <h1 className="masthead__name text-[clamp(2.25rem,5vw,3.75rem)]">
+          {siteName}
+        </h1>
       ) : (
         <p className="masthead__name text-xl tracking-tight">
           <Link to="/">{siteName}</Link>
@@ -132,7 +134,7 @@ export function PublicSiteShell({
           className={
             variant === "interior"
               ? "masthead masthead--compact reveal flex items-center justify-between gap-4 py-5 text-start"
-              : "masthead reveal grid justify-items-center gap-2 pt-10 pb-6 text-center max-[860px]:pt-8"
+              : "masthead reveal grid justify-items-center gap-2 pt-10 pb-6 text-center max-[640px]:pt-8"
           }
           style={revealStyle(0)}
         >

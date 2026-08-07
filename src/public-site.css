@@ -21,8 +21,6 @@
     "Inter", -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --font-outlier: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
-  --text-masthead: clamp(2.25rem, 5vw, 3.75rem);
-
   /* Radius */
   --radius-s: 0.5rem;
   --radius-full: 9999px;
@@ -179,11 +177,6 @@
   min-width: 0;
 }
 
-/* Home only — fluid brand size beats utility text-* on the name */
-.public-site .masthead:not(.masthead--compact) .masthead__name {
-  font-size: var(--text-masthead);
-}
-
 .public-site .masthead__name a {
   text-decoration: none;
   cursor: pointer;
@@ -237,6 +230,7 @@
 
 .public-site .masthead__nav a {
   min-height: 2.75rem;
+  line-height: 1;
   color: var(--foreground-muted);
   text-decoration: none;
   transition: color var(--dur-fast) var(--ease-out);
@@ -322,7 +316,7 @@
 /* ============ Index-First opening ============ */
 
 .public-site .intro {
-  width: 100%;
+  max-width: var(--measure);
 }
 
 .public-site .intro p {
@@ -333,6 +327,7 @@
 }
 
 .public-site .intro p + p {
+  margin-block-start: 1rem;
   font-family: var(--font-body);
   color: var(--foreground-muted);
   max-width: 58ch;
@@ -407,7 +402,6 @@
 
 .public-site .article-row__version {
   font-family: var(--font-outlier);
-  font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   color: var(--foreground-faint);
   border: var(--rule-hair) solid var(--border);
@@ -445,10 +439,13 @@
 
 .public-site .spec th {
   font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.005em;
 }
 
 .public-site .spec td {
   color: var(--foreground);
+  line-height: 1.55;
 }
 
 .public-site .spec td.spec__foot {
@@ -599,15 +596,15 @@
 }
 
 .public-site .article-body h1 {
-  font-size: var(--text-2xl);
+  @apply text-2xl;
 }
 
 .public-site .article-body h2 {
-  font-size: var(--text-2xl);
+  @apply text-2xl;
 }
 
 .public-site .article-body h3 {
-  font-size: var(--text-xl);
+  @apply text-xl;
 }
 
 .public-site .article-body a {
@@ -640,7 +637,7 @@
   border-inline-start: 2px solid var(--border-strong);
   color: var(--foreground-muted);
   font-style: italic;
-  font-size: var(--text-lg);
+  @apply text-lg;
   line-height: 1.5;
 }
 
@@ -666,7 +663,7 @@
   background: transparent;
   border: 0;
   padding: 0;
-  font-size: var(--text-sm);
+  @apply text-sm;
   line-height: 1.7;
 }
 
@@ -693,7 +690,7 @@
 
 .public-site .article-body figcaption {
   font-family: var(--font-body);
-  font-size: var(--text-sm);
+  @apply text-sm;
   color: var(--foreground-muted);
 }
 
@@ -795,18 +792,28 @@
   border: 0;
 }
 
-/* ============ Responsive ============ */
+/* ============ Responsive — match prototype 60rem / 40rem ============ */
 
 @media (max-width: 60rem) {
-  .public-site .article-row__meta-date {
-    font-family: var(--font-outlier);
-    font-variant-numeric: tabular-nums;
-    color: var(--foreground-faint);
-    white-space: nowrap;
+  /* The row keeps only title and summary; the date column drops out. */
+  .public-site .article-row__date {
+    display: none;
+  }
+
+  /*
+   * Higher specificity than the 40rem `.spec td { display: block }` rule so
+   * the footnote column stays hidden on phone widths, not only tablets.
+   */
+  .public-site .spec td.spec__foot {
+    display: none;
   }
 }
 
 @media (max-width: 40rem) {
+  .public-site .masthead:not(.masthead--compact) .masthead__controls {
+    inset-block-start: 1rem;
+  }
+
   .public-site .article-row__version {
     justify-self: start;
     order: 3;
@@ -816,7 +823,17 @@
   .public-site .spec tbody,
   .public-site .spec tr,
   .public-site .spec th,
-  .public-site .spec td {
+  .public-site .spec td:not(.spec__foot) {
     display: block;
+  }
+
+  .public-site .spec th {
+    width: auto;
+    padding-block-end: 0.25rem;
+  }
+
+  .public-site .spec td:not(.spec__foot) {
+    padding-block-start: 0;
+    padding-inline-end: 0;
   }
 }

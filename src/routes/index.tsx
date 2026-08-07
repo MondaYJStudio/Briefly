@@ -74,11 +74,11 @@ function Home() {
       <main>
         {site.siteDescription ? (
           <section
-            className="intro reveal pt-12 pb-10 max-[860px]:pt-10"
+            className="intro reveal pt-12 pb-10 max-[640px]:pt-10"
             style={revealStyle(1)}
             aria-label={m.public_about_site()}
           >
-            <p>{site.siteDescription}</p>
+            <p className="text-[1.375rem]">{site.siteDescription}</p>
           </section>
         ) : null}
 
@@ -89,7 +89,7 @@ function Home() {
           aria-labelledby="index-h"
         >
           <div className="section-head pb-5">
-            <h2 className="text-2xl tracking-tight" id="index-h">
+            <h2 className="text-[1.75rem] tracking-tight" id="index-h">
               {m.articles()}
             </h2>
           </div>
@@ -102,24 +102,18 @@ function Home() {
               {articles.map((article) => (
                 <li key={article.id}>
                   <Link
-                    className="article-row grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_auto] items-baseline gap-y-3 gap-x-6 py-5 px-2 -mx-2 no-underline max-[860px]:grid-cols-1 max-[860px]:gap-2"
+                    className="article-row grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)] items-baseline gap-y-3 gap-x-6 py-5 px-2 -mx-2 no-underline max-[960px]:grid-cols-1 max-[640px]:gap-2"
                     to="/articles/$slug"
                     params={{ slug: article.slug }}
                   >
                     <span
-                      className="article-row__date text-xs max-[860px]:hidden"
+                      className="article-row__date text-xs"
                       aria-label={m.public_publication_date()}
                     >
                       {formatPublicDate(article.publishedAt)}
                     </span>
                     <span className="article-row__body grid gap-1">
-                      <span
-                        className="article-row__meta-date hidden max-[860px]:inline text-xs"
-                        aria-hidden="true"
-                      >
-                        {formatPublicDate(article.publishedAt)} ·{" "}
-                      </span>
-                      <span className="article-row__title text-xl tracking-tight">
+                      <span className="article-row__title text-[1.375rem] tracking-tight">
                         {article.title}
                       </span>
                       {article.summary ? (
@@ -142,7 +136,7 @@ function Home() {
           aria-labelledby="how-h"
         >
           <div className="section-head pb-5">
-            <h2 className="text-2xl tracking-tight" id="how-h">
+            <h2 className="text-[1.75rem] tracking-tight" id="how-h">
               {m.public_how_it_works()}
             </h2>
           </div>
@@ -154,70 +148,70 @@ function Home() {
               <tr>
                 <th
                   scope="row"
-                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[860px]:w-36 max-[640px]:w-auto max-[640px]:pb-1 max-[640px]:pe-2"
+                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[960px]:w-36"
                 >
                   {m.public_spec_draft()}
                 </th>
-                <td className="py-4 pe-6 text-base leading-snug">
+                <td className="py-4 pe-6 text-base">
                   {m.public_spec_draft_body()}
                 </td>
-                <td className="spec__foot py-4 pe-6 text-sm max-[860px]:hidden w-64">
+                <td className="spec__foot py-4 pe-6 text-sm w-64">
                   {m.public_spec_draft_foot()}
                 </td>
               </tr>
               <tr>
                 <th
                   scope="row"
-                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[860px]:w-36 max-[640px]:w-auto max-[640px]:pb-1 max-[640px]:pe-2"
+                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[960px]:w-36"
                 >
                   {m.public_spec_publication()}
                 </th>
-                <td className="py-4 pe-6 text-base leading-snug">
+                <td className="py-4 pe-6 text-base">
                   {m.public_spec_publication_body()}
                 </td>
-                <td className="spec__foot py-4 pe-6 text-sm max-[860px]:hidden w-64">
+                <td className="spec__foot py-4 pe-6 text-sm w-64">
                   {m.public_spec_publication_foot()}
                 </td>
               </tr>
               <tr>
                 <th
                   scope="row"
-                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[860px]:w-36 max-[640px]:w-auto max-[640px]:pb-1 max-[640px]:pe-2"
+                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[960px]:w-36"
                 >
                   {m.public_spec_history()}
                 </th>
-                <td className="py-4 pe-6 text-base leading-snug">
+                <td className="py-4 pe-6 text-base">
                   {m.public_spec_history_body()}
                 </td>
-                <td className="spec__foot py-4 pe-6 text-sm max-[860px]:hidden w-64">
+                <td className="spec__foot py-4 pe-6 text-sm w-64">
                   {m.public_spec_history_foot()}
                 </td>
               </tr>
               <tr>
                 <th
                   scope="row"
-                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[860px]:w-36 max-[640px]:w-auto max-[640px]:pb-1 max-[640px]:pe-2"
+                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[960px]:w-36"
                 >
                   {m.public_spec_media()}
                 </th>
-                <td className="py-4 pe-6 text-base leading-snug">
+                <td className="py-4 pe-6 text-base">
                   {m.public_spec_media_body()}
                 </td>
-                <td className="spec__foot py-4 pe-6 text-sm max-[860px]:hidden w-64">
+                <td className="spec__foot py-4 pe-6 text-sm w-64">
                   {m.public_spec_media_foot()}
                 </td>
               </tr>
               <tr>
                 <th
                   scope="row"
-                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[860px]:w-36 max-[640px]:w-auto max-[640px]:pb-1 max-[640px]:pe-2"
+                  className="py-4 pe-6 text-lg font-semibold tracking-tight whitespace-nowrap w-48 max-[960px]:w-36"
                 >
                   {m.public_spec_deployment()}
                 </th>
-                <td className="py-4 pe-6 text-base leading-snug">
+                <td className="py-4 pe-6 text-base">
                   {m.public_spec_deployment_body()}
                 </td>
-                <td className="spec__foot py-4 pe-6 text-sm max-[860px]:hidden w-64">
+                <td className="spec__foot py-4 pe-6 text-sm w-64">
                   {m.public_spec_deployment_foot()}
                 </td>
               </tr>
@@ -232,13 +226,13 @@ function Home() {
           aria-labelledby="console-h"
         >
           <div className="section-head pb-5">
-            <h2 className="text-2xl tracking-tight" id="console-h">
+            <h2 className="text-[1.75rem] tracking-tight" id="console-h">
               {m.public_publishing_console()}
             </h2>
           </div>
           <p className="text-base">{m.public_publishing_console_body()}</p>
           <a
-            className="console-link inline-flex items-center gap-2 mt-5 text-lg underline underline-offset-4"
+            className="console-link inline-flex items-center gap-2 mt-5 text-lg"
             href="/admin"
           >
             {m.public_enter_console()}

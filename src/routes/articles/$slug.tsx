@@ -70,7 +70,7 @@ function ArticleUnavailable() {
           style={revealStyle(1)}
         >
           <div className="section-head pb-5">
-            <h2 className="text-2xl tracking-tight">
+            <h2 className="text-[1.75rem] tracking-tight">
               {m.public_article_unavailable()}
             </h2>
           </div>
