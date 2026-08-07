@@ -46,6 +46,7 @@ import {
 import {
   activateInstalledPublicTemplate,
   deactivateActivePublicTemplate,
+  deleteInstalledPublicTemplate,
   installPublicTemplateFromZip,
   listInstalledPublicTemplates,
 } from "../public-templates/public-templates.server";
@@ -670,6 +671,49 @@ function createApi(getBindings: () => RuntimeBindings) {
       const result = await deactivateActivePublicTemplate(bindings.DB);
       return { active: result.active };
     })
+    .delete(
+      "/admin/public-templates/:installationId",
+      async ({ params, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        const result = await deleteInstalledPublicTemplate(
+          bindings.DB,
+          bindings.MEDIA_BUCKET,
+          params.installationId,
+        );
+        if (result.ok) {
+          return new Response(null, {
+            status: 204,
+            headers: { "cache-control": "no-store" },
+          });
+        }
+        if (result.reason === "not-found") {
+          return status(404, {
+            status: "error" as const,
+            code: "PUBLIC_TEMPLATE_NOT_FOUND" as const,
+          });
+        }
+        if (result.reason === "active") {
+          return status(409, {
+            status: "error" as const,
+            code: "PUBLIC_TEMPLATE_DELETE_BLOCKED" as const,
+          });
+        }
+        return status(503, {
+          status: "error" as const,
+          code: "PUBLIC_TEMPLATE_DELETE_FAILED" as const,
+        });
+      },
+      {
+        params: t.Object({ installationId: t.String({ format: "uuid" }) }),
+      },
+    )
     .post(
       "/admin/assets",
       async ({ body, request, set, status }) => {

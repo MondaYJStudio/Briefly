@@ -350,6 +350,19 @@ async function deactivateTemplate(cookie?: string): Promise<Response> {
   );
 }
 
+async function deleteTemplate(
+  cookie: string | undefined,
+  installationId: string,
+): Promise<Response> {
+  return SELF.fetch(
+    `http://briefly.test/api/admin/public-templates/${installationId}`,
+    {
+      method: "DELETE",
+      headers: cookie ? { cookie } : undefined,
+    },
+  );
+}
+
 describe("Public Template activate, deactivate, and serve", () => {
   beforeEach(async () => {
     await resetPublicTemplateState();
@@ -649,5 +662,215 @@ describe("Public Template activate, deactivate, and serve", () => {
       status: "error",
       code: "PUBLIC_TEMPLATE_NOT_FOUND",
     });
+  }, 30_000);
+});
+
+describe("Public Template replace while active and delete", () => {
+  beforeEach(async () => {
+    await resetPublicTemplateState();
+  });
+
+  afterEach(async () => {
+    await env.DB.prepare(
+      "UPDATE site_public_presentation SET active_installation_id = NULL WHERE id = 1",
+    ).run();
+  });
+
+  it("rejects unauthenticated delete like other Admin APIs", async () => {
+    const response = await deleteTemplate(
+      undefined,
+      "00000000-0000-4000-8000-000000000001",
+    );
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      status: "error",
+      code: "AUTHENTICATION_REQUIRED",
+    });
+  }, 30_000);
+
+  it("serves new bytes immediately when replacing the Active Public Template by manifest id", async () => {
+    const cookie = await initializeAndSignIn();
+    const firstUpload = await uploadTemplate(
+      cookie,
+      validTemplateZip({
+        files: {
+          "index.html": "<!doctype html><title>Active v1</title>",
+          "assets/app.js": "console.log('v1')",
+        },
+      }),
+    );
+    expect(firstUpload.status).toBe(201);
+    const first = (await firstUpload.json()) as { installationId: string };
+    expect((await activateTemplate(cookie, first.installationId)).status).toBe(
+      200,
+    );
+    expect(await (await SELF.fetch("http://briefly.test/")).text()).toBe(
+      "<!doctype html><title>Active v1</title>",
+    );
+
+    const replace = await uploadTemplate(
+      cookie,
+      validTemplateZip({
+        manifest: { version: "2.0.0", name: "Example Reader v2" },
+        files: {
+          "index.html": "<!doctype html><title>Active v2</title>",
+          "assets/app.js": "console.log('v2')",
+        },
+      }),
+    );
+    expect(replace.status).toBe(201);
+    const replaced = (await replace.json()) as {
+      installationId: string;
+      version: string;
+      name: string;
+      active: boolean;
+    };
+    expect(replaced.installationId).not.toBe(first.installationId);
+    expect(replaced.version).toBe("2.0.0");
+    expect(replaced.name).toBe("Example Reader v2");
+    expect(replaced.active).toBe(true);
+
+    const list = await listTemplates(cookie);
+    expect(await list.json()).toEqual({
+      templates: [
+        expect.objectContaining({
+          installationId: replaced.installationId,
+          manifestId: "example-reader",
+          version: "2.0.0",
+          active: true,
+        }),
+      ],
+    });
+
+    expect(await (await SELF.fetch("http://briefly.test/")).text()).toBe(
+      "<!doctype html><title>Active v2</title>",
+    );
+    expect(
+      await (await SELF.fetch("http://briefly.test/assets/app.js")).text(),
+    ).toBe("console.log('v2')");
+    expect(
+      await env.MEDIA_BUCKET.head(
+        `public-templates/${first.installationId}/index.html`,
+      ),
+    ).toBeNull();
+  }, 30_000);
+
+  it("refuses delete while the installation is the Active Public Template", async () => {
+    const cookie = await initializeAndSignIn();
+    const upload = await uploadTemplate(cookie, validTemplateZip());
+    const installed = (await upload.json()) as { installationId: string };
+    expect(
+      (await activateTemplate(cookie, installed.installationId)).status,
+    ).toBe(200);
+
+    const deleted = await deleteTemplate(cookie, installed.installationId);
+    expect(deleted.status).toBe(409);
+    expect(await deleted.json()).toEqual({
+      status: "error",
+      code: "PUBLIC_TEMPLATE_DELETE_BLOCKED",
+    });
+
+    const list = await listTemplates(cookie);
+    expect(await list.json()).toEqual({
+      templates: [
+        expect.objectContaining({
+          installationId: installed.installationId,
+          active: true,
+        }),
+      ],
+    });
+    expect(await (await SELF.fetch("http://briefly.test/")).text()).toContain(
+      "Example",
+    );
+  }, 30_000);
+
+  it("deletes a non-active installation and removes its R2 objects", async () => {
+    const cookie = await initializeAndSignIn();
+    const upload = await uploadTemplate(
+      cookie,
+      validTemplateZip({
+        files: {
+          "index.html": "<!doctype html><title>Disposable</title>",
+          "assets/app.js": "console.log('gone')",
+        },
+      }),
+    );
+    expect(upload.status).toBe(201);
+    const installed = (await upload.json()) as { installationId: string };
+
+    const deleted = await deleteTemplate(cookie, installed.installationId);
+    expect(deleted.status).toBe(204);
+    expect(deleted.headers.get("cache-control")).toBe("no-store");
+    expect(await deleted.text()).toBe("");
+
+    const list = await listTemplates(cookie);
+    expect(await list.json()).toEqual({ templates: [] });
+
+    expect(
+      await env.MEDIA_BUCKET.head(
+        `public-templates/${installed.installationId}/index.html`,
+      ),
+    ).toBeNull();
+    expect(
+      await env.MEDIA_BUCKET.head(
+        `public-templates/${installed.installationId}/assets/app.js`,
+      ),
+    ).toBeNull();
+    const leftover = await env.MEDIA_BUCKET.list({
+      prefix: `public-templates/${installed.installationId}/`,
+    });
+    expect(leftover.objects).toEqual([]);
+  }, 30_000);
+
+  it("returns not found when deleting an unknown installation", async () => {
+    const cookie = await initializeAndSignIn();
+    const response = await deleteTemplate(
+      cookie,
+      "00000000-0000-4000-8000-0000000000aa",
+    );
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      status: "error",
+      code: "PUBLIC_TEMPLATE_NOT_FOUND",
+    });
+  }, 30_000);
+
+  it("keeps the Active Public Template pointer intact when a replace package is rejected", async () => {
+    const cookie = await initializeAndSignIn();
+    const upload = await uploadTemplate(
+      cookie,
+      validTemplateZip({
+        files: {
+          "index.html": "<!doctype html><title>Still Active</title>",
+        },
+      }),
+    );
+    const installed = (await upload.json()) as { installationId: string };
+    expect(
+      (await activateTemplate(cookie, installed.installationId)).status,
+    ).toBe(200);
+
+    const rejected = await uploadTemplate(
+      cookie,
+      buildTemplateZip({
+        "manifest.json": validManifest({ version: "9.0.0" }),
+        "styles.css": "body{}",
+      }),
+    );
+    expect(rejected.status).toBe(400);
+
+    const list = await listTemplates(cookie);
+    expect(await list.json()).toEqual({
+      templates: [
+        expect.objectContaining({
+          installationId: installed.installationId,
+          version: "1.0.0",
+          active: true,
+        }),
+      ],
+    });
+    expect(await (await SELF.fetch("http://briefly.test/")).text()).toBe(
+      "<!doctype html><title>Still Active</title>",
+    );
   }, 30_000);
 });

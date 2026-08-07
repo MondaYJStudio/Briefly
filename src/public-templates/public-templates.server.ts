@@ -404,6 +404,51 @@ export async function deactivateActivePublicTemplate(
   return { active: false };
 }
 
+export type DeletePublicTemplateResult =
+  | { ok: true }
+  | { ok: false; reason: "not-found" }
+  | { ok: false; reason: "active" }
+  | { ok: false; reason: "storage-failed" };
+
+export async function deleteInstalledPublicTemplate(
+  database: D1Database,
+  bucket: R2Bucket,
+  installationId: string,
+): Promise<DeletePublicTemplateResult> {
+  const row = await database
+    .prepare(
+      `SELECT installation_id
+       FROM installed_public_template
+       WHERE installation_id = ?`,
+    )
+    .bind(installationId)
+    .first<{ installation_id: string }>();
+  if (!row) return { ok: false, reason: "not-found" };
+
+  const activeInstallationId = await readActiveInstallationId(database);
+  if (activeInstallationId === installationId) {
+    return { ok: false, reason: "active" };
+  }
+
+  // Clear R2 before D1 so a storage failure leaves the row for retry.
+  try {
+    await deleteInstallationPrefix(bucket, installationId);
+  } catch {
+    return { ok: false, reason: "storage-failed" };
+  }
+
+  try {
+    await database
+      .prepare(`DELETE FROM installed_public_template WHERE installation_id = ?`)
+      .bind(installationId)
+      .run();
+  } catch {
+    return { ok: false, reason: "storage-failed" };
+  }
+
+  return { ok: true };
+}
+
 function relativePathFromUrlPathname(pathname: string): string | null {
   if (pathname === "/" || pathname === "") return PUBLIC_TEMPLATE_INDEX_FILENAME;
   const trimmed = pathname.replace(/^\/+/, "").replace(/\/+$/, "");
