@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { LANGUAGE_TAG_MAXIMUM_LENGTH } from "../site-settings/site-settings";
 import { normalizeArticleTag } from "./articles.server";
 import type { PublicArticle, PublicArticleListItem } from "./articles";
 import { articleSlugKey } from "./article-slug";
@@ -19,6 +20,18 @@ export type UnpublishArticleResult =
 
 export const PUBLIC_ARTICLE_LIST_DEFAULT_PAGE_SIZE = 20;
 export const PUBLIC_ARTICLE_LIST_MAXIMUM_PAGE_SIZE = 100;
+
+const articleContentLanguage = z
+  .string()
+  .max(LANGUAGE_TAG_MAXIMUM_LENGTH)
+  .superRefine((value, context) => {
+    try {
+      if (Intl.getCanonicalLocales(value).length !== 1) throw new Error();
+    } catch {
+      context.addIssue({ code: "custom", message: "Invalid language" });
+    }
+  })
+  .transform((value) => Intl.getCanonicalLocales(value)[0]);
 
 export async function unpublishArticle(
   database: D1Database,
@@ -63,6 +76,7 @@ const publicArticleListQuery = z
       .max(PUBLIC_ARTICLE_LIST_MAXIMUM_PAGE_SIZE)
       .default(PUBLIC_ARTICLE_LIST_DEFAULT_PAGE_SIZE),
     tag: z.string().optional(),
+    language: articleContentLanguage.optional(),
   })
   .strict();
 
@@ -72,6 +86,7 @@ const publicArticleListCursor = z
     publishedAt: z.number().int().nonnegative(),
     articleId: z.string().uuid(),
     tag: z.string().nullable(),
+    language: articleContentLanguage.nullable().optional(),
   })
   .strict();
 
@@ -114,8 +129,12 @@ async function publicArticleListCursorIsCurrent(
          WHERE publication_tag.value = ?
        )`
     : "";
+  const languagePredicate = cursor.language
+    ? "AND publication.language = ?"
+    : "";
   const bindings: unknown[] = [cursor.articleId, cursor.publishedAt];
   if (cursor.tag) bindings.push(cursor.tag);
+  if (cursor.language) bindings.push(cursor.language);
   const anchor = await database
     .prepare(
       `${publicArticleProjectionSelection}
@@ -123,6 +142,7 @@ async function publicArticleListCursorIsCurrent(
          AND article.id = ?
          AND article.published_at = ?
          ${tagPredicate}
+         ${languagePredicate}
        LIMIT 1`,
     )
     .bind(...bindings)
@@ -142,13 +162,15 @@ export async function listPublicArticles(
   if (parsedQuery.data.tag !== undefined && normalizedTag === null) {
     return { ok: false, reason: "invalid-query" };
   }
+  const normalizedLanguage = parsedQuery.data.language ?? null;
 
   let cursor: PublicArticleListCursor | null = null;
   if (parsedQuery.data.cursor) {
     cursor = decodePublicArticleListCursor(parsedQuery.data.cursor);
     if (!cursor) return { ok: false, reason: "invalid-cursor" };
     if (
-      cursor.tag !== normalizedTag ||
+      (cursor.tag ?? null) !== normalizedTag ||
+      (cursor.language ?? null) !== normalizedLanguage ||
       !(await publicArticleListCursorIsCurrent(database, cursor))
     ) {
       return { ok: false, reason: "stale-cursor" };
@@ -163,6 +185,10 @@ export async function listPublicArticles(
       WHERE publication_tag.value = ?
     )`);
     bindings.push(normalizedTag);
+  }
+  if (normalizedLanguage) {
+    predicates.push("publication.language = ?");
+    bindings.push(normalizedLanguage);
   }
   if (cursor) {
     predicates.push(`(
@@ -195,6 +221,7 @@ export async function listPublicArticles(
               publishedAt: lastRow.article_published_at,
               articleId: lastRow.id,
               tag: normalizedTag,
+              language: normalizedLanguage,
             })
           : null,
     },

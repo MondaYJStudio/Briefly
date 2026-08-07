@@ -33,6 +33,7 @@ async function createArticle(
     title: string;
     summary?: string | null;
     tags?: string[];
+    language?: string;
     cover?: { assetId: string; alt: string };
   },
 ): Promise<{ id: string; publicationId: string }> {
@@ -55,7 +56,7 @@ async function createArticle(
         summary: input.summary ?? null,
         tags: input.tags ?? [],
         byline: { name: "Public Writer", url: null },
-        language: "en",
+        language: input.language ?? "en",
         cover: input.cover ?? null,
         document: textDocument(`Private source for ${input.title}`),
       }),
@@ -275,6 +276,108 @@ describe("public Article API", () => {
     ).toEqual(expectedIds);
   }, 30_000);
 
+  it("filters current publications by canonical content language and tag", async () => {
+    const cookie = await initializeAndSignIn();
+    const english = await createArticle(cookie, {
+      slug: "language-english",
+      title: "English article",
+      tags: ["news"],
+      language: "en",
+    });
+    await createArticle(cookie, {
+      slug: "language-french",
+      title: "French article",
+      tags: ["news"],
+      language: "fr-CA",
+    });
+    const simplifiedChinese = await createArticle(cookie, {
+      slug: "language-simplified-chinese",
+      title: "Simplified Chinese article",
+      tags: ["News"],
+      language: "zh-Hans",
+    });
+
+    const response = await SELF.fetch(
+      "http://briefly.test/api/articles?language=ZH-hans&tag=news",
+    );
+
+    expect(response.status).toBe(200);
+    const payload = await response.json<{
+      items: Array<{ id: string; language: string; tags: string[] }>;
+      nextCursor: string | null;
+    }>();
+    expect(payload.items).toEqual([
+      expect.objectContaining({
+        id: simplifiedChinese.id,
+        language: "zh-Hans",
+        tags: ["news"],
+      }),
+    ]);
+    expect(payload.nextCursor).toBeNull();
+    expect(payload.items.map(({ id }) => id)).not.toContain(english.id);
+  }, 30_000);
+
+  it("binds language filters to pagination cursors", async () => {
+    const cookie = await initializeAndSignIn();
+    const newestChinese = await createArticle(cookie, {
+      slug: "language-cursor-newest",
+      title: "Newest Chinese article",
+      language: "zh-Hans",
+    });
+    const olderChinese = await createArticle(cookie, {
+      slug: "language-cursor-older",
+      title: "Older Chinese article",
+      language: "zh-Hans",
+    });
+    const oldestEnglish = await createArticle(cookie, {
+      slug: "language-cursor-english",
+      title: "English article outside language page",
+      language: "en",
+    });
+    await env.DB.batch([
+      env.DB.prepare("UPDATE article SET published_at = ? WHERE id = ?").bind(
+        Date.parse("2026-06-03T00:00:00.000Z"),
+        newestChinese.id,
+      ),
+      env.DB.prepare("UPDATE article SET published_at = ? WHERE id = ?").bind(
+        Date.parse("2026-06-02T00:00:00.000Z"),
+        olderChinese.id,
+      ),
+      env.DB.prepare("UPDATE article SET published_at = ? WHERE id = ?").bind(
+        Date.parse("2026-06-01T00:00:00.000Z"),
+        oldestEnglish.id,
+      ),
+    ]);
+
+    const firstResponse = await SELF.fetch(
+      "http://briefly.test/api/articles?language=zh-Hans&limit=1",
+    );
+    expect(firstResponse.status).toBe(200);
+    const firstPage = await firstResponse.json<{
+      items: Array<{ id: string }>;
+      nextCursor: string | null;
+    }>();
+    expect(firstPage.items.map(({ id }) => id)).toEqual([newestChinese.id]);
+    expect(firstPage.nextCursor).toEqual(expect.any(String));
+
+    const secondResponse = await SELF.fetch(
+      `http://briefly.test/api/articles?language=zh-Hans&limit=1&cursor=${encodeURIComponent(firstPage.nextCursor ?? "")}`,
+    );
+    expect(secondResponse.status).toBe(200);
+    expect(
+      (await secondResponse.json<{ items: Array<{ id: string }> }>()).items,
+    ).toEqual([expect.objectContaining({ id: olderChinese.id })]);
+
+    const mismatched = await SELF.fetch(
+      `http://briefly.test/api/articles?language=en&limit=1&cursor=${encodeURIComponent(firstPage.nextCursor ?? "")}`,
+    );
+    expect(mismatched.status).toBe(400);
+    expect(await mismatched.json()).toEqual({
+      status: "error",
+      code: "ARTICLE_LIST_CURSOR_STALE",
+    });
+  }, 30_000);
+
   it("rejects unsupported list queries and distinguishes malformed from stale cursors", async () => {
     const cookie = await initializeAndSignIn();
     const newer = await createArticle(cookie, {
@@ -303,6 +406,10 @@ describe("public Article API", () => {
       "limit=101",
       "limit=1.5",
       "tag=one&tag=two",
+      "language=",
+      "language=_",
+      "language=zh--Hans",
+      "language=en&language=zh-Hans",
       "search=cursor",
       "sort=title",
     ]) {
@@ -346,6 +453,36 @@ describe("public Article API", () => {
       status: "error",
       code: "ARTICLE_LIST_CURSOR_STALE",
     });
+  }, 30_000);
+
+  it("applies the language filter to GET and HEAD representations", async () => {
+    const cookie = await initializeAndSignIn();
+    await createArticle(cookie, {
+      slug: "head-language-english",
+      title: "English article",
+      language: "en",
+    });
+    const japanese = await createArticle(cookie, {
+      slug: "head-language-japanese",
+      title: "Japanese article",
+      language: "ja",
+    });
+
+    const get = await SELF.fetch(
+      "http://briefly.test/api/articles?language=ja",
+    );
+    expect(get.status).toBe(200);
+    expect((await get.json<{ items: Array<{ id: string }> }>()).items).toEqual([
+      expect.objectContaining({ id: japanese.id }),
+    ]);
+
+    const head = await SELF.fetch(
+      "http://briefly.test/api/articles?language=ja",
+      { method: "HEAD" },
+    );
+    expect(head.status).toBe(200);
+    expect(await head.text()).toBe("");
+    expect(head.headers.get("etag")).toBe(get.headers.get("etag"));
   }, 30_000);
 
   it("serves cookie-independent CORS, HEAD, ETag, revalidation, and immediate list visibility", async () => {
@@ -482,6 +619,7 @@ describe("public Article API", () => {
       "cursor",
       "limit",
       "tag",
+      "language",
     ]);
     const limit = inlineParameters.find(
       (parameter) => parameter.name === "limit",
@@ -492,6 +630,11 @@ describe("public Article API", () => {
       maximum: 100,
       minimum: 1,
     });
+    const language = inlineParameters.find(
+      (parameter) => parameter.name === "language",
+    );
+    expect(language?.schema).toMatchObject({ type: "string" });
+    expect(language?.description).toContain("BCP 47");
 
     const listSuccess = await SELF.fetch(
       "http://briefly.test/api/articles?tag=contract",

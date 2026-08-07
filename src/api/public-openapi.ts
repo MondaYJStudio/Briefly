@@ -10,6 +10,7 @@ import {
   PUBLIC_ARTICLE_LIST_MAXIMUM_PAGE_SIZE,
 } from "../articles/publications.server";
 import { APP_LOCALES } from "../locales/registry";
+import { LANGUAGE_TAG_MAXIMUM_LENGTH } from "../site-settings/site-settings";
 
 const publicResponseHeaders = {
   "Access-Control-Allow-Origin": {
@@ -85,6 +86,17 @@ const listParameters = [
     required: false,
     description: `One tag. Unicode is normalized to NFC, surrounding whitespace is removed, internal whitespace is collapsed, and casing is normalized exactly as Draft metadata is normalized. The normalized result cannot exceed ${ARTICLE_TAG_MAXIMUM_LENGTH} characters. Multiple tag expressions are not supported.`,
     schema: { type: "string", minLength: 1 },
+  },
+  {
+    name: "language",
+    in: "query",
+    required: false,
+    description: `Exact Article Content Language filter. The value must be a valid BCP 47 tag and is canonicalized before matching the Current Publication language. The tag cannot exceed ${LANGUAGE_TAG_MAXIMUM_LENGTH} characters; this filter does not negotiate the request's Interface Locale.`,
+    schema: {
+      type: "string",
+      minLength: 1,
+      maxLength: LANGUAGE_TAG_MAXIMUM_LENGTH,
+    },
   },
 ] satisfies OpenAPIV3_1.ParameterObject[];
 
@@ -204,7 +216,7 @@ export const publicOpenApiDocument = {
         operationId: "listArticles",
         summary: "List Current Publications",
         description:
-          "Returns Current Publications ordered by first Published At descending and stable Article ID ascending. List items omit Publication HTML and all source content.",
+          "Returns Current Publications ordered by first Published At descending and stable Article ID ascending. An optional language filter matches the canonical Article Content Language, and an optional tag filter is normalized as Draft metadata. List items omit Publication HTML and all source content.",
         parameters: listParameters,
         responses: {
           200: {
