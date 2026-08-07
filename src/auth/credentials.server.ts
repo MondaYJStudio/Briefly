@@ -96,23 +96,20 @@ export async function recoverAdministrator(
 
 export async function changeAdministratorPassword(
   bindings: RuntimeBindings,
-  applicationOrigin: string,
-  headers: Headers,
+  request: Request,
   passwords: { currentPassword: string; newPassword: string },
 ): Promise<PasswordChangeResult> {
-  const { createAuth } = await import("./auth.server");
-  const session = await createAuth(bindings, applicationOrigin).api.getSession({
-    headers,
-    query: { disableRefresh: true },
-  });
-  if (!session) return { ok: false, reason: "authentication-required" };
+  const { readAdministratorSession } =
+    await import("./administrator-session.server");
+  const { administrator } = await readAdministratorSession(bindings, request);
+  if (!administrator) return { ok: false, reason: "authentication-required" };
   if (!validNewPassword(passwords.newPassword)) {
     return { ok: false, reason: "invalid-input" };
   }
 
   const credential = await findAdministratorCredential(
     bindings.DB,
-    session.user.id,
+    administrator.id,
   );
   if (!credential) return { ok: false, reason: "invalid-input" };
   const { verifyPassword } = await import("better-auth/crypto");

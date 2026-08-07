@@ -218,19 +218,17 @@ const worker = {
           routedPathname,
         )
       ) {
-        const { createAuth } = await import("./auth/auth.server");
+        const { readAdministratorSession } =
+          await import("./auth/administrator-session.server");
         const applicationOrigin = applicationOriginForRequest(
           configuration.bindings,
           request,
         );
-        const session = await createAuth(
+        const { administrator } = await readAdministratorSession(
           configuration.bindings,
-          applicationOrigin,
-        ).api.getSession({
-          headers: request.headers,
-          query: { disableRefresh: true },
-        });
-        if (session) {
+          request,
+        );
+        if (administrator) {
           response = withRequestId(
             await handleStartRequest(request, configuration.bindings),
             requestId,

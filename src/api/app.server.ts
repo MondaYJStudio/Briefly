@@ -30,7 +30,7 @@ import {
 } from "../articles/publications.server";
 import { recognizeVideoEmbed } from "../articles/video-embeds";
 import { cleanupAsset, listAssets, uploadAsset } from "../assets/assets.server";
-import { administratorInitialsFromEmail } from "../auth/administrator-identity";
+import { readAdministratorSession } from "../auth/administrator-session.server";
 import {
   initializeAdministrator,
   installationIsInitialized,
@@ -49,6 +49,7 @@ import {
   updateSiteSettings,
 } from "../site-settings/site-settings.server";
 import { resolveSiteLocale } from "../site-settings/site-description-locales";
+import { administratorGuard } from "./administrator-guard";
 import { publicOpenApiDocument } from "./public-openapi";
 
 // Elysia's dynamic validator cannot compile nullable unions or records of
@@ -119,22 +120,6 @@ function getValidatedWorkerBindings() {
     throw new Error("Validated Worker bindings are unavailable");
   }
   return configuration.bindings;
-}
-
-async function administratorIsAuthenticated(
-  bindings: RuntimeBindings,
-  request: Request,
-): Promise<boolean> {
-  const { createAuth } = await import("../auth/auth.server");
-  return Boolean(
-    await createAuth(
-      bindings,
-      applicationOriginForRequest(bindings, request),
-    ).api.getSession({
-      headers: request.headers,
-      query: { disableRefresh: true },
-    }),
-  );
 }
 
 function publicContentHeaders(): Headers {
@@ -292,6 +277,7 @@ function createApi(getBindings: () => RuntimeBindings) {
     prefix: "/api",
     aot: false,
   })
+    .use(administratorGuard(getBindings))
     .onError(({ code, request, status }) => {
       const pathname = new URL(request.url).pathname;
       if (
@@ -317,49 +303,39 @@ function createApi(getBindings: () => RuntimeBindings) {
       ),
     )
     .get("/admin/session", async ({ request }) => {
-      const { createAuth } = await import("../auth/auth.server");
-      const bindings = getBindings();
-      const result = await createAuth(
-        bindings,
-        applicationOriginForRequest(bindings, request),
-      ).api.getSession({
-        headers: request.headers,
-        returnHeaders: true,
-      });
-      const headers = new Headers(result.headers);
+      // The endpoint the admin shell polls is the one place that extends the
+      // Administrator Session, so it forwards Better Auth's renewal headers.
+      const { administrator, headers } = await readAdministratorSession(
+        getBindings(),
+        request,
+        { refresh: true },
+      );
       headers.set("cache-control", "no-store");
 
-      if (!result.response) {
+      if (!administrator) {
         return Response.json(
           { status: "error", code: "AUTHENTICATION_REQUIRED" },
           { status: 401, headers },
         );
       }
 
-      const email = result.response.user.email;
       return Response.json(
         {
           authenticated: true,
-          email,
-          initials: administratorInitialsFromEmail(email),
+          email: administrator.email,
+          initials: administrator.initials,
         },
         { headers },
       );
     })
     .get(
       "/admin/site-settings",
-      async ({ request, set, status }) => {
+      async () => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         return adminSiteSettingsResponse(await readSiteSettings(bindings.DB));
       },
       {
+        administrator: true,
         response: {
           200: adminSiteSettingsContract,
           401: authenticationRequiredContract,
@@ -368,15 +344,8 @@ function createApi(getBindings: () => RuntimeBindings) {
     )
     .put(
       "/admin/site-settings",
-      async ({ body, request, set, status }) => {
+      async ({ body, status }) => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         const result = await updateSiteSettings(bindings.DB, body);
         if (!result.ok) {
           return status(400, {
@@ -388,6 +357,7 @@ function createApi(getBindings: () => RuntimeBindings) {
         return adminSiteSettingsResponse(result.settings);
       },
       {
+        administrator: true,
         body: siteSettingsInputContract,
         response: {
           200: adminSiteSettingsContract,
@@ -396,55 +366,39 @@ function createApi(getBindings: () => RuntimeBindings) {
         },
       },
     )
-    .post("/admin/articles", async ({ request, set, status }) => {
-      const bindings = getBindings();
-      set.headers["cache-control"] = "no-store";
-      if (!(await administratorIsAuthenticated(bindings, request)))
-        return status(401, {
-          status: "error" as const,
-          code: "AUTHENTICATION_REQUIRED" as const,
-        });
-
-      return status(201, await createArticle(bindings.DB));
-    })
-    .get("/admin/articles", async ({ request, set, status }) => {
-      const bindings = getBindings();
-      set.headers["cache-control"] = "no-store";
-      if (!(await administratorIsAuthenticated(bindings, request)))
-        return status(401, {
-          status: "error" as const,
-          code: "AUTHENTICATION_REQUIRED" as const,
-        });
-
-      return {
-        articles: await projectAdminArticles(
-          bindings.DB,
-          await listArticles(bindings.DB),
-        ),
-      };
-    })
-    .get("/admin/trash/articles", async ({ request, set, status }) => {
-      const bindings = getBindings();
-      set.headers["cache-control"] = "no-store";
-      if (!(await administratorIsAuthenticated(bindings, request)))
-        return status(401, {
-          status: "error" as const,
-          code: "AUTHENTICATION_REQUIRED" as const,
-        });
-
-      return { articles: await listTrashedArticles(bindings.DB) };
-    })
+    .post(
+      "/admin/articles",
+      async ({ status }) => {
+        const bindings = getBindings();
+        return status(201, await createArticle(bindings.DB));
+      },
+      { administrator: true },
+    )
+    .get(
+      "/admin/articles",
+      async () => {
+        const bindings = getBindings();
+        return {
+          articles: await projectAdminArticles(
+            bindings.DB,
+            await listArticles(bindings.DB),
+          ),
+        };
+      },
+      { administrator: true },
+    )
+    .get(
+      "/admin/trash/articles",
+      async () => {
+        const bindings = getBindings();
+        return { articles: await listTrashedArticles(bindings.DB) };
+      },
+      { administrator: true },
+    )
     .post(
       "/admin/articles/:articleId/trash",
-      async ({ params, request, set, status }) => {
+      async ({ params, status }) => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         let result: Awaited<ReturnType<typeof trashArticle>>;
         try {
           result = await trashArticle(bindings.DB, params.articleId);
@@ -461,19 +415,15 @@ function createApi(getBindings: () => RuntimeBindings) {
               code: "ARTICLE_NOT_FOUND" as const,
             });
       },
-      { params: t.Object({ articleId: t.String({ format: "uuid" }) }) },
+      {
+        administrator: true,
+        params: t.Object({ articleId: t.String({ format: "uuid" }) }),
+      },
     )
     .post(
       "/admin/trash/articles/:articleId/restore",
-      async ({ params, request, set, status }) => {
+      async ({ params, status }) => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         let result: Awaited<ReturnType<typeof restoreTrashedArticle>>;
         try {
           result = await restoreTrashedArticle(bindings.DB, params.articleId);
@@ -490,19 +440,15 @@ function createApi(getBindings: () => RuntimeBindings) {
               code: "TRASHED_ARTICLE_NOT_FOUND" as const,
             });
       },
-      { params: t.Object({ articleId: t.String({ format: "uuid" }) }) },
+      {
+        administrator: true,
+        params: t.Object({ articleId: t.String({ format: "uuid" }) }),
+      },
     )
     .delete(
       "/admin/trash/articles/:articleId",
-      async ({ body, params, request, set, status }) => {
+      async ({ body, params, status }) => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         let result: Awaited<ReturnType<typeof purgeTrashedArticle>>;
         try {
           result = await purgeTrashedArticle(
@@ -526,6 +472,7 @@ function createApi(getBindings: () => RuntimeBindings) {
         });
       },
       {
+        administrator: true,
         params: t.Object({ articleId: t.String({ format: "uuid" }) }),
         body: t.Object({
           confirmationTitle: t.String(),
@@ -534,15 +481,8 @@ function createApi(getBindings: () => RuntimeBindings) {
     )
     .get(
       "/admin/articles/:articleId",
-      async ({ params, request, set, status }) => {
+      async ({ params, status }) => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         const article = await readArticle(bindings.DB, params.articleId);
         return article
           ? article
@@ -551,19 +491,15 @@ function createApi(getBindings: () => RuntimeBindings) {
               code: "ARTICLE_NOT_FOUND" as const,
             });
       },
-      { params: t.Object({ articleId: t.String({ format: "uuid" }) }) },
+      {
+        administrator: true,
+        params: t.Object({ articleId: t.String({ format: "uuid" }) }),
+      },
     )
     .put(
       "/admin/articles/:articleId/draft",
-      async ({ body, params, request, set, status }) => {
+      async ({ body, params, status }) => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         const result = await updateArticleDraft(
           bindings.DB,
           params.articleId,
@@ -590,21 +526,15 @@ function createApi(getBindings: () => RuntimeBindings) {
         });
       },
       {
+        administrator: true,
         params: t.Object({ articleId: t.String({ format: "uuid" }) }),
         body: t.Any(),
       },
     )
     .post(
       "/admin/video-embeds/recognize",
-      async ({ body, request, set, status }) => {
+      async ({ body, status }) => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         const recognized = recognizeVideoEmbed(body.input);
         return recognized
           ? recognized
@@ -615,30 +545,23 @@ function createApi(getBindings: () => RuntimeBindings) {
                 "Use a supported YouTube or Bilibili URL or identifier; other providers can remain ordinary links.",
             });
       },
-      { body: t.Object({ input: t.String({ maxLength: 2_048 }) }) },
+      {
+        administrator: true,
+        body: t.Object({ input: t.String({ maxLength: 2_048 }) }),
+      },
     )
-    .get("/admin/assets", async ({ request, set, status }) => {
-      const bindings = getBindings();
-      set.headers["cache-control"] = "no-store";
-      if (!(await administratorIsAuthenticated(bindings, request)))
-        return status(401, {
-          status: "error" as const,
-          code: "AUTHENTICATION_REQUIRED" as const,
-        });
-
-      return { assets: await listAssets(bindings.DB) };
-    })
+    .get(
+      "/admin/assets",
+      async () => {
+        const bindings = getBindings();
+        return { assets: await listAssets(bindings.DB) };
+      },
+      { administrator: true },
+    )
     .post(
       "/admin/assets",
-      async ({ body, request, set, status }) => {
+      async ({ body, status }) => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         const result = await uploadAsset(
           bindings.DB,
           bindings.MEDIA_BUCKET,
@@ -656,19 +579,12 @@ function createApi(getBindings: () => RuntimeBindings) {
               code: "ASSET_UPLOAD_FAILED" as const,
             });
       },
-      { body: t.Object({ file: t.File() }) },
+      { administrator: true, body: t.Object({ file: t.File() }) },
     )
     .delete(
       "/admin/assets/:assetId",
-      async ({ params, request, set, status }) => {
+      async ({ params, status }) => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         const result = await cleanupAsset(
           bindings.DB,
           bindings.MEDIA_BUCKET,
@@ -694,19 +610,15 @@ function createApi(getBindings: () => RuntimeBindings) {
           });
         }
       },
-      { params: t.Object({ assetId: t.String({ format: "uuid" }) }) },
+      {
+        administrator: true,
+        params: t.Object({ assetId: t.String({ format: "uuid" }) }),
+      },
     )
     .post(
       "/admin/articles/:articleId/preview",
-      async ({ body, params, request, set, status }) => {
+      async ({ body, params, request, status }) => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "private, no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         if (!Number.isInteger(body.draftVersion) || body.draftVersion < 1) {
           return status(400, {
             status: "error" as const,
@@ -759,21 +671,16 @@ function createApi(getBindings: () => RuntimeBindings) {
         throw new Error("Unhandled Publication Workflow result");
       },
       {
+        // A Draft rehearsal is private to the Administrator who asked for it.
+        administrator: { cacheControl: "private, no-store" },
         params: t.Object({ articleId: t.String({ format: "uuid" }) }),
         body: t.Object({ draftVersion: t.Number({ minimum: 1 }) }),
       },
     )
     .get(
       "/admin/articles/:articleId/publications",
-      async ({ params, request, set, status }) => {
+      async ({ params, status }) => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         const result = await listArticlePublicationHistory(
           bindings.DB,
           params.articleId,
@@ -785,19 +692,15 @@ function createApi(getBindings: () => RuntimeBindings) {
               code: "ARTICLE_NOT_FOUND" as const,
             });
       },
-      { params: t.Object({ articleId: t.String({ format: "uuid" }) }) },
+      {
+        administrator: true,
+        params: t.Object({ articleId: t.String({ format: "uuid" }) }),
+      },
     )
     .post(
       "/admin/articles/:articleId/publications",
-      async ({ body, params, request, set, status }) => {
+      async ({ body, params, request, status }) => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         if (
           !Number.isInteger(body.draftVersion) ||
           body.draftVersion < 1 ||
@@ -858,6 +761,7 @@ function createApi(getBindings: () => RuntimeBindings) {
         });
       },
       {
+        administrator: true,
         params: t.Object({ articleId: t.String({ format: "uuid" }) }),
         body: t.Object({
           draftVersion: t.Number({ minimum: 1 }),
@@ -867,15 +771,8 @@ function createApi(getBindings: () => RuntimeBindings) {
     )
     .post(
       "/admin/articles/:articleId/publications/:publicationId/restore",
-      async ({ body, params, request, set, status }) => {
+      async ({ body, params, status }) => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         let result: Awaited<ReturnType<typeof restoreArticlePublication>>;
         try {
           result = await restoreArticlePublication(
@@ -920,6 +817,7 @@ function createApi(getBindings: () => RuntimeBindings) {
         });
       },
       {
+        administrator: true,
         params: t.Object({
           articleId: t.String({ format: "uuid" }),
           publicationId: t.String({ format: "uuid" }),
@@ -932,15 +830,8 @@ function createApi(getBindings: () => RuntimeBindings) {
     )
     .delete(
       "/admin/articles/:articleId/current-publication",
-      async ({ params, request, set, status }) => {
+      async ({ params, status }) => {
         const bindings = getBindings();
-        set.headers["cache-control"] = "no-store";
-        if (!(await administratorIsAuthenticated(bindings, request)))
-          return status(401, {
-            status: "error" as const,
-            code: "AUTHENTICATION_REQUIRED" as const,
-          });
-
         let result: Awaited<ReturnType<typeof unpublishArticle>>;
         try {
           result = await unpublishArticle(bindings.DB, params.articleId);
@@ -957,7 +848,10 @@ function createApi(getBindings: () => RuntimeBindings) {
             code: "ARTICLE_NOT_FOUND" as const,
           });
       },
-      { params: t.Object({ articleId: t.String({ format: "uuid" }) }) },
+      {
+        administrator: true,
+        params: t.Object({ articleId: t.String({ format: "uuid" }) }),
+      },
     )
     .get("/openapi.json", ({ request }) => publicOpenApiResponse(request))
     .get("/site", ({ request }) =>

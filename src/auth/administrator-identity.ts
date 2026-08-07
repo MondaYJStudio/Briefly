@@ -1,3 +1,13 @@
+/** The sole Administrator, as identified by a resolved Administrator Session. */
+export interface Administrator {
+  id: string;
+  email: string;
+  initials: string;
+}
+
+/** The subset of an Administrator the admin shell presents. */
+export type AdministratorIdentity = Pick<Administrator, "email" | "initials">;
+
 /**
  * Stable avatar initials for the sole Administrator, derived from the
  * sign-in email local part (never from prototype fixture names).

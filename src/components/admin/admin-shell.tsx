@@ -9,16 +9,12 @@ import {
   canonicalizeAppLocale,
 } from "../../locales/registry";
 import { useHydrated } from "../../locales/use-hydrated";
+import type { AdministratorIdentity } from "../../auth/administrator-identity";
 import { AdminIcon } from "./icons";
 import styles from "./admin-shell.module.css";
 
 export type AdminDrawerKind = "settings" | "account";
 export type AdminTheme = "light" | "dark";
-
-export interface AdministratorIdentity {
-  email: string;
-  initials: string;
-}
 
 interface AdminShellProps {
   identity: AdministratorIdentity;

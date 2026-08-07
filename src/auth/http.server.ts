@@ -36,15 +36,10 @@ export async function handleAuthenticationRequest(
     return passwordChangeDenied(400);
   }
 
-  const result = await changeAdministratorPassword(
-    bindings,
-    applicationOrigin,
-    request.headers,
-    {
-      currentPassword: body.currentPassword,
-      newPassword: body.newPassword,
-    },
-  );
+  const result = await changeAdministratorPassword(bindings, request, {
+    currentPassword: body.currentPassword,
+    newPassword: body.newPassword,
+  });
   if (!result.ok) {
     return passwordChangeDenied(
       result.reason === "authentication-required" ? 401 : 400,

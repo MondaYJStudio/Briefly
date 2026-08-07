@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import type { AdministratorIdentity } from "../components/admin/admin-shell";
+import type { AdministratorIdentity } from "./administrator-identity";
 
 /**
  * SSR-safe Administrator identity for the admin shell. Runs only on the
@@ -9,8 +9,7 @@ import type { AdministratorIdentity } from "../components/admin/admin-shell";
 export const loadAdministratorIdentity = createServerFn({
   method: "GET",
 }).handler(async (): Promise<AdministratorIdentity> => {
-  const { readAdministratorIdentityFromRequest } = await import(
-    "./administrator-session.server"
-  );
+  const { readAdministratorIdentityFromRequest } =
+    await import("./administrator-session.server");
   return readAdministratorIdentityFromRequest();
 });
