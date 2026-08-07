@@ -1,19 +1,22 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  mergeVary,
+  resolveAcceptLanguage,
+  resolveSiteLocale,
+} from "../src/locales/locale";
+import {
   APP_LOCALE_OPTIONS,
   APP_LOCALES,
   COOKIE_NAME,
   canonicalizeAppLocale,
+} from "../src/locales/registry";
+import {
   localeFromRequestCookie,
   localeFromRequestUrl,
-  mergeVary,
-  normalizeLocalePathUrl,
-  resolveAcceptLanguage,
-  resolveSiteLocale,
-  selectLocalizedValue,
-} from "../src/locales/locale";
-import { matchOrderedAppLocales } from "../src/locales/matcher";
+} from "../src/locales/request";
+import { normalizeLocalePathUrl } from "../src/locales/locale-path";
+import { selectLocalizedValue } from "../src/locales/selection";
 
 function request(
   url = "https://briefly.test/",
@@ -45,7 +48,7 @@ describe("application locale registry", () => {
   });
 
   it("keeps a subset fallback inside the supplied available locales", () => {
-    expect(matchOrderedAppLocales(["fr"], ["ja"], "en")).toBe("ja");
+    expect(resolveAcceptLanguage(request(), ["ja"], "en")).toBe("ja");
   });
 });
 

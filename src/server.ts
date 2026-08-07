@@ -12,11 +12,8 @@ import {
   applicationOriginForRequest,
   requestUsesApplicationOrigin,
 } from "./env/origin.server";
-import {
-  canonicalizeAppLocale,
-  mergeVary,
-  resolveSiteLocale,
-} from "./locales/locale";
+import { mergeVary, resolveSiteLocale } from "./locales/locale";
+import { canonicalizeAppLocale } from "./locales/registry";
 import { normalizeLocalePathUrl } from "./locales/locale-path";
 import { registerParaglideServerLocaleStrategy } from "./locales/paraglide-strategy.server";
 import { deLocalizeUrl } from "./paraglide/runtime.js";

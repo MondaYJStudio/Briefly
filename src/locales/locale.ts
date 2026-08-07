@@ -31,32 +31,6 @@ import {
   type LocalizedValues,
 } from "./selection";
 
-export {
-  APP_LOCALE_ALIASES,
-  APP_LOCALE_OPTIONS,
-  APP_LOCALES,
-  COOKIE_NAME,
-  DEFAULT_APP_LOCALE,
-  canonicalizeAppLocale,
-  isAppLocale,
-} from "./registry";
-export type { AppLocale, AppLocaleOption } from "./registry";
-export {
-  isReservedApplicationPath,
-  normalizeLocalePathUrl,
-} from "./locale-path";
-
-export {
-  localeFromCookieHeader,
-  localeFromRequestCookie,
-  localeFromRequestUrl,
-} from "./request";
-export {
-  selectLocalizedValue,
-  type LocalizedValueSelection,
-  type LocalizedValues,
-} from "./selection";
-
 /**
  * Return configured locales ruled out by an explicit q=0 language range.
  * Negotiator filters exact available tags, but it cannot know that our
