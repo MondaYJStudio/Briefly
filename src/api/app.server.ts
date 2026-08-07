@@ -47,6 +47,7 @@ import {
   activateInstalledPublicTemplate,
   deactivateActivePublicTemplate,
   deleteInstalledPublicTemplate,
+  installPublicTemplateFromUrl,
   installPublicTemplateFromZip,
   listInstalledPublicTemplates,
 } from "../public-templates/public-templates.server";
@@ -632,6 +633,40 @@ function createApi(getBindings: () => RuntimeBindings) {
             });
       },
       { body: t.Object({ file: t.File() }) },
+    )
+    .post(
+      "/admin/public-templates/from-url",
+      async ({ body, request, set, status }) => {
+        const bindings = getBindings();
+        set.headers["cache-control"] = "no-store";
+        if (!(await administratorIsAuthenticated(bindings, request)))
+          return status(401, {
+            status: "error" as const,
+            code: "AUTHENTICATION_REQUIRED" as const,
+          });
+
+        const result = await installPublicTemplateFromUrl(
+          bindings.DB,
+          bindings.MEDIA_BUCKET,
+          body.url,
+        );
+        if (result.ok) return status(201, result.template);
+        return result.reason === "invalid"
+          ? status(400, {
+              status: "error" as const,
+              code: "PUBLIC_TEMPLATE_INSTALL_INVALID" as const,
+              issues: result.issues,
+            })
+          : status(503, {
+              status: "error" as const,
+              code: "PUBLIC_TEMPLATE_INSTALL_FAILED" as const,
+            });
+      },
+      {
+        body: t.Object({
+          url: t.String({ minLength: 1, maxLength: 2_048 }),
+        }),
+      },
     )
     .post(
       "/admin/public-templates/:installationId/activate",

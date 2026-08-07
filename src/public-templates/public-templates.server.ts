@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   PUBLIC_TEMPLATE_ALLOWED_EXTENSIONS,
+  PUBLIC_TEMPLATE_FETCH_TIMEOUT_MS,
   PUBLIC_TEMPLATE_INDEX_FILENAME,
   PUBLIC_TEMPLATE_MANIFEST_FILENAME,
   PUBLIC_TEMPLATE_MAXIMUM_FILE_BYTE_SIZE,
@@ -518,27 +519,85 @@ export async function serveActivePublicTemplate(
   };
 }
 
-export async function installPublicTemplateFromZip(
-  database: D1Database,
-  bucket: R2Bucket,
-  file: File,
-): Promise<InstallPublicTemplateResult> {
-  if (file.size === 0 || file.size > PUBLIC_TEMPLATE_MAXIMUM_ZIP_BYTE_SIZE) {
+function downloadFailedResult(): InstallPublicTemplateResult {
+  return {
+    ok: false,
+    reason: "invalid",
+    issues: [
+      issue("url", "Could not download a Public Template zip from that URL."),
+    ],
+  };
+}
+
+function oversizedZipUrlIssue(
+  maximumByteSize: number,
+): PublicTemplateValidationIssue {
+  return issue(
+    "url",
+    `Fetch a Public Template zip no larger than ${maximumByteSize / (1024 * 1024)} MiB.`,
+  );
+}
+
+async function readResponseBodyWithLimit(
+  response: Response,
+  maximumByteSize: number,
+): Promise<
+  | { ok: true; bytes: Uint8Array }
+  | { ok: false; issue: PublicTemplateValidationIssue }
+> {
+  const contentLengthHeader = response.headers.get("content-length");
+  if (contentLengthHeader !== null) {
+    const contentLength = Number(contentLengthHeader);
+    if (!Number.isFinite(contentLength) || contentLength < 0) {
+      return {
+        ok: false,
+        issue: issue(
+          "url",
+          "Could not download a Public Template zip from that URL.",
+        ),
+      };
+    }
+    if (contentLength > maximumByteSize) {
+      return { ok: false, issue: oversizedZipUrlIssue(maximumByteSize) };
+    }
+  }
+
+  if (!response.body) {
     return {
       ok: false,
-      reason: "invalid",
-      issues: [
-        issue(
-          "file",
-          file.size === 0
-            ? "Upload a Public Template zip."
-            : `Upload a Public Template zip no larger than ${PUBLIC_TEMPLATE_MAXIMUM_ZIP_BYTE_SIZE / (1024 * 1024)} MiB.`,
-        ),
-      ],
+      issue: issue("url", "Could not download a Public Template zip from that URL."),
     };
   }
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.byteLength;
+    if (total > maximumByteSize) {
+      await reader.cancel().catch(() => {});
+      return { ok: false, issue: oversizedZipUrlIssue(maximumByteSize) };
+    }
+    chunks.push(value);
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { ok: true, bytes };
+}
+
+async function installPublicTemplateFromBytes(
+  database: D1Database,
+  bucket: R2Bucket,
+  bytes: Uint8Array,
+): Promise<InstallPublicTemplateResult> {
   const validated = validatePackage(bytes);
   if (!validated.ok) {
     return { ok: false, reason: "invalid", issues: validated.issues };
@@ -651,4 +710,119 @@ export async function installPublicTemplateFromZip(
       installedAt: new Date(installedAt).toISOString(),
     },
   };
+}
+
+export async function installPublicTemplateFromZip(
+  database: D1Database,
+  bucket: R2Bucket,
+  file: File,
+): Promise<InstallPublicTemplateResult> {
+  if (file.size === 0 || file.size > PUBLIC_TEMPLATE_MAXIMUM_ZIP_BYTE_SIZE) {
+    return {
+      ok: false,
+      reason: "invalid",
+      issues: [
+        issue(
+          "file",
+          file.size === 0
+            ? "Upload a Public Template zip."
+            : `Upload a Public Template zip no larger than ${PUBLIC_TEMPLATE_MAXIMUM_ZIP_BYTE_SIZE / (1024 * 1024)} MiB.`,
+        ),
+      ],
+    };
+  }
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  return installPublicTemplateFromBytes(database, bucket, bytes);
+}
+
+function parseHttpsTemplateZipUrl(
+  rawUrl: string,
+):
+  | { ok: true; url: URL }
+  | { ok: false; issue: PublicTemplateValidationIssue } {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) {
+    return {
+      ok: false,
+      issue: issue("url", "Provide an HTTPS URL to a Public Template zip."),
+    };
+  }
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return {
+      ok: false,
+      issue: issue("url", "Provide a valid HTTPS URL to a Public Template zip."),
+    };
+  }
+
+  if (url.protocol !== "https:") {
+    return {
+      ok: false,
+      issue: issue("url", "Public Template URL installs require an HTTPS URL."),
+    };
+  }
+  if (url.username !== "" || url.password !== "") {
+    return {
+      ok: false,
+      issue: issue(
+        "url",
+        "Public Template URL installs cannot include credentials in the URL.",
+      ),
+    };
+  }
+
+  return { ok: true, url };
+}
+
+export async function installPublicTemplateFromUrl(
+  database: D1Database,
+  bucket: R2Bucket,
+  rawUrl: string,
+): Promise<InstallPublicTemplateResult> {
+  const parsed = parseHttpsTemplateZipUrl(rawUrl);
+  if (!parsed.ok) {
+    return { ok: false, reason: "invalid", issues: [parsed.issue] };
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(parsed.url, {
+      method: "GET",
+      redirect: "follow",
+      signal: AbortSignal.timeout(PUBLIC_TEMPLATE_FETCH_TIMEOUT_MS),
+    });
+  } catch {
+    return downloadFailedResult();
+  }
+
+  const finalUrl = parseHttpsTemplateZipUrl(response.url || parsed.url.href);
+  if (!finalUrl.ok) {
+    return { ok: false, reason: "invalid", issues: [finalUrl.issue] };
+  }
+
+  if (!response.ok) {
+    return downloadFailedResult();
+  }
+
+  let body: Awaited<ReturnType<typeof readResponseBodyWithLimit>>;
+  try {
+    body = await readResponseBodyWithLimit(
+      response,
+      PUBLIC_TEMPLATE_MAXIMUM_ZIP_BYTE_SIZE,
+    );
+  } catch {
+    return downloadFailedResult();
+  }
+  if (!body.ok) {
+    return { ok: false, reason: "invalid", issues: [body.issue] };
+  }
+  if (body.bytes.byteLength === 0) {
+    return downloadFailedResult();
+  }
+
+  return installPublicTemplateFromBytes(database, bucket, body.bytes);
 }
