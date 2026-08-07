@@ -5,6 +5,7 @@ import { createIsomorphicFn } from "@tanstack/react-start";
 import { api, createApiForBindings } from "../api/app.server";
 import { createApiClient } from "../api/client";
 import type { RuntimeBindings } from "../env/runtime.server";
+import { getLocale } from "../paraglide/runtime.js";
 
 const handle = ({
   request,
@@ -33,5 +34,13 @@ export const Route = createFileRoute("/api/$")({
 });
 
 export const getApiClient = createIsomorphicFn()
-  .server(() => treaty(api).api)
+  .server(
+    () =>
+      treaty(api, {
+        // Server-side route loaders call the API in-process. Forward the
+        // already-negotiated locale so localized Site Settings use the same
+        // representation as the surrounding SSR document.
+        headers: () => ({ "accept-language": getLocale() }),
+      }).api,
+  )
   .client(() => createApiClient(globalThis.location.origin));

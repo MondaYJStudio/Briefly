@@ -808,7 +808,7 @@ describe("private Asset media library", () => {
     const html = await response.text();
 
     expect(response.status).toBe(200);
-    expect(html).toContain('<html lang="zh-CN"');
+    expect(html).toContain('<html lang="zh-Hans"');
     expect(html).toContain(">媒体</h1>");
     expect(html).toContain(">上传图片<");
     expect(html).toContain("草稿");

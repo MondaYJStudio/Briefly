@@ -12,6 +12,19 @@ import {
   applicationOriginForRequest,
   requestUsesApplicationOrigin,
 } from "./env/origin.server";
+import {
+  canonicalizeAppLocale,
+  mergeVary,
+  resolveSiteLocale,
+} from "./locales/locale";
+import { normalizeLocalePathUrl } from "./locales/locale-path";
+import { registerParaglideServerLocaleStrategy } from "./locales/paraglide-strategy.server";
+import { deLocalizeUrl } from "./paraglide/runtime.js";
+
+// Register from the Worker entry itself. Keeping this call explicit avoids a
+// bundler/tree-shaking order edge where a side-effect-only strategy module can
+// be evaluated after Paraglide's middleware has captured its strategy table.
+registerParaglideServerLocaleStrategy();
 
 type WorkerBindings = RuntimeBindings;
 
@@ -64,8 +77,13 @@ const worker = {
   async fetch(request, unsafeBindings, context) {
     const requestId = requestIdFor(request);
     const requestUrl = new URL(request.url);
-    const operation =
-      requestUrl.pathname === "/health" ? "health" : "application";
+    // Paraglide/TanStack receive the original URL so their rewrite layer can
+    // render the localized route. Worker-level guards still need the
+    // de-localized pathname; otherwise `/zh-Hans/api/...` could bypass the
+    // authentication/rate-limit branches that correctly protect `/api/...`.
+    const routedUrl = deLocalizeUrl(normalizeLocalePathUrl(requestUrl));
+    const routedPathname = routedUrl.pathname;
+    const operation = routedPathname === "/health" ? "health" : "application";
     const finishResponse = (response: Response, code?: LogCode) => {
       logRequest({
         requestId,
@@ -122,7 +140,7 @@ const worker = {
       let diagnosisCode: LogCode | undefined;
       const authenticationRateLimit = authenticationRateLimitFor(
         request,
-        requestUrl.pathname,
+        routedPathname,
       );
       if (authenticationRateLimit) {
         const { checkAuthenticationRateLimit } =
@@ -195,10 +213,9 @@ const worker = {
         }
       } else if (
         (request.method === "GET" || request.method === "HEAD") &&
-        (requestUrl.pathname === "/admin" ||
-          requestUrl.pathname.startsWith("/admin/")) &&
+        (routedPathname === "/admin" || routedPathname.startsWith("/admin/")) &&
         !["/admin/login", "/admin/setup", "/admin/recovery"].includes(
-          requestUrl.pathname,
+          routedPathname,
         )
       ) {
         const { createAuth } = await import("./auth/auth.server");
@@ -232,7 +249,7 @@ const worker = {
           );
         }
         response.headers.set("cache-control", "no-store");
-      } else if (requestUrl.pathname.startsWith("/api/auth/")) {
+      } else if (routedPathname.startsWith("/api/auth/")) {
         const { handleAuthenticationRequest } =
           await import("./auth/http.server");
         response = withRequestId(
@@ -265,8 +282,50 @@ export default {
     bindings: WorkerBindings,
     context: ExecutionContext,
   ) {
-    return paraglideMiddleware(request as globalThis.Request, () =>
-      worker.fetch(request as never, bindings, context),
+    let middlewareLocale: string | undefined;
+    const response = await paraglideMiddleware(
+      request as globalThis.Request,
+      ({ locale }) => {
+        middlewareLocale = locale;
+        return worker.fetch(request as never, bindings, context);
+      },
+      {
+        effectiveRequestUrl: normalizeLocalePathUrl(new URL(request.url)),
+        onRedirect(response) {
+          response.headers.set(
+            "vary",
+            mergeVary(
+              response.headers.get("vary"),
+              "Accept-Language",
+              "Cookie",
+            ),
+          );
+        },
+      },
     );
+
+    // HTML is also a negotiated representation (the shell and all message
+    // calls use the Paraglide locale). Expose the same cache and language
+    // metadata as the public JSON endpoint so intermediaries and clients do
+    // not mistake a response rendered for one locale for another.
+    if (response.headers.get("content-type")?.includes("text/html")) {
+      const headers = new Headers(response.headers);
+      const locale =
+        canonicalizeAppLocale(middlewareLocale) ??
+        middlewareLocale ??
+        resolveSiteLocale(request);
+      headers.set("content-language", locale);
+      headers.set(
+        "vary",
+        mergeVary(headers.get("vary"), "Accept-Language", "Cookie"),
+      );
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }
+
+    return response;
   },
 } satisfies ExportedHandler<WorkerBindings>;

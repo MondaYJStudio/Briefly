@@ -939,6 +939,14 @@ describe("sole Administrator authentication", () => {
     expect(initializedAnonymousResponse.headers.get("location")).toBe(
       "http://briefly.test/admin/login",
     );
+    const localizedAnonymousResponse = await SELF.fetch(
+      "http://briefly.test/zh-Hans/admin",
+      { redirect: "manual" },
+    );
+    expect(localizedAnonymousResponse.status).toBe(302);
+    expect(localizedAnonymousResponse.headers.get("location")).toBe(
+      "http://briefly.test/admin/login",
+    );
 
     const cookie = cookieFrom(await signIn());
     const authenticatedRedirect = await SELF.fetch(
@@ -980,7 +988,7 @@ describe("sole Administrator authentication", () => {
     );
     expect(preferredResponse.status).toBe(200);
     const preferredHtml = await preferredResponse.text();
-    expect(preferredHtml).toContain('<html lang="zh-CN"');
+    expect(preferredHtml).toContain('<html lang="zh-Hans"');
     expect(preferredHtml).toContain(">登录<");
 
     const cookieResponse = await SELF.fetch("http://briefly.test/admin/login", {

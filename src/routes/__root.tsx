@@ -7,6 +7,8 @@ import {
 } from "@tanstack/react-router";
 
 import stylesheet from "../styles.css?url";
+import "../locales/paraglide-strategy-browser";
+import { canonicalizeAppLocale } from "../locales/registry";
 import { getLocale } from "../paraglide/runtime.js";
 
 export const Route = createRootRoute({
@@ -46,8 +48,10 @@ function RootComponent() {
 }
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
+  const locale = getLocale();
+
   return (
-    <html lang={getLocale()}>
+    <html lang={canonicalizeAppLocale(locale) ?? locale}>
       <head>
         <HeadContent />
       </head>

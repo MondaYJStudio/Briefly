@@ -85,6 +85,7 @@ describe("public Interface Locale routes", () => {
         `UPDATE site_settings
          SET site_name = 'Briefly',
              site_description = 'A modern, self-hosted content engine.',
+             site_descriptions = json_object('en', 'A modern, self-hosted content engine.'),
              default_byline_name = 'Briefly', default_byline_url = NULL,
              default_language = 'en'
          WHERE id = 1`,
@@ -109,7 +110,7 @@ describe("public Interface Locale routes", () => {
     const html = await response.text();
 
     expect(html).toContain('<html lang="en"');
-    expect(html).toMatch(/masthead__name"><a href="\/"/);
+    expect(html).toMatch(/masthead__name[^>]*><a href="\/"/);
     expect(html).not.toContain("Back to home");
     expect(html).toContain("Published");
     const englishDate = html.match(
@@ -147,8 +148,8 @@ describe("public Interface Locale routes", () => {
     expect(response.status).toBe(200);
     const html = await response.text();
 
-    expect(html).toContain('<html lang="zh-CN"');
-    expect(html).toMatch(/masthead__name"><a href="\/zh-CN\/?"/);
+    expect(html).toContain('<html lang="zh-Hans"');
+    expect(html).toMatch(/masthead__name[^>]*><a href="\/zh-Hans\/?"/);
     expect(html).not.toContain("返回首页");
     expect(html).toContain("发布于");
     const chineseDate = html.match(
@@ -156,7 +157,7 @@ describe("public Interface Locale routes", () => {
     );
     expect(chineseDate).toBeTruthy();
     expect(chineseDate![2]).toBe(
-      new Intl.DateTimeFormat("zh-CN", {
+      new Intl.DateTimeFormat("zh-Hans", {
         year: "numeric",
         month: "short",
         day: "numeric",
@@ -176,7 +177,7 @@ describe("public Interface Locale routes", () => {
     const englishHtml = await english.text();
     expect(englishHtml).toContain('<html lang="en"');
     expect(englishHtml).toContain("Article unavailable");
-    expect(englishHtml).toMatch(/masthead__name"><a href="\/"/);
+    expect(englishHtml).toMatch(/masthead__name[^>]*><a href="\/"/);
     expect(englishHtml).not.toContain("Back to home");
 
     const chinese = await SELF.fetch(
@@ -184,9 +185,9 @@ describe("public Interface Locale routes", () => {
     );
     expect(chinese.status).toBe(404);
     const chineseHtml = await chinese.text();
-    expect(chineseHtml).toContain('<html lang="zh-CN"');
+    expect(chineseHtml).toContain('<html lang="zh-Hans"');
     expect(chineseHtml).toContain("文章不可用");
-    expect(chineseHtml).toMatch(/masthead__name"><a href="\/zh-CN\/?"/);
+    expect(chineseHtml).toMatch(/masthead__name[^>]*><a href="\/zh-Hans\/?"/);
     expect(chineseHtml).not.toContain("返回首页");
   });
 
@@ -202,7 +203,7 @@ describe("public Interface Locale routes", () => {
     const chinese = await SELF.fetch("http://briefly.test/zh-CN");
     expect(chinese.status).toBe(200);
     const chineseHtml = await chinese.text();
-    expect(chineseHtml).toContain('<html lang="zh-CN"');
+    expect(chineseHtml).toContain('<html lang="zh-Hans"');
     expect(chineseHtml).toContain("核心机制");
     expect(chineseHtml).toContain("还没有发布的文章。");
     expect(chineseHtml).not.toContain("How it works");

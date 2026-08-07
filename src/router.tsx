@@ -1,21 +1,31 @@
 import { createRouter } from "@tanstack/react-router";
 
-import { deLocalizeUrl, localizeUrl } from "./paraglide/runtime.js";
+import { normalizeLocalePathUrl } from "./locales/locale-path";
+import { deLocalizeUrl, localizeUrl, locales } from "./paraglide/runtime.js";
 import { routeTree } from "./routeTree.gen";
 
 function isPrivatePath(pathname: string): boolean {
   return (
     pathname === "/admin" ||
     pathname.startsWith("/admin/") ||
+    pathname === "/api" ||
     pathname.startsWith("/api/") ||
+    pathname === "/media" ||
     pathname.startsWith("/media/") ||
-    pathname === "/health"
+    pathname === "/health" ||
+    pathname.startsWith("/health/")
   );
 }
 
 function rewriteInputUrl(url: URL): URL {
-  if (url.pathname === "/zh-CN" || url.pathname.startsWith("/zh-CN/")) {
-    return deLocalizeUrl(url);
+  const normalizedUrl = normalizeLocalePathUrl(url);
+  const firstSegment = normalizedUrl.pathname.split("/")[1];
+  if (
+    (locales as readonly string[]).some(
+      (locale) => locale.toLowerCase() === firstSegment?.toLowerCase(),
+    )
+  ) {
+    return deLocalizeUrl(normalizedUrl);
   }
   return url;
 }
