@@ -14,6 +14,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminArticlesRouteImport } from './routes/admin/articles'
 import { Route as AdminMediaRouteImport } from './routes/admin/media'
+import { Route as AdminPublicTemplatesRouteImport } from './routes/admin/public-templates'
 import { Route as AdminTrashRouteImport } from './routes/admin/trash'
 import { Route as AdminLoginRouteImport } from './routes/admin_.login'
 import { Route as AdminRecoveryRouteImport } from './routes/admin_.recovery'
@@ -48,6 +49,11 @@ const AdminArticlesRoute = AdminArticlesRouteImport.update({
 const AdminMediaRoute = AdminMediaRouteImport.update({
   id: '/media',
   path: '/media',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPublicTemplatesRoute = AdminPublicTemplatesRouteImport.update({
+  id: '/public-templates',
+  path: '/public-templates',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminTrashRoute = AdminTrashRouteImport.update({
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/admin/articles': typeof AdminArticlesRouteWithChildren
   '/admin/media': typeof AdminMediaRoute
+  '/admin/public-templates': typeof AdminPublicTemplatesRoute
   '/admin/trash': typeof AdminTrashRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/recovery': typeof AdminRecoveryRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin/media': typeof AdminMediaRoute
+  '/admin/public-templates': typeof AdminPublicTemplatesRoute
   '/admin/trash': typeof AdminTrashRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/recovery': typeof AdminRecoveryRoute
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/admin/articles': typeof AdminArticlesRouteWithChildren
   '/admin/media': typeof AdminMediaRoute
+  '/admin/public-templates': typeof AdminPublicTemplatesRoute
   '/admin/trash': typeof AdminTrashRoute
   '/admin_/login': typeof AdminLoginRoute
   '/admin_/recovery': typeof AdminRecoveryRoute
@@ -158,6 +167,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin/articles'
     | '/admin/media'
+    | '/admin/public-templates'
     | '/admin/trash'
     | '/admin/login'
     | '/admin/recovery'
@@ -173,6 +183,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin/media'
+    | '/admin/public-templates'
     | '/admin/trash'
     | '/admin/login'
     | '/admin/recovery'
@@ -190,6 +201,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin/articles'
     | '/admin/media'
+    | '/admin/public-templates'
     | '/admin/trash'
     | '/admin_/login'
     | '/admin_/recovery'
@@ -250,6 +262,13 @@ declare module '@tanstack/react-router' {
       path: '/media'
       fullPath: '/admin/media'
       preLoaderRoute: typeof AdminMediaRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/public-templates': {
+      id: '/admin/public-templates'
+      path: '/public-templates'
+      fullPath: '/admin/public-templates'
+      preLoaderRoute: typeof AdminPublicTemplatesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/trash': {
@@ -342,6 +361,7 @@ const AdminArticlesRouteWithChildren = AdminArticlesRoute._addFileChildren(
 interface AdminRouteChildren {
   AdminArticlesRoute: typeof AdminArticlesRouteWithChildren
   AdminMediaRoute: typeof AdminMediaRoute
+  AdminPublicTemplatesRoute: typeof AdminPublicTemplatesRoute
   AdminTrashRoute: typeof AdminTrashRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -349,6 +369,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminArticlesRoute: AdminArticlesRouteWithChildren,
   AdminMediaRoute: AdminMediaRoute,
+  AdminPublicTemplatesRoute: AdminPublicTemplatesRoute,
   AdminTrashRoute: AdminTrashRoute,
   AdminIndexRoute: AdminIndexRoute,
 }

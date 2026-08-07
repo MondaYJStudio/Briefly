@@ -8,6 +8,7 @@ export default defineConfig({
     "critical-journey.spec.ts",
     "settings-account-drawers.spec.ts",
     "reference-acceptance.spec.ts",
+    "public-templates-admin.spec.ts",
   ],
   fullyParallel: false,
   workers: 1,

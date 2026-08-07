@@ -1,0 +1,145 @@
+.pageTitle {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.pageDesc {
+  color: var(--foreground-muted);
+  max-width: 46rem;
+}
+
+.list {
+  list-style: none;
+}
+
+.row {
+  border-bottom: 1px solid var(--divider);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.title {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.meta {
+  color: var(--foreground-muted);
+}
+
+.card {
+  background: var(--content1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-s);
+}
+
+.note {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--content2);
+  color: var(--foreground-muted);
+}
+
+.emptyIcon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-l);
+  background: var(--content2);
+  color: var(--foreground-faint);
+}
+
+.emptyIconDanger {
+  background: var(--danger-soft-bg);
+  color: var(--danger-strong);
+}
+
+.emptyTitle {
+  font-weight: 600;
+}
+
+.emptyCopy {
+  color: var(--foreground-muted);
+  max-width: 26rem;
+}
+
+.skeletonRow {
+  border-bottom: 1px solid var(--divider);
+}
+
+.skeletonRow:last-child {
+  border-bottom: 0;
+}
+
+.skeleton {
+  border-radius: var(--radius-s);
+  background: linear-gradient(
+    90deg,
+    var(--content2) 25%,
+    var(--content3) 50%,
+    var(--content2) 75%
+  );
+  background-size: 200% 100%;
+  animation: briefly-shimmer 1.4s var(--ease-in-out) infinite;
+}
+
+@keyframes briefly-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+.dropzone {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-m);
+  background: var(--content2);
+  color: var(--foreground-muted);
+}
+
+.dropzoneInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.dropzoneTitle {
+  color: var(--foreground);
+  font-weight: 550;
+}
+
+.dropzoneFile {
+  color: var(--foreground);
+  font-weight: 550;
+}
+
+@media (max-width: 860px) {
+  .row,
+  .skeletonRow {
+    flex-direction: column;
+  }
+
+  .side,
+  .skeletonSide {
+    width: 100%;
+  }
+
+  .side :global(button) {
+    flex: 1;
+  }
+
+  .skeletonSide .skeleton {
+    flex: 1;
+  }
+}
