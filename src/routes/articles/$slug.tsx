@@ -95,14 +95,14 @@ function ArticlePage() {
             className="article-header reveal pt-8 pb-8"
             style={revealStyle(1)}
           >
-            <h1 className="article-header__title text-2xl sm:text-4xl tracking-tight">
+            <h1 className="article-header__title text-[clamp(1.5rem,4.5vw,1.875rem)] tracking-tight">
               {article.title}
             </h1>
             <hr
               className="article-header__rule block mt-5 w-10"
               aria-hidden="true"
             />
-            <p className="article-header__meta flex flex-wrap items-baseline gap-2 mt-4 text-sm">
+            <p className="article-header__meta flex flex-wrap items-baseline gap-2 text-sm">
               <span>
                 {article.byline.url ? (
                   <a
@@ -151,7 +151,7 @@ function ArticlePage() {
               ) : null}
             </p>
             {article.summary ? (
-              <p className="article-header__summary mt-6 py-4 px-5 text-sm">
+              <p className="article-header__summary py-4 px-5 text-sm">
                 {article.summary}
               </p>
             ) : null}

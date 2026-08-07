@@ -171,13 +171,17 @@
 
 .public-site .masthead__name {
   font-family: var(--font-display);
-  font-size: var(--text-masthead);
   font-weight: 600;
   letter-spacing: -0.015em;
   line-height: 1.05;
   font-style: normal;
   overflow-wrap: anywhere;
   min-width: 0;
+}
+
+/* Home only — fluid brand size beats utility text-* on the name */
+.public-site .masthead:not(.masthead--compact) .masthead__name {
+  font-size: var(--text-masthead);
 }
 
 .public-site .masthead__name a {
@@ -516,6 +520,8 @@
 }
 
 .public-site .article-header__meta {
+  /* Beats `.public-site p { margin: 0 }` — utilities lose on that reset */
+  margin-block-start: 1rem;
   font-family: var(--font-body);
   line-height: 1.5;
   color: var(--foreground-muted);
@@ -555,6 +561,7 @@
 }
 
 .public-site .article-header__summary {
+  margin-block-start: 1.5rem;
   border-radius: var(--radius-s);
   background: color-mix(in oklch, var(--foreground) 4%, transparent);
   font-family: var(--font-display);

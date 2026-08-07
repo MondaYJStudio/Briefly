@@ -129,11 +129,11 @@ export function PublicSiteShell({
       <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       <div className="page flex flex-col">
         <header
-          className={`masthead reveal grid justify-items-center gap-2 pt-10 pb-6 text-center max-[860px]:pt-8${
+          className={
             variant === "interior"
-              ? " masthead--compact flex items-center justify-between gap-4 py-5 text-start justify-items-stretch"
-              : ""
-          }`}
+              ? "masthead masthead--compact reveal flex items-center justify-between gap-4 py-5 text-start"
+              : "masthead reveal grid justify-items-center gap-2 pt-10 pb-6 text-center max-[860px]:pt-8"
+          }
           style={revealStyle(0)}
         >
           {issueLine ? (
