@@ -2,7 +2,12 @@ import { Link } from "@tanstack/react-router";
 import { type CSSProperties, type ReactNode, useState } from "react";
 
 import { m } from "../../paraglide/messages.js";
-import { getLocale, setLocale, type Locale } from "../../paraglide/runtime.js";
+import { getLocale, setLocale } from "../../paraglide/runtime.js";
+import {
+  APP_LOCALE_OPTIONS,
+  canonicalizeAppLocale,
+} from "../../locales/registry";
+import { useHydrated } from "../../locales/use-hydrated";
 
 export type PublicTheme = "light" | "dark";
 
@@ -87,8 +92,10 @@ export function PublicSiteShell({
   children: ReactNode;
 }>) {
   const [theme, setTheme] = useState<PublicTheme>(initialTheme);
+  const hydrated = useHydrated();
   const dark = theme === "dark";
   const locale = getLocale();
+  const selectedLocale = canonicalizeAppLocale(locale) ?? locale;
 
   function toggleTheme() {
     setTheme((current) => {
@@ -102,9 +109,14 @@ export function PublicSiteShell({
     });
   }
 
-  function switchLocale(next: Locale) {
-    if (next === locale) return;
-    setLocale(next);
+  function switchLocale(next: string) {
+    const normalized = canonicalizeAppLocale(next);
+    if (!normalized) return;
+    // Always persist an explicit choice, including when it happens to match
+    // the locale inferred from the browser. The generated runtime avoids a
+    // reload when the locale is unchanged, while the cookie then protects
+    // the choice if the browser's language preferences change later.
+    setLocale(normalized);
   }
 
   const name = (
@@ -126,7 +138,7 @@ export function PublicSiteShell({
     <div
       className="public-site text-base leading-[1.65]"
       data-theme={theme}
-      lang={locale}
+      lang={selectedLocale}
     >
       <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       <div className="page flex flex-col">
@@ -200,7 +212,7 @@ export function PublicSiteShell({
           style={revealStyle(5)}
         >
           <div className="colophon__row flex flex-wrap items-center justify-between gap-y-3 gap-x-6">
-            <p className="text-xs font-[family-name:var(--font-outlier)]">
+            <p className="text-xs">
               {m.public_powered_by()}{" "}
               <a href="https://github.com/MondaYJStudio/Briefly">Briefly</a>
             </p>
@@ -208,12 +220,24 @@ export function PublicSiteShell({
               <span className="sr-only">{m.interface_language()}</span>
               <select
                 className="text-xs"
-                value={locale}
+                value={selectedLocale}
                 aria-label={m.interface_language()}
-                onChange={(event) => switchLocale(event.target.value as Locale)}
+                disabled={!hydrated}
+                onChange={(event) => switchLocale(event.target.value)}
               >
-                <option value="en">{m.switch_to_english()}</option>
-                <option value="zh-CN">{m.switch_to_zh_cn()}</option>
+                {/* Accept legacy form values, but normalize them to zh-Hans. */}
+                <option value="zh-CN" hidden>
+                  {m.switch_to_zh_cn()}
+                </option>
+                {APP_LOCALE_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.id === "en"
+                      ? m.switch_to_english()
+                      : option.id === "zh-Hans"
+                        ? m.switch_to_zh_cn()
+                        : option.label}
+                  </option>
+                ))}
               </select>
             </label>
           </div>

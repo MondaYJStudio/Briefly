@@ -68,9 +68,62 @@
   min-height: 2.75rem;
 }
 
-.languageDetail {
-  color: var(--foreground-faint);
-  font-family: var(--font-mono);
+.descriptionLocaleTabs {
+  margin: 0;
+}
+
+.descriptionLocaleTab {
+  padding: 0.4rem 0.65rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 550;
+  line-height: 1.2;
+  color: var(--foreground-muted);
+  border-radius: var(--radius-m);
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .descriptionLocaleTab {
+    transition: none;
+  }
+}
+
+.descriptionLocaleTab[aria-selected="true"] {
+  color: var(--foreground);
+  background: var(--content2);
+}
+
+.descriptionLocaleTab[data-invalid="true"] {
+  color: var(--danger);
+}
+
+.descriptionLocaleTab[aria-selected="true"][data-invalid="true"] {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, var(--content2));
+}
+
+.descriptionLocaleMark {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 999px;
+  background: var(--foreground-faint);
+  flex-shrink: 0;
+}
+
+.descriptionLocaleTab[data-invalid="true"] .descriptionLocaleMark {
+  background: var(--danger);
+}
+
+.descriptionLocaleTab[aria-selected="true"]:not([data-invalid="true"])
+  .descriptionLocaleMark {
+  background: var(--primary);
+}
+
+.descriptionTextArea {
+  min-height: 5.5rem;
 }
 
 .retryInAlert :global(button:last-child) {

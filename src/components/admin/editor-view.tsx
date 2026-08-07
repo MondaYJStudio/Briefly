@@ -31,12 +31,12 @@ import {
   type VerifiedAssetPickerState,
 } from "../../assets/verified-asset-picker";
 import { m } from "../../paraglide/messages.js";
+import { APP_LOCALE_OPTIONS } from "../../locales/registry";
 import { getApiClient } from "../../routes/api.$";
 import type { SiteSettings } from "../../site-settings/site-settings";
 import styles from "./editor-view.module.css";
 import { SettingsField } from "./fields";
 import { AdminIcon } from "./icons";
-import { LANGUAGE_OPTIONS } from "./language-options";
 import {
   localizePublicationIssue,
   localizeRestorationIssue,
@@ -537,6 +537,22 @@ function EditorRail({
   const [subTab, setSubTab] = useState<"basic" | "advanced">("basic");
   if (!selected) return null;
   const draft = selected.draft;
+  const articleLanguageOptions: ReadonlyArray<{
+    id: string;
+    label: string;
+    detail: string;
+  }> =
+    draft.language &&
+    !APP_LOCALE_OPTIONS.some((language) => language.id === draft.language)
+      ? [
+          {
+            id: draft.language,
+            label: draft.language,
+            detail: draft.language,
+          },
+          ...APP_LOCALE_OPTIONS,
+        ]
+      : APP_LOCALE_OPTIONS;
   const hasCurrentPublication = selected.currentPublicationId !== null;
   const currentPublication = publicationHistory.find(
     (publication) => publication.isCurrent,
@@ -916,15 +932,15 @@ function EditorRail({
                         >
                           {m.inherit_default_language()}
                         </ListBox.Item>
-                        {LANGUAGE_OPTIONS.map((language) => (
+                        {articleLanguageOptions.map((language) => (
                           <ListBox.Item
                             key={language.id}
                             id={language.id}
-                            className="briefly-language-option flex items-center gap-4"
+                            className="briefly-language-option flex w-full items-center justify-between gap-4"
                             textValue={`${language.label} (${language.detail})`}
                           >
                             <span>{language.label}</span>
-                            <span className="briefly-select-detail text-xs mono">
+                            <span className="briefly-select-detail text-xs">
                               {language.detail}
                             </span>
                           </ListBox.Item>

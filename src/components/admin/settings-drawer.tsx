@@ -18,6 +18,13 @@ import {
 } from "react";
 
 import { m } from "../../paraglide/messages.js";
+import { getLocale } from "../../paraglide/runtime.js";
+import {
+  APP_LOCALE_OPTIONS,
+  type AppLocale,
+  canonicalizeAppLocale,
+  DEFAULT_APP_LOCALE,
+} from "../../locales/registry";
 import { getApiClient } from "../../routes/api.$";
 import {
   BYLINE_NAME_MAXIMUM_LENGTH,
@@ -28,7 +35,6 @@ import {
 } from "../../site-settings/site-settings";
 import { AdminIcon } from "./icons";
 import { SettingsField } from "./fields";
-import { LANGUAGE_OPTIONS } from "./language-options";
 import styles from "./settings-drawer.module.css";
 
 interface SettingsDrawerProps {
@@ -42,6 +48,13 @@ type SettingsState =
   "loading" | "ready" | "submitting" | "saved" | "failed" | "load-failed";
 
 function localizeIssue(path: string, message: string): string {
+  if (path.startsWith("siteDescriptions.")) {
+    return /use at most \d+ characters\.?$/iu.test(message)
+      ? m.site_description_too_long({
+          maximum: SITE_DESCRIPTION_MAXIMUM_LENGTH,
+        })
+      : m.invalid_site_description();
+  }
   switch (path) {
     case "siteName":
       return m.enter_site_name();
@@ -56,6 +69,24 @@ function localizeIssue(path: string, message: string): string {
   }
 }
 
+function siteDescriptionValue(
+  settings: SiteSettings,
+  locale: AppLocale,
+): string {
+  const hasLocalizedValue = Object.prototype.hasOwnProperty.call(
+    settings.siteDescriptions ?? {},
+    locale,
+  );
+  if (hasLocalizedValue) {
+    return settings.siteDescriptions?.[locale] ?? "";
+  }
+  return locale === "en" ? (settings.siteDescription ?? "") : "";
+}
+
+function initialDescriptionLocale(): AppLocale {
+  return canonicalizeAppLocale(getLocale()) ?? DEFAULT_APP_LOCALE;
+}
+
 function LoadingState() {
   return (
     <div
@@ -65,24 +96,14 @@ function LoadingState() {
     >
       <div className={`${styles.card} p-5`}>
         <div className={`${styles.skeleton} ${styles.skeletonTitle}`} />
-        <div
-          className={`${styles.skeleton} ${styles.skeletonInput} mt-4`}
-        />
-        <div
-          className={`${styles.skeleton} ${styles.skeletonArea} mt-4`}
-        />
+        <div className={`${styles.skeleton} ${styles.skeletonInput} mt-4`} />
+        <div className={`${styles.skeleton} ${styles.skeletonArea} mt-4`} />
       </div>
       <div className={`${styles.card} p-5`}>
         <div className={`${styles.skeleton} ${styles.skeletonWideTitle}`} />
-        <div
-          className={`${styles.skeleton} ${styles.skeletonInput} mt-4`}
-        />
-        <div
-          className={`${styles.skeleton} ${styles.skeletonInput} mt-4`}
-        />
-        <div
-          className={`${styles.skeleton} ${styles.skeletonPartial} mt-4`}
-        />
+        <div className={`${styles.skeleton} ${styles.skeletonInput} mt-4`} />
+        <div className={`${styles.skeleton} ${styles.skeletonInput} mt-4`} />
+        <div className={`${styles.skeleton} ${styles.skeletonPartial} mt-4`} />
       </div>
     </div>
   );
@@ -90,6 +111,108 @@ function LoadingState() {
 
 function SettingsCard({ children }: Readonly<{ children: ReactNode }>) {
   return <section className={`${styles.card} p-5`}>{children}</section>;
+}
+
+function SiteDescriptionField({
+  settings,
+  descriptionLocale,
+  onDescriptionLocaleChange,
+  issueByPath,
+  onChange,
+}: Readonly<{
+  settings: SiteSettings;
+  descriptionLocale: AppLocale;
+  onDescriptionLocaleChange: (locale: AppLocale) => void;
+  issueByPath: ReadonlyMap<string, string>;
+  onChange: (next: SiteSettings) => void;
+}>) {
+  const activeOption =
+    APP_LOCALE_OPTIONS.find((option) => option.id === descriptionLocale) ??
+    APP_LOCALE_OPTIONS[0];
+  const fieldId = `siteDescription-${activeOption.id}`;
+  const activeIssuePath = `siteDescriptions.${activeOption.id}`;
+  const value = siteDescriptionValue(settings, activeOption.id);
+
+  return (
+    <SettingsField
+      label={m.site_description()}
+      htmlFor={fieldId}
+      optional={m.optional()}
+      issues={
+        issueByPath.has(activeIssuePath)
+          ? [issueByPath.get(activeIssuePath)!]
+          : []
+      }
+    >
+      <div
+        className={`${styles.descriptionLocaleTabs} flex flex-wrap gap-1 mb-2`}
+        role="tablist"
+        aria-label={m.site_description_languages()}
+      >
+        {APP_LOCALE_OPTIONS.map((option) => {
+          const filled =
+            siteDescriptionValue(settings, option.id).trim().length > 0;
+          const invalid = issueByPath.has(`siteDescriptions.${option.id}`);
+          return (
+            <button
+              key={option.id}
+              id={`siteDescription-tab-${option.id}`}
+              type="button"
+              role="tab"
+              className={`${styles.descriptionLocaleTab} inline-flex items-center border-0 bg-transparent cursor-pointer gap-1.5`}
+              aria-selected={option.id === activeOption.id}
+              aria-controls={`siteDescription-panel-${option.id}`}
+              data-invalid={invalid || undefined}
+              onClick={() => onDescriptionLocaleChange(option.id)}
+            >
+              <span>{option.label}</span>
+              {filled || invalid ? (
+                <span
+                  className={styles.descriptionLocaleMark}
+                  aria-hidden="true"
+                />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+      <div
+        id={`siteDescription-panel-${activeOption.id}`}
+        role="tabpanel"
+        aria-labelledby={`siteDescription-tab-${activeOption.id}`}
+      >
+        <TextArea
+          fullWidth
+          className={styles.descriptionTextArea}
+          id={fieldId}
+          name={fieldId}
+          maxLength={SITE_DESCRIPTION_MAXIMUM_LENGTH}
+          aria-invalid={issueByPath.has(activeIssuePath)}
+          aria-describedby={
+            issueByPath.has(activeIssuePath) ? `${fieldId}-error` : undefined
+          }
+          value={value}
+          onChange={(e) => {
+            // An empty string is an intentional blank for this locale; the
+            // API also accepts null when a caller wants the normal English
+            // fallback.
+            const nextValue = e.target.value;
+            onChange({
+              ...settings,
+              siteDescription:
+                activeOption.id === "en"
+                  ? nextValue
+                  : settings.siteDescription,
+              siteDescriptions: {
+                ...settings.siteDescriptions,
+                [activeOption.id]: nextValue,
+              },
+            });
+          }}
+        />
+      </div>
+    </SettingsField>
+  );
 }
 
 export function SettingsDrawer({
@@ -102,12 +225,16 @@ export function SettingsDrawer({
   const [issues, setIssues] = useState<
     ReadonlyArray<{ path: string; message: string }>
   >([]);
+  const [descriptionLocale, setDescriptionLocale] = useState<AppLocale>(
+    initialDescriptionLocale,
+  );
 
   useEffect(() => {
     if (!open) return;
     let active = true;
     setState("loading");
     setIssues([]);
+    setDescriptionLocale(initialDescriptionLocale());
     void getApiClient()
       .admin["site-settings"].get()
       .then((response) => {
@@ -138,6 +265,13 @@ export function SettingsDrawer({
       ),
     [issues],
   );
+
+  useEffect(() => {
+    const firstInvalid = APP_LOCALE_OPTIONS.find((option) =>
+      issueByPath.has(`siteDescriptions.${option.id}`),
+    );
+    if (firstInvalid) setDescriptionLocale(firstInvalid.id);
+  }, [issueByPath]);
 
   function update(next: SiteSettings) {
     onSettingsChange(next);
@@ -172,10 +306,16 @@ export function SettingsDrawer({
 
   const disabled = state === "submitting";
   const hasValidation = issues.length > 0;
-  const languageOptions = LANGUAGE_OPTIONS.some(
+  // Site Settings share the Application Locale Registry with localized
+  // descriptions.
+  const languageOptions: ReadonlyArray<{
+    id: string;
+    label: string;
+    detail: string;
+  }> = APP_LOCALE_OPTIONS.some(
     (language) => language.id === settings?.defaultLanguage,
   )
-    ? LANGUAGE_OPTIONS
+    ? APP_LOCALE_OPTIONS
     : settings
       ? [
           {
@@ -183,18 +323,16 @@ export function SettingsDrawer({
             label: settings.defaultLanguage,
             detail: settings.defaultLanguage,
           },
-          ...LANGUAGE_OPTIONS,
+          ...APP_LOCALE_OPTIONS,
         ]
-      : LANGUAGE_OPTIONS;
+      : APP_LOCALE_OPTIONS;
 
   return (
     <Drawer.Backdrop isOpen={open} onOpenChange={onOpenChange}>
       <Drawer.Content placement="right" className="briefly-drawer-wide">
         <Drawer.Dialog aria-label={m.settings_menu()}>
           <Drawer.Header>
-            <div
-              className={`flex w-full items-center justify-between gap-3`}
-            >
+            <div className={`flex w-full items-center justify-between gap-3`}>
               <div>
                 <Drawer.Heading>
                   <strong>{m.settings_menu()}</strong>
@@ -324,25 +462,13 @@ export function SettingsDrawer({
                         }
                       />
                     </SettingsField>
-                    <SettingsField
-                      label={m.site_description()}
-                      htmlFor="siteDescription"
-                      optional={m.optional()}
-                    >
-                      <TextArea
-                        fullWidth
-                        id="siteDescription"
-                        name="siteDescription"
-                        maxLength={SITE_DESCRIPTION_MAXIMUM_LENGTH}
-                        value={settings.siteDescription ?? ""}
-                        onChange={(e) =>
-                          update({
-                            ...settings,
-                            siteDescription: e.target.value || null,
-                          })
-                        }
-                      />
-                    </SettingsField>
+                    <SiteDescriptionField
+                      settings={settings}
+                      descriptionLocale={descriptionLocale}
+                      onDescriptionLocaleChange={setDescriptionLocale}
+                      issueByPath={issueByPath}
+                      onChange={update}
+                    />
                   </div>
                 </SettingsCard>
 
@@ -352,9 +478,7 @@ export function SettingsDrawer({
                   >
                     {m.default_public_identity()}
                   </h2>
-                  <p
-                    className={`text-xs muted -mt-3 mx-0 mb-5`}
-                  >
+                  <p className={`text-xs muted -mt-3 mx-0 mb-5`}>
                     {m.default_public_identity_description()}
                   </p>
                   <div className={`flex flex-col gap-5`}>
@@ -454,7 +578,7 @@ export function SettingsDrawer({
                         }}
                       >
                         <Select.Trigger
-                          className={`${styles.languageTrigger} py-2`}
+                          className={`${styles.languageTrigger} briefly-language-trigger flex items-center`}
                         >
                           <Select.Value />
                           <Select.Indicator />
@@ -465,13 +589,11 @@ export function SettingsDrawer({
                               <ListBox.Item
                                 key={language.id}
                                 id={language.id}
-                                className={`flex w-full items-center justify-between gap-3`}
+                                className="briefly-language-option flex w-full items-center justify-between gap-4"
                                 textValue={`${language.label} (${language.detail})`}
                               >
                                 <span>{language.label}</span>
-                                <span
-                                  className={`${styles.languageDetail} text-xs`}
-                                >
+                                <span className="briefly-select-detail text-xs">
                                   {language.detail}
                                 </span>
                               </ListBox.Item>
@@ -491,25 +613,27 @@ export function SettingsDrawer({
                   <div>{m.public_content_note()}</div>
                 </div>
                 <div
-                  className={`${styles.actions} flex flex-wrap items-center justify-end gap-3`}
+                  className={`${styles.actions} flex flex-wrap items-center justify-between gap-3`}
                 >
-                  {state === "submitting" ? (
-                    <span
-                      className={`${styles.saveState} inline-flex items-center text-sm gap-2`}
-                      role="status"
-                    >
-                      <Spinner size="sm" />
-                      {m.saving()}
-                    </span>
-                  ) : state === "saved" ? (
-                    <span
-                      className={`${styles.saveState} ${styles.saveStateOk}`}
-                      role="status"
-                    >
-                      <AdminIcon name="check" />
-                      {m.all_changes_saved()}
-                    </span>
-                  ) : null}
+                  <div className="min-w-0">
+                    {state === "submitting" ? (
+                      <span
+                        className={`${styles.saveState} inline-flex items-center text-sm gap-2`}
+                        role="status"
+                      >
+                        <Spinner size="sm" />
+                        {m.saving()}
+                      </span>
+                    ) : state === "saved" ? (
+                      <span
+                        className={`${styles.saveState} ${styles.saveStateOk} inline-flex items-center text-sm gap-2`}
+                        role="status"
+                      >
+                        <AdminIcon name="check" />
+                        {m.all_changes_saved()}
+                      </span>
+                    ) : null}
+                  </div>
                   <Button type="submit" isPending={disabled}>
                     {disabled ? m.saving() : m.save_changes()}
                   </Button>

@@ -4,6 +4,11 @@ import { type ReactNode, useEffect } from "react";
 
 import { getLocale, setLocale } from "../../paraglide/runtime.js";
 import { m } from "../../paraglide/messages.js";
+import {
+  APP_LOCALE_OPTIONS,
+  canonicalizeAppLocale,
+} from "../../locales/registry";
+import { useHydrated } from "../../locales/use-hydrated";
 import { AdminIcon } from "./icons";
 import styles from "./admin-shell.module.css";
 
@@ -60,6 +65,8 @@ export function AdminShell({
     matchRoute({ to: "/admin/articles/$articleId", fuzzy: true }),
   );
   const locale = getLocale();
+  const hydrated = useHydrated();
+  const selectedLocale = canonicalizeAppLocale(locale) ?? (locale as string);
   const { email, initials } = identity;
 
   useEffect(() => {
@@ -221,7 +228,11 @@ export function AdminShell({
                   </span>
                 </Dropdown.Item>
                 <Dropdown.SubmenuTrigger>
-                  <Dropdown.Item id="locale" textValue={m.interface_language()}>
+                  <Dropdown.Item
+                    id="locale"
+                    textValue={m.interface_language()}
+                    isDisabled={!hydrated}
+                  >
                     <span
                       className={`${styles.menuRow} flex w-full min-w-0 items-center`}
                     >
@@ -236,23 +247,28 @@ export function AdminShell({
                     <Dropdown.Menu
                       aria-label={m.interface_language()}
                       selectionMode="single"
-                      selectedKeys={new Set([locale])}
+                      selectedKeys={new Set([selectedLocale])}
                       onSelectionChange={(keys) => {
                         if (keys === "all") return;
                         const next = keys.values().next().value;
-                        if (next === "en" || next === "zh-CN") {
-                          setLocale(next);
-                        }
+                        const normalized = canonicalizeAppLocale(next);
+                        if (normalized) setLocale(normalized);
                       }}
                     >
-                      <Dropdown.Item id="en" textValue={m.switch_to_english()}>
-                        <Dropdown.ItemIndicator />
-                        {m.switch_to_english()}
-                      </Dropdown.Item>
-                      <Dropdown.Item id="zh-CN" textValue={m.switch_to_zh_cn()}>
-                        <Dropdown.ItemIndicator />
-                        {m.switch_to_zh_cn()}
-                      </Dropdown.Item>
+                      {APP_LOCALE_OPTIONS.map((option) => (
+                        <Dropdown.Item
+                          key={option.id}
+                          id={option.id}
+                          textValue={option.label}
+                        >
+                          <Dropdown.ItemIndicator />
+                          {option.id === "en"
+                            ? m.switch_to_english()
+                            : option.id === "zh-Hans"
+                              ? m.switch_to_zh_cn()
+                              : option.label}
+                        </Dropdown.Item>
+                      ))}
                     </Dropdown.Menu>
                   </Dropdown.Popover>
                 </Dropdown.SubmenuTrigger>

@@ -1,33 +1,197 @@
 .description {
   margin-top: 2px;
+  max-width: 36rem;
+  line-height: 1.45;
 }
 
 .card {
   background: var(--content1);
   border: 1px solid var(--border);
   border-radius: var(--radius-l);
+  padding: 1.25rem;
 }
 
 .sectionTitle {
-  font-weight: 700;
-}
-
-.sectionLead {
-  font-weight: 700;
-}
-
-.sessionLabel {
-  font-weight: 600;
-}
-
-.muted {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
   color: var(--foreground-muted);
 }
 
+.sectionLead {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--foreground-muted);
+}
+
+.sectionCopy {
+  margin: 0 0 1.25rem;
+  max-width: 38rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--foreground-muted);
+}
+
+.warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--content2);
+  color: var(--foreground-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.warningIcon {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  color: var(--foreground);
+}
+
+.sessionLabel {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.sessionCopy {
+  margin: 0.25rem 0 0;
+  max-width: 26rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--foreground-muted);
+}
+
+.sessionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sessionAction {
+  flex-shrink: 0;
+  min-height: 2.75rem;
+}
+
+.readonlyInput {
+  color: var(--foreground-muted);
+  background: var(--content2);
+  cursor: default;
+}
+
 .hint {
-  color: var(--foreground-faint);
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--foreground-muted);
 }
 
 .fieldError {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
   color: var(--danger);
+}
+
+.passwordField {
+  position: relative;
+}
+
+.passwordToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--foreground-muted);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+
+.passwordToggle:hover {
+  color: var(--foreground);
+  background: var(--hover);
+}
+
+.passwordToggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.meter {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.meterTrack {
+  height: 0.25rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--content3);
+}
+
+.meterFill {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--foreground-faint);
+  transition:
+    width var(--dur-med) var(--ease-out),
+    background-color var(--dur-med) var(--ease-out);
+}
+
+.meterFill[data-ready="true"] {
+  background: var(--success-strong);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+}
+
+@media (max-width: 480px) {
+  .sessionRow {
+    align-items: stretch;
+  }
+
+  .sessionAction {
+    width: 100%;
+  }
+
+  .actions {
+    justify-content: stretch;
+  }
+
+  .actions :global(button) {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .passwordToggle,
+  .meterFill {
+    transition: none;
+  }
 }

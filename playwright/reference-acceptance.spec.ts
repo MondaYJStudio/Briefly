@@ -534,7 +534,7 @@ test("Trash purge success shows the permanent deletion empty state", async ({
   await expect(page.getByText(title, { exact: true })).toHaveCount(0);
 });
 
-test("Articles heading uses zh-CN glossary on the Articles page", async ({
+test("Articles heading uses zh-Hans glossary on the Articles page", async ({
   browser,
 }) => {
   const context = await browser.newContext({

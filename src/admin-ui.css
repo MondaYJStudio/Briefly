@@ -432,7 +432,9 @@ html[data-theme="dark"],
 .briefly-select-detail {
   margin-left: auto;
   color: var(--foreground-faint);
+  font-family: var(--font-mono);
 }
+/* Keep the closed trigger to the language name only. */
 .briefly-language-trigger .briefly-select-detail {
   display: none;
 }

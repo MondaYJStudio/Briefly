@@ -84,12 +84,11 @@ test("Interface Locale fallback and switching keep SSR and hydration aligned", a
   });
 
   const response = await page.goto("/admin/login");
-  expect(await response?.text()).toContain('<html lang="zh-CN"');
-  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  expect(await response?.text()).toContain('<html lang="zh-Hans"');
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-Hans");
   await expect(page.getByRole("heading", { name: "登录" })).toBeVisible();
-
   await page.getByLabel("界面语言").click();
-  await page.getByRole("menuitem", { name: "English" }).click();
+  await page.getByRole("menuitemradio", { name: "English" }).click();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 
@@ -137,14 +136,15 @@ test("public locale URLs switch while preserving the destination", async ({
   await expect(
     page.getByRole("heading", { name: "How it works" }),
   ).toBeVisible();
-
-  await page.getByLabel("Interface language").selectOption("zh-CN");
-  await expect(page).toHaveURL(/\/zh-CN\/?/);
+  await page.getByLabel("Interface language").selectOption("zh-Hans");
+  await expect(page).toHaveURL(/\/zh-Hans\/?/);
   expect(page.url()).toContain("ref=nav");
-  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
-  await expect(
-    page.getByRole("heading", { name: "核心机制" }),
-  ).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-Hans");
+  await expect(page.getByRole("heading", { name: "核心机制" })).toBeVisible();
+  // An explicit English choice is persisted, so an unprefixed public URL
+  // remains English even after the preceding Simplified Chinese visit.
+  await page.locator("select[aria-label]").selectOption("en");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
 
   const articleResponse = await page.goto(
     "/articles/missing-public-locale?src=list",
@@ -154,14 +154,22 @@ test("public locale URLs switch while preserving the destination", async ({
   await expect(
     page.getByRole("heading", { name: "Article unavailable" }),
   ).toBeVisible();
-
-  await page.getByLabel("Interface language").selectOption("zh-CN");
-  await expect(page).toHaveURL(/\/zh-CN\/articles\/missing-public-locale/);
+  await page.getByLabel("Interface language").selectOption("zh-Hans");
+  await expect(page).toHaveURL(/\/zh-Hans\/articles\/missing-public-locale/);
   expect(page.url()).toContain("src=list");
-  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
-  await expect(
-    page.getByRole("heading", { name: "文章不可用" }),
-  ).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-Hans");
+  await expect(page.getByRole("heading", { name: "文章不可用" })).toBeVisible();
+
+  // Compatibility URLs remain readable, but the next explicit switch emits
+  // only the canonical route and must not nest the old prefix in the path.
+  await page.goto("/zh-CN/articles/missing-public-locale?src=legacy");
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-Hans");
+  await page.locator("select[aria-label]").selectOption("en");
+  await expect(page).toHaveURL(
+    /\/articles\/missing-public-locale\?src=legacy$/,
+  );
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  expect(page.url()).not.toContain("/zh-CN/");
 
   expect(hydrationErrors).toEqual([]);
   await context.close();
@@ -375,7 +383,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page.getByRole("menuitem", { name: "简体中文" }).click();
     await expect
       .poll(async () => page.locator("html").getAttribute("lang"))
-      .toBe("zh-CN");
+      .toBe("zh-Hans");
     await expect(page.getByRole("link", { name: "文章" })).toBeVisible();
     await expect(page.getByText("当前登录", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "媒体" }).click();
@@ -942,7 +950,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page.getByRole("menuitem", { name: "简体中文" }).click();
     await expect
       .poll(async () => page.locator("html").getAttribute("lang"))
-      .toBe("zh-CN");
+      .toBe("zh-Hans");
     await expect(
       page.getByRole("tab", { name: /有待发布的修改/ }),
     ).toBeVisible();

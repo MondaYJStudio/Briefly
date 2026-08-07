@@ -4,6 +4,8 @@ import { type ReactNode, useEffect, useState } from "react";
 import { AdminIcon } from "../components/admin/icons";
 import { getLocale, locales, setLocale } from "../paraglide/runtime.js";
 import { m } from "../paraglide/messages.js";
+import { APP_LOCALE_OPTIONS, canonicalizeAppLocale } from "../locales/registry";
+import { useHydrated } from "../locales/use-hydrated";
 import styles from "./auth-surface.module.css";
 
 type AuthTheme = "light" | "dark";
@@ -39,7 +41,9 @@ export function AuthenticationSurface({
   showDescription?: boolean;
 }>) {
   const [theme, setTheme] = useState<AuthTheme>("light");
+  const hydrated = useHydrated();
   const locale = getLocale();
+  const selectedLocale = canonicalizeAppLocale(locale) ?? locale;
 
   useEffect(() => {
     setTheme(readStoredTheme());
@@ -97,6 +101,7 @@ export function AuthenticationSurface({
               <Dropdown.Trigger
                 className={`${styles.iconButton} inline-flex items-center justify-center cursor-pointer`}
                 aria-label={m.interface_language()}
+                isDisabled={!hydrated}
               >
                 <AdminIcon name="globe" size={16} />
               </Dropdown.Trigger>
@@ -104,26 +109,33 @@ export function AuthenticationSurface({
                 <Dropdown.Menu
                   aria-label={m.interface_language()}
                   selectionMode="single"
-                  selectedKeys={new Set([locale])}
+                  selectedKeys={new Set([selectedLocale])}
                   onSelectionChange={(keys) => {
                     if (keys === "all") return;
                     const next = keys.values().next().value;
+                    const normalized = canonicalizeAppLocale(next);
                     if (
-                      typeof next === "string" &&
-                      (locales as readonly string[]).includes(next)
+                      normalized &&
+                      (locales as readonly string[]).includes(normalized)
                     ) {
-                      setLocale(next as (typeof locales)[number]);
+                      setLocale(normalized as (typeof locales)[number]);
                     }
                   }}
                 >
-                  <Dropdown.Item id="en" textValue={m.switch_to_english()}>
-                    <Dropdown.ItemIndicator />
-                    {m.switch_to_english()}
-                  </Dropdown.Item>
-                  <Dropdown.Item id="zh-CN" textValue={m.switch_to_zh_cn()}>
-                    <Dropdown.ItemIndicator />
-                    {m.switch_to_zh_cn()}
-                  </Dropdown.Item>
+                  {APP_LOCALE_OPTIONS.map((option) => (
+                    <Dropdown.Item
+                      key={option.id}
+                      id={option.id}
+                      textValue={option.label}
+                    >
+                      <Dropdown.ItemIndicator />
+                      {option.id === "en"
+                        ? m.switch_to_english()
+                        : option.id === "zh-Hans"
+                          ? m.switch_to_zh_cn()
+                          : option.label}
+                    </Dropdown.Item>
+                  ))}
                 </Dropdown.Menu>
               </Dropdown.Popover>
             </Dropdown.Root>

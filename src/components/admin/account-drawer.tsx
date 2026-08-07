@@ -1,12 +1,55 @@
-import { Alert, Button, Drawer, Form, Input, Label } from "@heroui/react";
-import { type FormEvent, useEffect, useState } from "react";
+import {
+  Alert,
+  Button,
+  Drawer,
+  Form,
+  Input,
+  InputGroup,
+  Label,
+} from "@heroui/react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 
 import { PASSWORD_MINIMUM_LENGTH } from "../../auth/policy";
 import { m } from "../../paraglide/messages.js";
+import { AdminIcon } from "./icons";
 import styles from "./account-drawer.module.css";
 
 type PasswordState =
   "ready" | "submitting" | "validation" | "request-failed" | "success";
+
+function AccountCard({ children }: Readonly<{ children: ReactNode }>) {
+  return <section className={styles.card}>{children}</section>;
+}
+
+function PasswordVisibilityToggle({
+  visible,
+  onToggle,
+  labelledBy,
+}: Readonly<{
+  visible: boolean;
+  onToggle: () => void;
+  labelledBy: string;
+}>) {
+  return (
+    <button
+      type="button"
+      className={styles.passwordToggle}
+      aria-pressed={visible}
+      aria-label={visible ? m.hide_password() : m.show_password()}
+      aria-controls={labelledBy}
+      onClick={onToggle}
+    >
+      <AdminIcon name={visible ? "eye-off" : "eye"} size={18} />
+    </button>
+  );
+}
 
 /**
  * Account as an overlay drawer: read-only sign-in email, change password
@@ -27,15 +70,23 @@ export function AccountDrawer({
 }>) {
   const [passwordState, setPasswordState] = useState<PasswordState>("ready");
   const [newPasswordLength, setNewPasswordLength] = useState(0);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [currentPasswordError, setCurrentPasswordError] = useState<
     string | null
   >(null);
   const [newPasswordError, setNewPasswordError] = useState<string | null>(null);
+  const currentPasswordRef = useRef<HTMLInputElement>(null);
+  const newPasswordRef = useRef<HTMLInputElement>(null);
+  const currentPasswordId = useId();
+  const newPasswordId = useId();
 
   useEffect(() => {
     if (!open) {
       setPasswordState("ready");
       setNewPasswordLength(0);
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
       setCurrentPasswordError(null);
       setNewPasswordError(null);
     }
@@ -60,6 +111,7 @@ export function AccountDrawer({
       setCurrentPasswordError(null);
       setNewPasswordError(nextNewError);
       setPasswordState("validation");
+      newPasswordRef.current?.focus();
       return;
     }
 
@@ -82,6 +134,7 @@ export function AccountDrawer({
         setCurrentPasswordError(nextCurrentError);
         setNewPasswordError(null);
         setPasswordState("validation");
+        currentPasswordRef.current?.focus();
         return;
       }
       setPasswordState("request-failed");
@@ -90,19 +143,21 @@ export function AccountDrawer({
     }
   }
 
-  const passwordHint =
-    newPasswordLength >= PASSWORD_MINIMUM_LENGTH
-      ? m.password_long_enough({ count: newPasswordLength })
-      : m.password_chars_entered({ count: newPasswordLength });
+  const passwordReady = newPasswordLength >= PASSWORD_MINIMUM_LENGTH;
+  const passwordHint = passwordReady
+    ? m.password_long_enough({ count: newPasswordLength })
+    : m.password_chars_entered({ count: newPasswordLength });
+  const meterPercent = Math.min(
+    100,
+    Math.round((newPasswordLength / PASSWORD_MINIMUM_LENGTH) * 100),
+  );
 
   return (
     <Drawer.Backdrop isOpen={open} onOpenChange={onOpenChange}>
       <Drawer.Content placement="right" className="briefly-drawer-wide">
         <Drawer.Dialog aria-label={m.account_menu()}>
           <Drawer.Header>
-            <div
-              className={`flex w-full items-center justify-between gap-3`}
-            >
+            <div className={`flex w-full items-center justify-between gap-3`}>
               <div>
                 <Drawer.Heading>
                   <strong>{m.account_menu()}</strong>
@@ -127,41 +182,33 @@ export function AccountDrawer({
                 </Alert>
               ) : null}
 
-              <div className={`${styles.card} p-5`}>
-                <h2
-                  className={`${styles.sectionTitle} text-base mt-0 mx-0 mb-5`}
-                >
-                  {m.sign_in_email()}
-                </h2>
+              <AccountCard>
+                <h2 className={styles.sectionTitle}>{m.sign_in_email()}</h2>
                 <div className={`flex w-full flex-col gap-2`}>
                   <Label htmlFor="adminEmail">{m.email()}</Label>
                   <Input
                     fullWidth
+                    className={styles.readonlyInput}
                     id="adminEmail"
                     type="email"
                     value={email}
                     readOnly
+                    aria-readonly="true"
                     aria-describedby="admin-email-note"
                   />
-                  <p
-                    className={`${styles.hint} text-xs m-0`}
-                    id="admin-email-note"
-                  >
+                  <p className={styles.hint} id="admin-email-note">
                     {m.admin_email_note()}
                   </p>
                 </div>
-              </div>
+              </AccountCard>
 
-              <div className={`${styles.card} `}>
-                <div>
-                  <h2
-                    className={`${styles.sectionLead} text-base mt-0 mx-0 mb-2`}
-                  >
-                    {m.change_password()}
-                  </h2>
-                  <p className={`${styles.muted} text-sm m-0 mb-5`}>
-                    {m.change_password_description()}
-                  </p>
+              <AccountCard>
+                <h2 className={styles.sectionLead}>{m.change_password()}</h2>
+                <div className={styles.warning} role="note">
+                  <span className={styles.warningIcon} aria-hidden="true">
+                    <AdminIcon name="alert" size={16} />
+                  </span>
+                  <p className="m-0">{m.change_password_description()}</p>
                 </div>
 
                 {passwordState === "success" ? (
@@ -174,9 +221,7 @@ export function AccountDrawer({
                         </Alert.Description>
                       </Alert.Content>
                     </Alert>
-                    <div
-                      className={`flex flex-wrap items-center justify-end gap-3`}
-                    >
+                    <div className={`${styles.actions} mt-4`}>
                       <Button
                         type="button"
                         onPress={() => {
@@ -191,7 +236,7 @@ export function AccountDrawer({
                   </>
                 ) : (
                   <Form
-                    className={`flex flex-col gap-4`}
+                    className={`flex flex-col gap-5`}
                     onSubmit={changePassword}
                   >
                     {passwordState === "request-failed" ? (
@@ -206,30 +251,44 @@ export function AccountDrawer({
                         </Alert.Content>
                       </Alert>
                     ) : null}
+
                     <div className={`flex flex-col gap-5`}>
                       <div
-                        className={`flex w-full flex-col gap-2`}
+                        className={`${styles.passwordField} flex w-full flex-col gap-2`}
                       >
-                        <Label htmlFor="currentPassword">
+                        <Label htmlFor={currentPasswordId}>
                           {m.current_password()}
                         </Label>
-                        <Input
-                          fullWidth
-                          id="currentPassword"
-                          name="currentPassword"
-                          type="password"
-                          autoComplete="current-password"
-                          required
-                          aria-invalid={Boolean(currentPasswordError)}
-                          aria-describedby={
-                            currentPasswordError
-                              ? "current-password-error"
-                              : undefined
-                          }
-                        />
+                        <InputGroup fullWidth>
+                          <InputGroup.Input
+                            ref={currentPasswordRef}
+                            id={currentPasswordId}
+                            name="currentPassword"
+                            type={
+                              showCurrentPassword ? "text" : "password"
+                            }
+                            autoComplete="current-password"
+                            required
+                            aria-invalid={Boolean(currentPasswordError)}
+                            aria-describedby={
+                              currentPasswordError
+                                ? "current-password-error"
+                                : undefined
+                            }
+                          />
+                          <InputGroup.Suffix>
+                            <PasswordVisibilityToggle
+                              visible={showCurrentPassword}
+                              labelledBy={currentPasswordId}
+                              onToggle={() =>
+                                setShowCurrentPassword((value) => !value)
+                              }
+                            />
+                          </InputGroup.Suffix>
+                        </InputGroup>
                         {currentPasswordError ? (
                           <p
-                            className={`${styles.fieldError} text-xs m-0`}
+                            className={styles.fieldError}
                             id="current-password-error"
                             role="alert"
                           >
@@ -237,49 +296,71 @@ export function AccountDrawer({
                           </p>
                         ) : null}
                       </div>
+
                       <div
-                        className={`flex w-full flex-col gap-2`}
+                        className={`${styles.passwordField} flex w-full flex-col gap-2`}
                       >
-                        <Label htmlFor="newPassword">{m.new_password()}</Label>
-                        <Input
-                          fullWidth
-                          id="newPassword"
-                          name="newPassword"
-                          type="password"
-                          autoComplete="new-password"
-                          maxLength={128}
-                          required
-                          aria-invalid={Boolean(newPasswordError)}
-                          aria-describedby={
-                            newPasswordError
-                              ? "new-password-error"
-                              : "new-password-hint"
-                          }
-                          onChange={(event) =>
-                            setNewPasswordLength(event.target.value.length)
-                          }
-                        />
+                        <Label htmlFor={newPasswordId}>
+                          {m.new_password()}
+                        </Label>
+                        <InputGroup fullWidth>
+                          <InputGroup.Input
+                            ref={newPasswordRef}
+                            id={newPasswordId}
+                            name="newPassword"
+                            type={showNewPassword ? "text" : "password"}
+                            autoComplete="new-password"
+                            maxLength={128}
+                            required
+                            aria-invalid={Boolean(newPasswordError)}
+                            aria-describedby={
+                              newPasswordError
+                                ? "new-password-error"
+                                : "new-password-hint"
+                            }
+                            onChange={(event) =>
+                              setNewPasswordLength(event.target.value.length)
+                            }
+                          />
+                          <InputGroup.Suffix>
+                            <PasswordVisibilityToggle
+                              visible={showNewPassword}
+                              labelledBy={newPasswordId}
+                              onToggle={() =>
+                                setShowNewPassword((value) => !value)
+                              }
+                            />
+                          </InputGroup.Suffix>
+                        </InputGroup>
                         {newPasswordError ? (
                           <p
-                            className={`${styles.fieldError} text-xs m-0`}
+                            className={styles.fieldError}
                             id="new-password-error"
                             role="alert"
                           >
                             {newPasswordError}
                           </p>
                         ) : (
-                          <p
-                            className={`${styles.hint} text-xs m-0`}
-                            id="new-password-hint"
-                          >
-                            {m.minimum_password()} {passwordHint}
-                          </p>
+                          <div className={styles.meter} id="new-password-hint">
+                            <div
+                              className={styles.meterTrack}
+                              aria-hidden="true"
+                            >
+                              <div
+                                className={styles.meterFill}
+                                data-ready={passwordReady || undefined}
+                                style={{ width: `${meterPercent}%` }}
+                              />
+                            </div>
+                            <p className={styles.hint}>
+                              {m.minimum_password()} {passwordHint}
+                            </p>
+                          </div>
                         )}
                       </div>
                     </div>
-                    <div
-                      className={`flex flex-wrap items-center justify-end gap-3`}
-                    >
+
+                    <div className={styles.actions}>
                       <Button
                         type="submit"
                         isPending={passwordState === "submitting"}
@@ -289,27 +370,22 @@ export function AccountDrawer({
                     </div>
                   </Form>
                 )}
-              </div>
+              </AccountCard>
 
-              <div className={`${styles.card} p-5`}>
-                <h2
-                  className={`${styles.sectionTitle} text-base mt-0 mx-0 mb-5`}
-                >
-                  {m.session_section()}
-                </h2>
-                <div
-                  className={`flex flex-wrap items-center justify-between gap-4`}
-                >
+              <AccountCard>
+                <h2 className={styles.sectionTitle}>{m.session_section()}</h2>
+                <div className={styles.sessionRow}>
                   <div>
-                    <p className={`${styles.sessionLabel} text-sm m-0`}>
+                    <p className={styles.sessionLabel}>
                       {m.sign_out_this_session()}
                     </p>
-                    <p className={`${styles.muted} text-sm m-0`}>
+                    <p className={styles.sessionCopy}>
                       {m.sign_out_this_session_description()}
                     </p>
                   </div>
                   <Button
                     type="button"
+                    className={styles.sessionAction}
                     variant="outline"
                     isPending={signOutState === "submitting"}
                     onPress={onSignOut}
@@ -317,7 +393,7 @@ export function AccountDrawer({
                     {m.sign_out()}
                   </Button>
                 </div>
-              </div>
+              </AccountCard>
             </div>
           </Drawer.Body>
         </Drawer.Dialog>
