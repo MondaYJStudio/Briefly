@@ -33,12 +33,24 @@ import {
   type PreviewSavedDraftCommand,
   type PublicationIssue,
   type PublicationIssueCode,
+  type PublicationOutcome,
   type PublicationPreview,
   type PublicationReceipt,
   type PublicationWorkflowErrorCode,
-  type PublicationWorkflowResult,
   type PublishSavedDraftCommand,
 } from "./publication-workflow";
+
+/** Everything the Publication Workflow needs from one request. */
+export interface PublicationWorkflowContext {
+  database: D1Database;
+  bucket: R2Bucket;
+  applicationOrigin: string;
+}
+
+type PublicationWorkflowResult<Value> =
+  | { ok: true; value: Value }
+  | { ok: false; reason: "invalid"; issues: PublicationIssue[] }
+  | { ok: false; reason: "conflict" | "not-found" };
 
 interface SavedDraftRow {
   id: unknown;
@@ -153,6 +165,25 @@ const documentEnvelopeSchema = z
   })
   .passthrough();
 
+// Preview and Publish name an exact Draft Version and, for Publish, the
+// Current Publication they expect to replace. A transport contract cannot
+// enforce a whole version or a well-formed identity, so a command that names
+// neither is refused here rather than in each caller.
+const identitySchema = z
+  .string()
+  .regex(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu,
+  );
+
+const previewCommandSchema = z.object({
+  articleId: identitySchema,
+  draftVersion: z.number().int().positive(),
+});
+
+const publishCommandSchema = previewCommandSchema.extend({
+  expectedCurrentPublicationId: identitySchema.nullable(),
+});
+
 class PublicationAssetAdapterError extends Error {
   constructor(cause: unknown) {
     super("Publication Asset adapter failed", { cause });
@@ -160,7 +191,7 @@ class PublicationAssetAdapterError extends Error {
   }
 }
 
-export class PublicationWorkflowError extends Error {
+class PublicationWorkflowError extends Error {
   readonly code: PublicationWorkflowErrorCode;
 
   constructor(code: PublicationWorkflowErrorCode, cause?: unknown) {
@@ -170,7 +201,7 @@ export class PublicationWorkflowError extends Error {
   }
 }
 
-export function isPublicationWorkflowError(
+function isPublicationWorkflowError(
   value: unknown,
 ): value is PublicationWorkflowError {
   return (
@@ -620,10 +651,8 @@ function workflowAssetResolver(
   };
 }
 
-export async function previewSavedDraft(
-  database: D1Database,
-  bucket: R2Bucket,
-  applicationOrigin: string,
+async function previewSavedDraft(
+  { database, bucket, applicationOrigin }: PublicationWorkflowContext,
   command: PreviewSavedDraftCommand,
 ): Promise<PublicationWorkflowResult<PublicationPreview>> {
   const resolvedAssets = new Map<string, PublicationAssetResolution>();
@@ -1024,10 +1053,8 @@ async function commitPublication(
   );
 }
 
-export async function publishSavedDraft(
-  database: D1Database,
-  bucket: R2Bucket,
-  applicationOrigin: string,
+async function publishSavedDraft(
+  { database, bucket, applicationOrigin }: PublicationWorkflowContext,
   command: PublishSavedDraftCommand,
 ): Promise<PublicationWorkflowResult<PublicationReceipt>> {
   const resolvedAssets = new Map<string, PublicationAssetResolution>();
@@ -1051,4 +1078,48 @@ export async function publishSavedDraft(
   );
   if (!prepared.ok) return prepared;
   return commitPublication(database, command, prepared.prepared);
+}
+
+async function attemptWorkflow<Value>(
+  command: unknown,
+  schema: z.ZodType,
+  run: () => Promise<PublicationWorkflowResult<Value>>,
+): Promise<PublicationOutcome<Value>> {
+  if (!schema.safeParse(command).success) {
+    return { ok: false, reason: "command-invalid" };
+  }
+  try {
+    return await run();
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "failed",
+      code: isPublicationWorkflowError(error) ? error.code : "INTERNAL_ERROR",
+    };
+  }
+}
+
+/**
+ * The Publication Workflow bound to one request's context.
+ *
+ * Preview and Publish accept the same command and report the same outcomes,
+ * including the operational failures a caller would otherwise have to
+ * recognize as exceptions. A caller therefore says how an outcome is
+ * represented once rather than once per operation.
+ */
+export function publicationWorkflow(context: PublicationWorkflowContext) {
+  return {
+    preview: (
+      command: PreviewSavedDraftCommand,
+    ): Promise<PublicationOutcome<PublicationPreview>> =>
+      attemptWorkflow(command, previewCommandSchema, () =>
+        previewSavedDraft(context, command),
+      ),
+    publish: (
+      command: PublishSavedDraftCommand,
+    ): Promise<PublicationOutcome<PublicationReceipt>> =>
+      attemptWorkflow(command, publishCommandSchema, () =>
+        publishSavedDraft(context, command),
+      ),
+  };
 }

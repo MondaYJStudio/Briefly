@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { Elysia, t } from "elysia";
+import { Elysia, status, t } from "elysia";
 
 import {
   createArticle,
@@ -18,11 +18,8 @@ import {
   projectAdminArticles,
   restoreArticlePublication,
 } from "../articles/publication-history.server";
-import {
-  isPublicationWorkflowError,
-  previewSavedDraft,
-  publishSavedDraft,
-} from "../articles/publication-workflow.server";
+import type { PublicationOutcome } from "../articles/publication-workflow";
+import { publicationWorkflow } from "../articles/publication-workflow.server";
 import {
   listPublicArticles,
   resolvePublicArticle,
@@ -98,20 +95,64 @@ const publicationBaselineContract = t
   .Decode((value): string | null => value as string | null)
   .Encode((value) => value);
 
-function logPublicationFailure(
-  operation: "preview" | "publish",
-  error: unknown,
-  request: Request,
-): void {
-  const code = isPublicationWorkflowError(error)
-    ? error.code
-    : ("INTERNAL_ERROR" as const);
-  logPublicationWorkflowFailure({
-    requestId: requestIdFor(request),
-    operation,
-    status: code === "PUBLICATION_NOT_COMPLETED" ? 503 : 500,
-    code,
+function publicationWorkflowFor(bindings: RuntimeBindings, request: Request) {
+  return publicationWorkflow({
+    database: bindings.DB,
+    bucket: bindings.MEDIA_BUCKET,
+    applicationOrigin: applicationOriginForRequest(bindings, request),
   });
+}
+
+/**
+ * States how one Publication Workflow outcome is represented over HTTP.
+ *
+ * Preview and Publish share this mapping, so only their success status differs
+ * and their refusals cannot drift apart.
+ */
+function publicationOutcomeResponse<const Code extends 200 | 201, Value>(
+  operation: "preview" | "publish",
+  request: Request,
+  successStatus: Code,
+  outcome: PublicationOutcome<Value>,
+) {
+  if (outcome.ok) return status(successStatus, outcome.value);
+  switch (outcome.reason) {
+    case "command-invalid":
+      return status(400, {
+        status: "error" as const,
+        code: "REQUEST_INVALID" as const,
+      });
+    case "invalid":
+      return status(400, {
+        status: "error" as const,
+        code: "PUBLICATION_INVALID" as const,
+        issues: outcome.issues,
+      });
+    case "not-found":
+      return status(404, {
+        status: "error" as const,
+        code: "ARTICLE_NOT_FOUND" as const,
+      });
+    case "conflict":
+      return status(409, {
+        status: "error" as const,
+        code: "PUBLICATION_CONFLICT" as const,
+      });
+    case "failed": {
+      const failureStatus =
+        outcome.code === "PUBLICATION_NOT_COMPLETED" ? 503 : 500;
+      logPublicationWorkflowFailure({
+        requestId: requestIdFor(request),
+        operation,
+        status: failureStatus,
+        code: outcome.code,
+      });
+      return status(failureStatus, {
+        status: "error" as const,
+        code: outcome.code,
+      });
+    }
+  }
 }
 
 function getValidatedWorkerBindings() {
@@ -617,59 +658,16 @@ function createApi(getBindings: () => RuntimeBindings) {
     )
     .post(
       "/admin/articles/:articleId/preview",
-      async ({ body, params, request, status }) => {
-        const bindings = getBindings();
-        if (!Number.isInteger(body.draftVersion) || body.draftVersion < 1) {
-          return status(400, {
-            status: "error" as const,
-            code: "REQUEST_INVALID" as const,
-          });
-        }
-
-        let result: Awaited<ReturnType<typeof previewSavedDraft>>;
-        try {
-          result = await previewSavedDraft(
-            bindings.DB,
-            bindings.MEDIA_BUCKET,
-            applicationOriginForRequest(bindings, request),
-            {
-              articleId: params.articleId,
-              draftVersion: body.draftVersion,
-            },
-          );
-        } catch (error) {
-          logPublicationFailure("preview", error, request);
-          if (isPublicationWorkflowError(error)) {
-            return status(
-              error.code === "PUBLICATION_NOT_COMPLETED" ? 503 : 500,
-              { status: "error" as const, code: error.code },
-            );
-          }
-          return status(500, {
-            status: "error" as const,
-            code: "INTERNAL_ERROR" as const,
-          });
-        }
-        if (result.ok) return result.value;
-        if (result.reason === "not-found")
-          return status(404, {
-            status: "error" as const,
-            code: "ARTICLE_NOT_FOUND" as const,
-          });
-        if (result.reason === "conflict")
-          return status(409, {
-            status: "error" as const,
-            code: "PUBLICATION_CONFLICT" as const,
-          });
-        if (result.reason === "invalid") {
-          return status(400, {
-            status: "error" as const,
-            code: "PUBLICATION_INVALID" as const,
-            issues: result.issues,
-          });
-        }
-        throw new Error("Unhandled Publication Workflow result");
-      },
+      async ({ body, params, request }) =>
+        publicationOutcomeResponse(
+          "preview",
+          request,
+          200,
+          await publicationWorkflowFor(getBindings(), request).preview({
+            articleId: params.articleId,
+            draftVersion: body.draftVersion,
+          }),
+        ),
       {
         // A Draft rehearsal is private to the Administrator who asked for it.
         administrator: { cacheControl: "private, no-store" },
@@ -699,67 +697,17 @@ function createApi(getBindings: () => RuntimeBindings) {
     )
     .post(
       "/admin/articles/:articleId/publications",
-      async ({ body, params, request, status }) => {
-        const bindings = getBindings();
-        if (
-          !Number.isInteger(body.draftVersion) ||
-          body.draftVersion < 1 ||
-          !(
-            body.expectedCurrentPublicationId === null ||
-            (typeof body.expectedCurrentPublicationId === "string" &&
-              /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
-                body.expectedCurrentPublicationId,
-              ))
-          )
-        ) {
-          return status(400, {
-            status: "error" as const,
-            code: "REQUEST_INVALID" as const,
-          });
-        }
-
-        let result: Awaited<ReturnType<typeof publishSavedDraft>>;
-        try {
-          result = await publishSavedDraft(
-            bindings.DB,
-            bindings.MEDIA_BUCKET,
-            applicationOriginForRequest(bindings, request),
-            {
-              articleId: params.articleId,
-              draftVersion: body.draftVersion,
-              expectedCurrentPublicationId: body.expectedCurrentPublicationId,
-            },
-          );
-        } catch (error) {
-          logPublicationFailure("publish", error, request);
-          if (isPublicationWorkflowError(error)) {
-            return status(
-              error.code === "PUBLICATION_NOT_COMPLETED" ? 503 : 500,
-              { status: "error" as const, code: error.code },
-            );
-          }
-          return status(500, {
-            status: "error" as const,
-            code: "INTERNAL_ERROR" as const,
-          });
-        }
-        if (result.ok) return status(201, result.value);
-        if (result.reason === "invalid")
-          return status(400, {
-            status: "error" as const,
-            code: "PUBLICATION_INVALID" as const,
-            issues: result.issues,
-          });
-        if (result.reason === "not-found")
-          return status(404, {
-            status: "error" as const,
-            code: "ARTICLE_NOT_FOUND" as const,
-          });
-        return status(409, {
-          status: "error" as const,
-          code: "PUBLICATION_CONFLICT" as const,
-        });
-      },
+      async ({ body, params, request }) =>
+        publicationOutcomeResponse(
+          "publish",
+          request,
+          201,
+          await publicationWorkflowFor(getBindings(), request).publish({
+            articleId: params.articleId,
+            draftVersion: body.draftVersion,
+            expectedCurrentPublicationId: body.expectedCurrentPublicationId,
+          }),
+        ),
       {
         administrator: true,
         params: t.Object({ articleId: t.String({ format: "uuid" }) }),

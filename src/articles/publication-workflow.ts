@@ -74,11 +74,6 @@ export interface PublishSavedDraftCommand extends PreviewSavedDraftCommand {
   expectedCurrentPublicationId: string | null;
 }
 
-export type PublicationWorkflowResult<Value> =
-  | { ok: true; value: Value }
-  | { ok: false; reason: "invalid"; issues: PublicationIssue[] }
-  | { ok: false; reason: "conflict" | "not-found" };
-
 export const PUBLICATION_WORKFLOW_ERROR_CODES = [
   "PUBLICATION_NOT_COMPLETED",
   "PUBLICATION_STATE_UNCONFIRMED",
@@ -86,6 +81,26 @@ export const PUBLICATION_WORKFLOW_ERROR_CODES = [
 
 export type PublicationWorkflowErrorCode =
   (typeof PUBLICATION_WORKFLOW_ERROR_CODES)[number];
+
+/**
+ * Why an attempt could not complete. These are operational failures rather
+ * than Publication Issues: the same command may still complete later.
+ */
+export type PublicationFailureCode =
+  PublicationWorkflowErrorCode | "INTERNAL_ERROR";
+
+/**
+ * What one Publication Workflow attempt produced.
+ *
+ * Preview and Publish report the same outcomes for the same state, so a caller
+ * states how an outcome is represented once instead of once per operation.
+ */
+export type PublicationOutcome<Value> =
+  | { ok: true; value: Value }
+  | { ok: false; reason: "command-invalid" }
+  | { ok: false; reason: "invalid"; issues: PublicationIssue[] }
+  | { ok: false; reason: "conflict" | "not-found" }
+  | { ok: false; reason: "failed"; code: PublicationFailureCode };
 
 export function isPublicationIssue(value: unknown): value is PublicationIssue {
   if (typeof value !== "object" || value === null) return false;
