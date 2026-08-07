@@ -16,29 +16,25 @@ import {
 } from "./article-document";
 import { articleSlugKey, articleSlugSchema } from "./article-slug";
 import { articleTagSchema, normalizeArticleTag } from "./tag-chips";
+import {
+  BYLINE_NAME_MAXIMUM_LENGTH,
+  LANGUAGE_TAG_MAXIMUM_LENGTH,
+} from "../site-settings/site-settings";
+import { bylineUrl } from "../site-settings/byline-url";
 
 const emptyDocument = {
   documentSchemaVersion: ARTICLE_DOCUMENT_SCHEMA_VERSION,
   doc: { type: "doc", content: [{ type: "paragraph" }] },
 } as const;
 
-const bylineUrl = z
-  .string()
-  .max(2_048)
-  .url()
-  .refine((value) => ["http:", "https:"].includes(new URL(value).protocol), {
-    message: "Use an HTTP or HTTPS URL.",
-  })
-  .transform((value) => new URL(value).toString());
-
 const byline = z.object({
-  name: z.string().trim().min(1).max(120),
+  name: z.string().trim().min(1).max(BYLINE_NAME_MAXIMUM_LENGTH),
   url: bylineUrl.nullable(),
 });
 
 const language = z
   .string()
-  .max(35)
+  .max(LANGUAGE_TAG_MAXIMUM_LENGTH)
   .superRefine((value, context) => {
     try {
       if (Intl.getCanonicalLocales(value).length !== 1) throw new Error();
@@ -95,7 +91,10 @@ const persistedArticleBase = z.object({
   version: z.number().int().positive(),
   title: z.string(),
   slug: z.string().nullable(),
-  slug_is_manual: z.number().int().pipe(z.union([z.literal(0), z.literal(1)])),
+  slug_is_manual: z
+    .number()
+    .int()
+    .pipe(z.union([z.literal(0), z.literal(1)])),
   summary: z.string().nullable(),
   tags: z.string().transform((value, context) => {
     try {

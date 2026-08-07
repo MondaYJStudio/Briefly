@@ -11,16 +11,17 @@ import {
 import { siteSettings } from "../db/schema";
 import {
   BYLINE_NAME_MAXIMUM_LENGTH,
-  BYLINE_URL_MAXIMUM_LENGTH,
   LANGUAGE_TAG_MAXIMUM_LENGTH,
   SITE_DESCRIPTION_MAXIMUM_LENGTH,
   SITE_NAME_MAXIMUM_LENGTH,
   emptySiteDescriptionTranslations,
+  hasOwnCanonicalDescription,
   normalizeSiteDescriptionTranslations,
   siteDescriptionForLocale,
   type SiteDescriptionTranslations,
   type SiteSettings,
 } from "./site-settings";
+import { bylineUrl } from "./byline-url";
 
 function canonicalLanguageTag(language: string): string {
   // Article/Publications keep their own content-language metadata. It is a
@@ -49,19 +50,6 @@ const bcp47Language = z
     }
   })
   .transform(canonicalLanguageTag);
-
-const bylineUrl = z
-  .string()
-  .max(BYLINE_URL_MAXIMUM_LENGTH, {
-    message: `Use at most ${BYLINE_URL_MAXIMUM_LENGTH} characters.`,
-  })
-  .refine(URL.canParse, { message: "Enter a valid URL." })
-  .refine(
-    (url) =>
-      URL.canParse(url) && ["http:", "https:"].includes(new URL(url).protocol),
-    { message: "Use an HTTP or HTTPS URL." },
-  )
-  .transform((url) => new URL(url).toString());
 
 const descriptionValue = z
   .string()
@@ -117,22 +105,6 @@ function persistedDescriptions(value: unknown): unknown {
     }
   }
   return parsed;
-}
-
-function hasOwnCanonicalDescription(
-  value: unknown,
-  locale: AppLocale,
-): boolean {
-  return Boolean(
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.entries(value).some(
-      ([key, description]) =>
-        canonicalizeAppLocale(key) === locale &&
-        (description === null || typeof description === "string"),
-    ),
-  );
 }
 
 const persistedSiteSettings = z.object({

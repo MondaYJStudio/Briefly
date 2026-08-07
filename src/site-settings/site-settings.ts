@@ -112,7 +112,12 @@ export function normalizeSiteDescriptionTranslations(
   return normalized;
 }
 
-function hasOwnCanonicalDescription(
+/**
+ * Whether a description map already owns a key for `locale`, including an
+ * explicit null. Used when deciding whether a legacy English scalar may still
+ * seed that slot.
+ */
+export function hasOwnCanonicalDescription(
   value: unknown,
   locale: AppLocale,
 ): boolean {
