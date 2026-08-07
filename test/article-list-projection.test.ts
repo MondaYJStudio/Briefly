@@ -113,6 +113,7 @@ describe("Admin Article list lifecycle projection", () => {
         `UPDATE site_settings
          SET site_name = 'Briefly',
              site_description = 'A modern, self-hosted content engine with editable drafts and an immutable version history.',
+             site_descriptions = json_object('en', 'A modern, self-hosted content engine with editable drafts and an immutable version history.'),
              default_byline_name = 'Briefly', default_byline_url = NULL,
              default_language = 'en'
          WHERE id = 1`,

@@ -44,14 +44,31 @@ import {
   type RuntimeBindings,
 } from "../env/runtime.server";
 import {
+  localizedSiteSettings,
   readSiteSettings,
   updateSiteSettings,
 } from "../site-settings/site-settings.server";
+import { resolveSiteLocale } from "../site-settings/site-description-locales";
 import { publicOpenApiDocument } from "./public-openapi";
 
-const siteSettingsContract = t.Object({
+// Elysia's dynamic validator cannot compile nullable unions or records of
+// unions without TypeCompiler. The server/domain layer performs the closed
+// runtime validation; these opaque fields preserve the Eden contract without
+// requiring a compiler-only schema at request time.
+const adminSiteSettingsContract = t.Object({
   siteName: t.String(),
   siteDescription: t.Any(),
+  siteDescriptions: t.Any(),
+  defaultByline: t.Object({
+    name: t.String(),
+    url: t.Any(),
+  }),
+  defaultLanguage: t.String(),
+});
+const siteSettingsInputContract = t.Object({
+  siteName: t.String(),
+  siteDescription: t.Optional(t.Any()),
+  siteDescriptions: t.Optional(t.Any()),
   defaultByline: t.Object({
     name: t.String(),
     url: t.Any(),
@@ -155,9 +172,15 @@ async function publicJsonResponse(
     status?: number;
     head?: boolean;
     etag?: string | true;
+    headers?: HeadersInit;
   } = {},
 ): Promise<Response> {
   const headers = publicContentHeaders();
+  if (options.headers) {
+    for (const [name, value] of new Headers(options.headers)) {
+      headers.set(name, value);
+    }
+  }
   const body = JSON.stringify(value);
   if (options.etag) {
     const etag = options.etag === true ? await etagForBody(body) : options.etag;
@@ -206,7 +229,27 @@ async function publicSiteSettingsResponse(
   head = false,
 ): Promise<Response> {
   const settings = await readSiteSettings(database);
-  return publicJsonResponse(request, settings, { head, etag: true });
+  const locale = resolveSiteLocale(request);
+  const localized = localizedSiteSettings(settings, locale);
+  return publicJsonResponse(request, localized, {
+    head,
+    etag: true,
+    headers: {
+      "content-language": localized.siteDescriptionLocale,
+      // The selected representation can depend on either the browser's
+      // Accept-Language header or the explicit locale preference cookie.
+      vary: "Accept-Language, Cookie",
+    },
+  });
+}
+
+function adminSiteSettingsResponse(
+  settings: Awaited<ReturnType<typeof readSiteSettings>>,
+) {
+  // The administration endpoint returns the complete map (updates may send a
+  // partial patch) and therefore has no single negotiated description locale.
+  // Public consumers receive the selected-locale projection from `/api/site`.
+  return settings;
 }
 
 async function publicArticleResponse(
@@ -314,11 +357,11 @@ function createApi(getBindings: () => RuntimeBindings) {
             code: "AUTHENTICATION_REQUIRED" as const,
           });
 
-        return readSiteSettings(bindings.DB);
+        return adminSiteSettingsResponse(await readSiteSettings(bindings.DB));
       },
       {
         response: {
-          200: siteSettingsContract,
+          200: adminSiteSettingsContract,
           401: authenticationRequiredContract,
         },
       },
@@ -342,12 +385,12 @@ function createApi(getBindings: () => RuntimeBindings) {
             issues: result.issues,
           });
         }
-        return result.settings;
+        return adminSiteSettingsResponse(result.settings);
       },
       {
-        body: siteSettingsContract,
+        body: siteSettingsInputContract,
         response: {
-          200: siteSettingsContract,
+          200: adminSiteSettingsContract,
           400: siteSettingsInvalidContract,
           401: authenticationRequiredContract,
         },

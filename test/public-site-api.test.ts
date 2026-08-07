@@ -17,6 +17,7 @@ describe("public Site Settings API", () => {
         `UPDATE site_settings
          SET site_name = 'Briefly',
              site_description = 'A modern, self-hosted content engine with editable drafts and an immutable version history.',
+             site_descriptions = json_object('en', 'A modern, self-hosted content engine with editable drafts and an immutable version history.'),
              default_byline_name = 'Briefly', default_byline_url = NULL,
              default_language = 'en'
          WHERE id = 1`,
@@ -33,10 +34,20 @@ describe("public Site Settings API", () => {
     );
     expect(response.headers.get("access-control-allow-origin")).toBe("*");
     expect(response.headers.get("etag")).toBeTruthy();
+    expect(response.headers.get("content-language")).toBe("en");
+    expect(response.headers.get("vary")).toBe("Accept-Language, Cookie");
     expect(await response.json()).toEqual({
       siteName: "Briefly",
       siteDescription:
         "A modern, self-hosted content engine with editable drafts and an immutable version history.",
+      siteDescriptions: {
+        en: "A modern, self-hosted content engine with editable drafts and an immutable version history.",
+        "zh-Hans": null,
+        "zh-Hant": null,
+        ja: null,
+        ko: null,
+      },
+      siteDescriptionLocale: "en",
       defaultByline: { name: "Briefly", url: null },
       defaultLanguage: "en",
     });
@@ -46,10 +57,24 @@ describe("public Site Settings API", () => {
     const contract = await (
       await SELF.fetch("http://briefly.test/api/openapi.json")
     ).json<OpenAPIV3_1.Document>();
+    const localeParameters = contract.paths?.["/api/site"]?.get?.parameters;
+    expect(
+      localeParameters?.map((parameter) =>
+        "$ref" in parameter ? parameter.$ref : parameter.name,
+      ),
+    ).toEqual(["Accept-Language", "Cookie"]);
     expectResponseMatchesContract(contract, "/api/site", "get", 200, {
       siteName: "Briefly",
       siteDescription:
         "A modern, self-hosted content engine with editable drafts and an immutable version history.",
+      siteDescriptions: {
+        en: "A modern, self-hosted content engine with editable drafts and an immutable version history.",
+        "zh-Hans": null,
+        "zh-Hant": null,
+        ja: null,
+        ko: null,
+      },
+      siteDescriptionLocale: "en",
       defaultByline: { name: "Briefly", url: null },
       defaultLanguage: "en",
     });
@@ -84,7 +109,17 @@ describe("public Site Settings API", () => {
     const response = await SELF.fetch("http://briefly.test/api/site");
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toEqual(update);
+    expect(body).toEqual({
+      ...update,
+      siteDescriptions: {
+        en: "A compact newsroom.",
+        "zh-Hans": null,
+        "zh-Hant": null,
+        ja: null,
+        ko: null,
+      },
+      siteDescriptionLocale: "en",
+    });
     expect(JSON.stringify(body)).not.toContain(administrator.email);
   });
 });

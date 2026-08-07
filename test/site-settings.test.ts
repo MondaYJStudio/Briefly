@@ -15,6 +15,7 @@ describe("site identity and Byline defaults", () => {
         `UPDATE site_settings
          SET site_name = 'Briefly',
              site_description = 'A modern, self-hosted content engine with editable drafts and an immutable version history.',
+             site_descriptions = json_object('en', 'A modern, self-hosted content engine with editable drafts and an immutable version history.'),
              default_byline_name = 'Briefly', default_byline_url = NULL,
              default_language = 'en'
          WHERE id = 1`,
@@ -36,6 +37,13 @@ describe("site identity and Byline defaults", () => {
       siteName: "Briefly",
       siteDescription:
         "A modern, self-hosted content engine with editable drafts and an immutable version history.",
+      siteDescriptions: {
+        en: "A modern, self-hosted content engine with editable drafts and an immutable version history.",
+        "zh-Hans": null,
+        "zh-Hant": null,
+        ja: null,
+        ko: null,
+      },
       defaultByline: { name: "Briefly", url: null },
       defaultLanguage: "en",
     });
@@ -66,13 +74,31 @@ describe("site identity and Byline defaults", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(update);
+    expect(await response.json()).toEqual({
+      ...update,
+      siteDescriptions: {
+        en: "Independent writing about software.",
+        "zh-Hans": null,
+        "zh-Hant": null,
+        ja: null,
+        ko: null,
+      },
+    });
     const readResponse = await SELF.fetch(
       "http://briefly.test/api/admin/site-settings",
       { headers: { cookie } },
     );
     const persisted = await readResponse.json();
-    expect(persisted).toEqual(update);
+    expect(persisted).toEqual({
+      ...update,
+      siteDescriptions: {
+        en: "Independent writing about software.",
+        "zh-Hans": null,
+        "zh-Hant": null,
+        ja: null,
+        ko: null,
+      },
+    });
     expect(JSON.stringify(persisted)).not.toContain(administrator.email);
   }, 15_000);
 
@@ -112,7 +138,16 @@ describe("site identity and Byline defaults", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(cleared);
+    expect(await response.json()).toEqual({
+      ...cleared,
+      siteDescriptions: {
+        en: null,
+        "zh-Hans": null,
+        "zh-Hant": null,
+        ja: null,
+        ko: null,
+      },
+    });
   }, 15_000);
 
   it("returns actionable private validation issues and preserves the previous settings", async () => {
@@ -160,6 +195,13 @@ describe("site identity and Byline defaults", () => {
     );
     expect(await persisted.json()).toMatchObject({
       siteName: "Briefly",
+      siteDescriptions: {
+        en: "A modern, self-hosted content engine with editable drafts and an immutable version history.",
+        "zh-Hans": null,
+        "zh-Hant": null,
+        ja: null,
+        ko: null,
+      },
       defaultByline: { name: "Briefly", url: null },
       defaultLanguage: "en",
     });

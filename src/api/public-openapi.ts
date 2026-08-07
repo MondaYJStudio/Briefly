@@ -9,6 +9,7 @@ import {
   PUBLIC_ARTICLE_LIST_DEFAULT_PAGE_SIZE,
   PUBLIC_ARTICLE_LIST_MAXIMUM_PAGE_SIZE,
 } from "../articles/publications.server";
+import { APP_LOCALES } from "../locales/registry";
 
 const publicResponseHeaders = {
   "Access-Control-Allow-Origin": {
@@ -17,6 +18,31 @@ const publicResponseHeaders = {
   "Cache-Control": { $ref: "#/components/headers/CacheControl" },
   ETag: { $ref: "#/components/headers/ETag" },
 } satisfies Record<string, OpenAPIV3_1.ReferenceObject>;
+
+const siteResponseHeaders = {
+  ...publicResponseHeaders,
+  "Content-Language": { $ref: "#/components/headers/ContentLanguage" },
+  Vary: { $ref: "#/components/headers/Vary" },
+} satisfies Record<string, OpenAPIV3_1.ReferenceObject>;
+
+const siteLocaleParameters = [
+  {
+    name: "Accept-Language",
+    in: "header",
+    required: false,
+    description:
+      "Optional ordered language ranges. The server applies the canonical Application Locale Registry and falls back to English when no range matches.",
+    schema: { type: "string" },
+  },
+  {
+    name: "Cookie",
+    in: "header",
+    required: false,
+    description:
+      "Optional PARAGLIDE_LOCALE preference cookie. It takes precedence over Accept-Language when the request has no locale URL prefix.",
+    schema: { type: "string" },
+  },
+] satisfies OpenAPIV3_1.ParameterObject[];
 
 const canonicalRedirectHeaders = {
   "Access-Control-Allow-Origin":
@@ -136,11 +162,12 @@ export const publicOpenApiDocument = {
         operationId: "getSiteSettings",
         summary: "Read public Site Settings",
         description:
-          "Returns the site's public identity: name, description, default Byline, and default language. Draft-only or administrative settings are never part of this contract.",
+          "Returns the site's public identity: name, the description selected from the canonical locale registry, all configured description translations, default Byline, and default language. Draft-only or administrative settings are never part of this contract.",
+        parameters: siteLocaleParameters,
         responses: {
           200: {
             description: "The public Site Settings.",
-            headers: publicResponseHeaders,
+            headers: siteResponseHeaders,
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/SiteSettings" },
@@ -150,7 +177,7 @@ export const publicOpenApiDocument = {
           304: {
             description:
               "The Site Settings are unchanged for the supplied If-None-Match value.",
-            headers: publicResponseHeaders,
+            headers: siteResponseHeaders,
           },
         },
       },
@@ -158,14 +185,15 @@ export const publicOpenApiDocument = {
         tags: ["Site"],
         operationId: "headSiteSettings",
         summary: "Read Site Settings metadata without a response body",
+        parameters: siteLocaleParameters,
         responses: {
           200: {
             description: "The Site Settings exist; the body is omitted.",
-            headers: publicResponseHeaders,
+            headers: siteResponseHeaders,
           },
           304: {
             description: "The Site Settings are unchanged.",
-            headers: publicResponseHeaders,
+            headers: siteResponseHeaders,
           },
         },
       },
@@ -356,6 +384,16 @@ export const publicOpenApiDocument = {
         description: "Deterministic strong entity tag for this representation.",
         schema: { type: "string" },
       },
+      ContentLanguage: {
+        description:
+          "The canonical locale that supplied the localized site description.",
+        schema: { type: "string", enum: [...APP_LOCALES] },
+      },
+      Vary: {
+        description:
+          "Request headers that participate in selecting the representation.",
+        schema: { type: "string", enum: ["Accept-Language, Cookie"] },
+      },
       CanonicalArticleLocation: {
         description:
           "Origin-relative canonical Article detail URL. The normalized canonical slug is percent-encoded as exactly one path segment; no query or fragment is preserved.",
@@ -373,6 +411,8 @@ export const publicOpenApiDocument = {
         required: [
           "siteName",
           "siteDescription",
+          "siteDescriptions",
+          "siteDescriptionLocale",
           "defaultByline",
           "defaultLanguage",
         ],
@@ -380,6 +420,30 @@ export const publicOpenApiDocument = {
           siteName: { type: "string", minLength: 1 },
           siteDescription: {
             oneOf: [{ type: "string" }, { type: "null" }],
+          },
+          siteDescriptions: {
+            type: "object",
+            additionalProperties: false,
+            required: ["en", "zh-Hans", "zh-Hant", "ja", "ko"],
+            properties: {
+              en: { oneOf: [{ type: "string" }, { type: "null" }] },
+              "zh-Hans": {
+                oneOf: [{ type: "string" }, { type: "null" }],
+              },
+              "zh-Hant": {
+                oneOf: [{ type: "string" }, { type: "null" }],
+              },
+              ja: { oneOf: [{ type: "string" }, { type: "null" }] },
+              ko: { oneOf: [{ type: "string" }, { type: "null" }] },
+            },
+            description:
+              "Localized descriptions keyed by the canonical application locale.",
+          },
+          siteDescriptionLocale: {
+            type: "string",
+            enum: [...APP_LOCALES],
+            description:
+              "Locale selected for the siteDescription compatibility projection.",
           },
           defaultByline: { $ref: "#/components/schemas/Byline" },
           defaultLanguage: {
