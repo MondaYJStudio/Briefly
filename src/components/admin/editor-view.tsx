@@ -44,7 +44,7 @@ import {
   type PublicationIssueSurface,
 } from "./publication-issues";
 import { StatusChip } from "./status-chip";
-import type { ArticleWorkspace } from "./use-article-workspace";
+import type { ArticleEditorWorkspace } from "./use-article-workspace";
 import { WorkspaceAlerts } from "./workspace-alerts";
 
 const ArticleEditor = lazy(async () => {
@@ -61,7 +61,7 @@ function ArticleEditorFallback() {
 }
 
 interface EditorViewProps {
-  workspace: ArticleWorkspace;
+  workspace: ArticleEditorWorkspace;
   siteSettings: SiteSettings | null;
   onBack: () => void;
   onPreviewOpenChange: (open: boolean) => void;
@@ -442,7 +442,7 @@ export function EditorView({
 /** The truth-telling save indicator from the prototype top bar. */
 function EditorSaveState({
   workspace,
-}: Readonly<{ workspace: ArticleWorkspace }>) {
+}: Readonly<{ workspace: ArticleEditorWorkspace }>) {
   const { selected, state, serverConfirmed } = workspace;
   let tone = "is-ok";
   let icon: ReactNode = <AdminIcon name="check" size={14} strokeWidth={2.2} />;
@@ -515,7 +515,7 @@ function EditorRail({
   onOpenTrashDialog,
   onPreview,
 }: Readonly<{
-  workspace: ArticleWorkspace;
+  workspace: ArticleEditorWorkspace;
   siteSettings: SiteSettings | null;
   railOpen: boolean;
   tab: "settings" | "history";
@@ -1348,7 +1348,7 @@ function CoverPickerDialog({
 
 function HistoryPanel({
   workspace,
-}: Readonly<{ workspace: ArticleWorkspace }>) {
+}: Readonly<{ workspace: ArticleEditorWorkspace }>) {
   const {
     publicationHistory,
     historyState,
@@ -1569,7 +1569,7 @@ export function PreviewDrawer({
   open,
   onOpenChange,
 }: Readonly<{
-  workspace: ArticleWorkspace;
+  workspace: ArticleEditorWorkspace;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }>) {

@@ -9,7 +9,7 @@ import { getLocale } from "../../paraglide/runtime.js";
 import { AdminIcon } from "./icons";
 import { StatusChip } from "./status-chip";
 import styles from "./trash-view.module.css";
-import type { ArticleWorkspace } from "./use-article-workspace";
+import type { ArticleTrashWorkspace } from "./use-article-workspace";
 
 function displayTitle(article: ArticleTrashEntry): string {
   return article.title || m.trash_untitled();
@@ -23,7 +23,7 @@ function formatTrashedAt(trashedAt: string | Date): string {
 /** Trash: trashed articles with restore and permanent-purge confirmations. */
 export function TrashView({
   workspace,
-}: Readonly<{ workspace: ArticleWorkspace }>) {
+}: Readonly<{ workspace: ArticleTrashWorkspace }>) {
   const {
     trashedArticles,
     trashViewState,

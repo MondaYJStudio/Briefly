@@ -2,7 +2,7 @@ import { Alert, Button, TextArea } from "@heroui/react";
 
 import { m } from "../../paraglide/messages.js";
 import { publicationIssueGuidance } from "./publication-issues";
-import type { ArticleWorkspace } from "./use-article-workspace";
+import type { ArticleWorkspaceAlerts } from "./use-article-workspace";
 import styles from "./workspace-alerts.module.css";
 
 /**
@@ -12,7 +12,7 @@ import styles from "./workspace-alerts.module.css";
  */
 export function WorkspaceAlerts({
   workspace,
-}: Readonly<{ workspace: ArticleWorkspace }>) {
+}: Readonly<{ workspace: ArticleWorkspaceAlerts }>) {
   const {
     state,
     issues,
@@ -62,9 +62,7 @@ export function WorkspaceAlerts({
             <Alert.Title>{m.alert_unsaved_local_changes()}</Alert.Title>
             <Alert.Description>
               {m.alert_unsaved_local_changes_description()}
-              <span
-                className={`flex items-center gap-3 mt-2`}
-              >
+              <span className={`flex items-center gap-3 mt-2`}>
                 <Button
                   type="button"
                   variant="secondary"
@@ -93,9 +91,7 @@ export function WorkspaceAlerts({
             <Alert.Title>{m.alert_draft_save_failed()}</Alert.Title>
             <Alert.Description>
               {m.alert_draft_save_failed_description()}
-              <span
-                className={`flex items-center gap-3 mt-2`}
-              >
+              <span className={`flex items-center gap-3 mt-2`}>
                 <Button
                   type="button"
                   onPress={() => void persistCurrentDraft()}
@@ -120,9 +116,7 @@ export function WorkspaceAlerts({
             <Alert.Title>{m.alert_draft_conflict()}</Alert.Title>
             <Alert.Description>
               {m.alert_draft_conflict_description()}
-              <span
-                className={`flex items-center gap-3 mt-2`}
-              >
+              <span className={`flex items-center gap-3 mt-2`}>
                 <Button
                   type="button"
                   isDisabled={lifecycleActionPending}

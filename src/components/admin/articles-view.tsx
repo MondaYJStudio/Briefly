@@ -9,10 +9,8 @@ import { m } from "../../paraglide/messages.js";
 import { AdminIcon } from "./icons";
 import styles from "./articles-view.module.css";
 import { StatusChip } from "./status-chip";
-import {
-  articleLifecycleProjection,
-  type ArticleWorkspace,
-} from "./use-article-workspace";
+import { articleLifecycleProjection } from "../../articles/article-workspace";
+import type { ArticleListWorkspace } from "./use-article-workspace";
 
 type ArticleFilter = "all" | ArticleLifecycleProjection;
 
@@ -60,7 +58,7 @@ export function ArticlesView({
   onOpen,
   onPreview,
 }: Readonly<{
-  workspace: ArticleWorkspace;
+  workspace: ArticleListWorkspace;
   onCreate: () => void;
   onOpen: (article: Article) => void;
   onPreview: (article: Article) => void;
@@ -127,11 +125,7 @@ export function ArticlesView({
       </header>
 
       {listError && articles.length > 0 ? (
-        <Alert
-          status="danger"
-          role="alert"
-          className={`mb-4`}
-        >
+        <Alert status="danger" role="alert" className={`mb-4`}>
           <Alert.Content>
             <Alert.Title>{m.articles_load_failed()}</Alert.Title>
             <Alert.Description>
@@ -151,11 +145,7 @@ export function ArticlesView({
       ) : null}
 
       {createError ? (
-        <Alert
-          status="danger"
-          role="alert"
-          className={`mb-4`}
-        >
+        <Alert status="danger" role="alert" className={`mb-4`}>
           <Alert.Content>
             <Alert.Title>{m.articles_create_failed()}</Alert.Title>
             <Alert.Description>
@@ -356,9 +346,7 @@ function ArticleRow({
         disabled={disabled}
         onClick={onOpen}
       >
-        <span
-          className={`flex items-center min-w-0 flex-wrap gap-2`}
-        >
+        <span className={`flex items-center min-w-0 flex-wrap gap-2`}>
           <span
             className={`${styles.title} text-base${article.draft.title ? "" : ` ${styles.titleUntitled}`}`}
           >
@@ -463,9 +451,7 @@ function ArticleRow({
 function ArticleListSkeleton() {
   return (
     <div aria-busy="true" role="status" aria-label={m.loading_article_drafts()}>
-      <div
-        className={`flex flex-wrap items-center justify-between mb-4 gap-3`}
-      >
+      <div className={`flex flex-wrap items-center justify-between mb-4 gap-3`}>
         <div
           className={styles.skeleton}
           style={{ width: "22rem", height: "2rem" }}

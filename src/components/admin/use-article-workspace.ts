@@ -1,268 +1,54 @@
 import { useBlocker } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ARTICLE_DRAFT_AUTOSAVE_DEBOUNCE_MS,
-  type AdminArticleListItem,
   type Article,
   type ArticleDraftUpdate,
-  type ArticleLifecycleProjection,
-  type ArticlePublicationHistory,
   type ArticlePublicationHistoryEntry,
   type ArticleTrashEntry,
 } from "../../articles/articles";
-import { slugAfterTitleChange } from "../../articles/slug-follow";
-
-export function articleLifecycleProjection(
-  article: Article,
-): ArticleLifecycleProjection {
-  if (
-    "lifecycleProjection" in article &&
-    typeof (article as AdminArticleListItem).lifecycleProjection === "string"
-  ) {
-    return (article as AdminArticleListItem).lifecycleProjection;
-  }
-  return article.currentPublicationId !== null ? "published" : "draft";
-}
-
-function withLifecycleProjection(
-  article: Article,
-  lifecycleProjection: ArticleLifecycleProjection,
-): AdminArticleListItem {
-  return { ...article, lifecycleProjection };
-}
+import type { PublicationRestorationIssue } from "../../articles/publication-restoration";
 import {
-  isPublicationRestorationIssue,
-  type PublicationRestorationIssue,
-} from "../../articles/publication-restoration";
-import {
-  isPublicationIssue,
   type PublicationIssue,
   type PublicationPreview,
-  type PublicationReceipt,
 } from "../../articles/publication-workflow";
+import {
+  draftUpdate,
+  mergeConcurrentCurrentPublication,
+  preserveLocalDraft,
+  preserveNewestLocalDraft,
+  reducePublicationState,
+  reduceTrashActionState,
+  reduceArticleWorkspace,
+  replaceArticlePreservingConcurrentCurrentPublication,
+  withLifecycleProjection,
+  type ArticleWorkspacePublicationCommand,
+  type ArticleWorkspaceTrashCommand,
+  type PublicationReceiptConfirmation,
+  type ArticleWorkspaceGateway,
+  type PublishState,
+  type TrashActionState,
+  type WorkspaceState,
+} from "../../articles/article-workspace";
+import { createArticleWorkspaceGateway } from "./article-workspace-gateway";
 import { localizeServerIssueMessage } from "./publication-issues";
-import { getApiClient } from "../../routes/api.$";
-
-export type WorkspaceState =
-  | "loading"
-  | "ready"
-  | "creating"
-  | "dirty"
-  | "saving"
-  | "saved"
-  | "invalid"
-  | "conflict"
-  | "slug-conflict"
-  | "failed"
-  | "offline";
-
-export type TrashActionState =
-  | "ready"
-  | "trashing"
-  | "trashed"
-  | "trash-error"
-  | "restoring"
-  | "restored"
-  | "restore-error"
-  | "purging"
-  | "purged"
-  | "purge-error";
-
-type EditableArticleDraft = Pick<
-  Article["draft"],
-  | "title"
-  | "slug"
-  | "slugIsManual"
-  | "summary"
-  | "tags"
-  | "byline"
-  | "language"
-  | "cover"
-  | "document"
->;
-
-function editableArticleDraft(draft: Article["draft"]): EditableArticleDraft {
-  const {
-    title,
-    slug,
-    slugIsManual,
-    summary,
-    tags,
-    byline,
-    language,
-    cover,
-    document,
-  } = draft;
-  return {
-    title,
-    slug,
-    slugIsManual,
-    summary,
-    tags,
-    byline,
-    language,
-    cover,
-    document,
-  };
-}
-
-function draftUpdate(
-  draft: Article["draft"],
-  version = draft.version,
-): ArticleDraftUpdate {
-  return {
-    version,
-    ...editableArticleDraft(draft),
-  };
-}
-
-function preserveLocalDraft(server: Article, local: Article): Article {
-  return {
-    ...server,
-    draft: {
-      ...server.draft,
-      ...editableArticleDraft(local.draft),
-    },
-  };
-}
-
-function preserveNewestLocalDraft(server: Article, local: Article): Article {
-  const merged = preserveLocalDraft(server, local);
-  return local.draft.version > server.draft.version
-    ? { ...merged, draft: local.draft }
-    : merged;
-}
-
-type PublicationReceiptConfirmation = Pick<
-  PublicationReceipt,
-  "publicationId" | "draftVersion"
->;
-
-function publicationReceiptConfirmationFromApi(
-  value: unknown,
-  expectedArticleId: string,
-): PublicationReceiptConfirmation | null {
-  if (typeof value !== "object" || value === null) return null;
-  const candidate = value as Record<string, unknown>;
-  const article = candidate.article;
-  if (typeof article !== "object" || article === null) return null;
-  const publicationId = candidate.publicationId;
-  const draftVersion = candidate.draftVersion;
-  if (
-    typeof publicationId !== "string" ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
-      publicationId,
-    ) ||
-    typeof draftVersion !== "number" ||
-    !Number.isInteger(draftVersion) ||
-    draftVersion < 1 ||
-    !("id" in article) ||
-    article.id !== expectedArticleId
-  ) {
-    return null;
-  }
-  return { publicationId, draftVersion };
-}
-
-function mergeConcurrentCurrentPublication(
-  server: Article,
-  requestSnapshot: Article | null,
-  local: Article | null,
-): { article: Article; currentPublicationChanged: boolean } {
-  if (
-    !requestSnapshot ||
-    !local ||
-    requestSnapshot.id !== server.id ||
-    local.id !== server.id ||
-    local.currentPublicationId === requestSnapshot.currentPublicationId
-  ) {
-    return { article: server, currentPublicationChanged: false };
-  }
-
-  return {
-    article: { ...server, currentPublicationId: local.currentPublicationId },
-    currentPublicationChanged: true,
-  };
-}
-
-function replaceArticlePreservingConcurrentCurrentPublication(
-  articles: Article[],
-  server: Article,
-  requestSnapshot: Article | null,
-): Article[] {
-  return articles.map((local) =>
-    local.id === server.id
-      ? mergeConcurrentCurrentPublication(server, requestSnapshot, local)
-          .article
-      : local,
-  );
-}
 
 interface PublishAttempt {
   snapshot: Article;
   capturedRevision: number;
 }
 
-type PublishState =
-  | "ready"
-  | "publishing"
-  | "published"
-  | "invalid"
-  | "conflict"
-  | "not-completed"
-  | "reconciling"
-  | "state-unconfirmed"
-  | "transport-error"
-  | "error";
-
-function publicationErrorCode(value: unknown): string | null {
-  return typeof value === "object" &&
-    value !== null &&
-    "code" in value &&
-    typeof value.code === "string"
-    ? value.code
-    : null;
-}
-
-function publicationErrorIssues(value: unknown): PublicationIssue[] {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    !("issues" in value) ||
-    !Array.isArray(value.issues)
-  ) {
-    return [];
-  }
-  return value.issues.filter(isPublicationIssue);
-}
-
-function preservePublicationRecoveryState(state: PublishState): PublishState {
-  return [
-    "publishing",
-    "not-completed",
-    "conflict",
-    "reconciling",
-    "state-unconfirmed",
-    "transport-error",
-  ].includes(state)
-    ? state
-    : "ready";
-}
-
-async function loadTrashedArticles(): Promise<ArticleTrashEntry[]> {
-  const response = await getApiClient().admin.trash.articles.get();
-  if (response.status !== 200 || !response.data)
-    throw new Error("Trash unavailable");
-  return response.data.articles as ArticleTrashEntry[];
-}
-
 /**
- * The complete Article workspace state machine: list, autosave, preview,
- * publish / unpublish, history restore and trash lifecycle. Extracted
- * verbatim from the former monolithic admin route so each view only renders.
+ * React binding for the Article workspace. Domain state transitions live in
+ * the framework-free Article workspace module and persistence is supplied by
+ * an injectable gateway.
  */
-export function useArticleWorkspace() {
+export function useArticleWorkspace(gateway?: ArticleWorkspaceGateway) {
+  const workspaceGateway = useMemo(
+    () => gateway ?? createArticleWorkspaceGateway(),
+    [gateway],
+  );
   const [articles, setArticles] = useState<Article[]>([]);
   const [trashedArticles, setTrashedArticles] = useState<ArticleTrashEntry[]>(
     [],
@@ -350,6 +136,14 @@ export function useArticleWorkspace() {
     setPreviewState("idle");
   }
 
+  function transitionPublication(command: ArticleWorkspacePublicationCommand) {
+    setPublishState((current) => reducePublicationState(current, command));
+  }
+
+  function transitionTrash(command: ArticleWorkspaceTrashCommand) {
+    setTrashActionState((current) => reduceTrashActionState(current, command));
+  }
+
   function selectServerDraft(
     article: Article,
     options: {
@@ -358,12 +152,21 @@ export function useArticleWorkspace() {
     } = {},
   ) {
     draftLoadGeneration.current += 1;
-    selectedRef.current = article;
-    revisionRef.current = 0;
-    confirmedRevisionRef.current = 0;
-    setSelected(article);
-    setRevision(0);
-    setConfirmedRevision(0);
+    const editor = reduceArticleWorkspace(
+      {
+        selected: selectedRef.current,
+        revision: revisionRef.current,
+        confirmedRevision: confirmedRevisionRef.current,
+        state: "ready",
+      },
+      { type: "select", article },
+    );
+    selectedRef.current = editor.selected;
+    revisionRef.current = editor.revision;
+    confirmedRevisionRef.current = editor.confirmedRevision;
+    setSelected(editor.selected);
+    setRevision(editor.revision);
+    setConfirmedRevision(editor.confirmedRevision);
     setEditorGeneration((current) => current + 1);
     retryablePublishAttemptRef.current = null;
     setPublicationIssues([]);
@@ -386,10 +189,9 @@ export function useArticleWorkspace() {
       );
     }
     try {
-      const response = await getApiClient().admin.articles.get();
-      if (response.status !== 200 || !response.data)
-        throw new Error("Articles unavailable");
-      const listed = response.data.articles as AdminArticleListItem[];
+      const response = await workspaceGateway.listArticles();
+      if (!response.ok) throw new Error("Articles unavailable");
+      const listed = response.value;
       setArticles(listed);
       setListError(false);
       setState((current) =>
@@ -410,13 +212,12 @@ export function useArticleWorkspace() {
 
   useEffect(() => {
     let active = true;
-    void getApiClient()
-      .admin.articles.get()
+    void workspaceGateway
+      .listArticles()
       .then((response) => {
-        if (response.status !== 200 || !response.data)
-          throw new Error("Articles unavailable");
+        if (!response.ok) throw new Error("Articles unavailable");
         if (active) {
-          const listed = response.data.articles as AdminArticleListItem[];
+          const listed = response.value;
           setArticles((current) => [
             ...current,
             ...listed.filter(
@@ -444,10 +245,12 @@ export function useArticleWorkspace() {
           );
         }
       });
-    void loadTrashedArticles()
-      .then((trashEntries) => {
+    void workspaceGateway
+      .listTrashedArticles()
+      .then((response) => {
+        if (!response.ok) throw new Error("Trash unavailable");
         if (active) {
-          setTrashedArticles(trashEntries);
+          setTrashedArticles(response.value);
           setTrashViewState("ready");
         }
       })
@@ -457,7 +260,7 @@ export function useArticleWorkspace() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [workspaceGateway]);
 
   async function createDraft(): Promise<Article | null> {
     if (lifecycleActionPending) return null;
@@ -465,10 +268,9 @@ export function useArticleWorkspace() {
     setState("creating");
     setIssues([]);
     try {
-      const response = await getApiClient().admin.articles.post();
-      if (response.status !== 201 || !response.data)
-        throw new Error("Article creation failed");
-      const created = withLifecycleProjection(response.data, "draft");
+      const response = await workspaceGateway.createArticle();
+      if (!response.ok) throw new Error("Article creation failed");
+      const created = withLifecycleProjection(response.value, "draft");
       setArticles((current) => [
         created,
         ...current.filter((article) => article.id !== created.id),
@@ -476,9 +278,9 @@ export function useArticleWorkspace() {
       selectServerDraft(created);
       setConflictCopy(null);
       setState("ready");
-      setPublishState("ready");
+      transitionPublication({ type: "reset" });
       setPublicationAction(null);
-      setTrashActionState("ready");
+      transitionTrash({ type: "reset" });
       return created;
     } catch {
       setCreateError(true);
@@ -491,13 +293,12 @@ export function useArticleWorkspace() {
     if (lifecycleActionPending || listActionPendingId !== null) return false;
     setListActionPendingId(article.id);
     try {
-      const response = await getApiClient()
-        .admin.articles({ articleId: article.id })
-        .publications.post({
-          draftVersion: article.draft.version,
-          expectedCurrentPublicationId: article.currentPublicationId,
-        });
-      if (response.status !== 201 || !response.data) return false;
+      const response = await workspaceGateway.publishDraft({
+        articleId: article.id,
+        draftVersion: article.draft.version,
+        expectedCurrentPublicationId: article.currentPublicationId,
+      });
+      if (!response.ok) return false;
       await reloadArticles({ soft: true });
       return true;
     } catch {
@@ -517,10 +318,8 @@ export function useArticleWorkspace() {
     }
     setListActionPendingId(article.id);
     try {
-      const response = await getApiClient()
-        .admin.articles({ articleId: article.id })
-        ["current-publication"].delete();
-      if (response.status !== 200 || !response.data) return false;
+      const response = await workspaceGateway.unpublishArticle(article.id);
+      if (!response.ok) return false;
       setArticles((current) =>
         current.map((row) =>
           row.id === article.id
@@ -551,10 +350,8 @@ export function useArticleWorkspace() {
     setListActionPendingId(article.id);
     trashLifecyclePendingRef.current = true;
     try {
-      const response = await getApiClient()
-        .admin.articles({ articleId: article.id })
-        .trash.post();
-      if (response.status !== 200 || !response.data) return false;
+      const response = await workspaceGateway.trashArticle(article.id);
+      if (!response.ok) return false;
       setArticles((current) => current.filter((row) => row.id !== article.id));
       if (selectedRef.current?.id === article.id) clearSelectedArticle();
       await reloadTrashView();
@@ -574,12 +371,11 @@ export function useArticleWorkspace() {
     setState("loading");
     setIssues([]);
     try {
-      const response = await getApiClient().admin.articles({ articleId }).get();
-      if (response.status !== 200 || !response.data)
-        throw new Error("Article unavailable");
+      const response = await workspaceGateway.readArticle(articleId);
+      if (!response.ok) throw new Error("Article unavailable");
       if (loadGeneration !== draftLoadGeneration.current) return null;
       const merged = mergeConcurrentCurrentPublication(
-        response.data,
+        response.value,
         requestSnapshot,
         selectedRef.current,
       );
@@ -587,9 +383,9 @@ export function useArticleWorkspace() {
         preserveUnpublishFeedback: merged.currentPublicationChanged,
       });
       setState("ready");
-      setPublishState("ready");
+      transitionPublication({ type: "reset" });
       setPublicationAction(null);
-      setTrashActionState("ready");
+      transitionTrash({ type: "reset" });
       return merged.article;
     } catch {
       if (loadGeneration === draftLoadGeneration.current) {
@@ -599,116 +395,116 @@ export function useArticleWorkspace() {
     }
   }
 
-  const persistCurrentDraft = useCallback(async (version?: number) => {
-    const snapshot = selectedRef.current;
-    if (
-      !snapshot ||
-      savingRef.current ||
-      restorePendingRef.current ||
-      trashLifecyclePendingRef.current
-    )
-      return;
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      setState("offline");
-      return;
-    }
-
-    const capturedRevision = revisionRef.current;
-    const saveGeneration = draftLoadGeneration.current;
-    const input = draftUpdate(snapshot.draft, version);
-    savingRef.current = true;
-    setState("saving");
-    setIssues([]);
-
-    try {
-      const response = await getApiClient()
-        .admin.articles({ articleId: snapshot.id })
-        .draft.put(input);
+  const persistCurrentDraft = useCallback(
+    async (version?: number) => {
+      const snapshot = selectedRef.current;
       if (
-        saveGeneration !== draftLoadGeneration.current ||
-        selectedRef.current?.id !== snapshot.id
-      ) {
+        !snapshot ||
+        savingRef.current ||
+        restorePendingRef.current ||
+        trashLifecyclePendingRef.current
+      )
         return;
-      }
-      if (response.status === 200 && response.data) {
-        const local = selectedRef.current;
-        const localArticle = local?.id === response.data.id ? local : null;
-        const localChanged = revisionRef.current !== capturedRevision;
-        const lifecycleMerged = mergeConcurrentCurrentPublication(
-          response.data,
-          snapshot,
-          localArticle,
-        ).article;
-        const next =
-          localChanged && localArticle
-            ? preserveLocalDraft(lifecycleMerged, localArticle)
-            : lifecycleMerged;
-        selectedRef.current = next;
-        setSelected(next);
-        setArticles((current) =>
-          replaceArticlePreservingConcurrentCurrentPublication(
-            current,
-            next,
-            snapshot,
-          ),
-        );
-        setPublishState(preservePublicationRecoveryState);
-        confirmedRevisionRef.current = capturedRevision;
-        setConfirmedRevision(capturedRevision);
-        setConflictCopy(null);
-        resetPreview();
-        setState(localChanged ? "dirty" : "saved");
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setState("offline");
         return;
       }
 
-      const error = response.error?.value;
-      if (
-        response.status === 409 &&
-        error &&
-        "code" in error &&
-        error.code === "ARTICLE_SLUG_CONFLICT"
-      ) {
-        setConflictCopy(null);
-        setState("slug-conflict");
-      } else if (response.status === 409) {
-        const local = selectedRef.current;
-        setConflictCopy(
-          local?.id === snapshot.id
-            ? draftUpdate(local.draft, input.version)
-            : input,
+      const capturedRevision = revisionRef.current;
+      const saveGeneration = draftLoadGeneration.current;
+      const input = draftUpdate(snapshot.draft, version);
+      savingRef.current = true;
+      setState("saving");
+      setIssues([]);
+
+      try {
+        const response = await workspaceGateway.saveDraft(snapshot.id, input);
+        if (
+          saveGeneration !== draftLoadGeneration.current ||
+          selectedRef.current?.id !== snapshot.id
+        ) {
+          return;
+        }
+        if (response.ok) {
+          const editor = reduceArticleWorkspace(
+            {
+              selected: selectedRef.current,
+              revision: revisionRef.current,
+              confirmedRevision: confirmedRevisionRef.current,
+              state: "saving",
+            },
+            {
+              type: "save-succeeded",
+              serverArticle: response.value,
+              requestSnapshot: snapshot,
+              capturedRevision,
+            },
+          );
+          const next = editor.selected;
+          if (!next) return;
+          selectedRef.current = next;
+          setSelected(next);
+          setArticles((current) =>
+            replaceArticlePreservingConcurrentCurrentPublication(
+              current,
+              next,
+              snapshot,
+            ),
+          );
+          transitionPublication({ type: "draft-changed" });
+          confirmedRevisionRef.current = editor.confirmedRevision;
+          setConfirmedRevision(editor.confirmedRevision);
+          setConflictCopy(null);
+          resetPreview();
+          setRevision(editor.revision);
+          setState(editor.state);
+          return;
+        }
+
+        if (response.reason === "slug-conflict") {
+          setConflictCopy(null);
+          setState("slug-conflict");
+        } else if (response.reason === "conflict") {
+          const local = selectedRef.current;
+          setConflictCopy(
+            local?.id === snapshot.id
+              ? draftUpdate(local.draft, input.version)
+              : input,
+          );
+          setState("conflict");
+        } else if (response.reason === "invalid") {
+          setIssues(
+            (response.issues ?? []).map((issue) =>
+              typeof issue === "object" &&
+              issue !== null &&
+              "message" in issue &&
+              typeof issue.message === "string"
+                ? localizeServerIssueMessage(issue.message)
+                : String(issue),
+            ),
+          );
+          setState("invalid");
+        } else {
+          setState("failed");
+        }
+      } catch {
+        if (
+          saveGeneration !== draftLoadGeneration.current ||
+          selectedRef.current?.id !== snapshot.id
+        ) {
+          return;
+        }
+        setState(
+          typeof navigator !== "undefined" && !navigator.onLine
+            ? "offline"
+            : "failed",
         );
-        setState("conflict");
-      } else if (error && "issues" in error) {
-        setIssues(
-          error.issues.map((issue) =>
-            typeof issue === "object" &&
-            issue !== null &&
-            "message" in issue &&
-            typeof issue.message === "string"
-              ? localizeServerIssueMessage(issue.message)
-              : String(issue),
-          ),
-        );
-        setState("invalid");
-      } else {
-        setState("failed");
+      } finally {
+        savingRef.current = false;
       }
-    } catch {
-      if (
-        saveGeneration !== draftLoadGeneration.current ||
-        selectedRef.current?.id !== snapshot.id
-      ) {
-        return;
-      }
-      setState(
-        typeof navigator !== "undefined" && !navigator.onLine
-          ? "offline"
-          : "failed",
-      );
-    } finally {
-      savingRef.current = false;
-    }
-  }, []);
+    },
+    [workspaceGateway],
+  );
 
   useEffect(() => {
     if (state !== "dirty" || revision === confirmedRevision) return;
@@ -745,24 +541,25 @@ export function useArticleWorkspace() {
       trashLifecyclePendingRef.current
     )
       return;
-    let draft = { ...current.draft, ...changes };
-    if ("title" in changes && !("slug" in changes) && !draft.slugIsManual) {
-      const followed = slugAfterTitleChange(
-        { mode: "auto", slug: draft.slug },
-        draft.title,
-      );
-      draft = { ...draft, slug: followed.slug, slugIsManual: false };
-    }
-    const next = { ...current, draft };
-    const nextRevision = revisionRef.current + 1;
+    const editor = reduceArticleWorkspace(
+      {
+        selected: current,
+        revision: revisionRef.current,
+        confirmedRevision: confirmedRevisionRef.current,
+        state: "dirty",
+      },
+      { type: "change-draft", changes },
+    );
+    const next = editor.selected;
+    if (!next) return;
     selectedRef.current = next;
-    revisionRef.current = nextRevision;
+    revisionRef.current = editor.revision;
     setSelected(next);
-    setRevision(nextRevision);
+    setRevision(editor.revision);
     setIssues([]);
-    setState("dirty");
+    setState(editor.state);
     if (!publishPendingRef.current) {
-      setPublishState(preservePublicationRecoveryState);
+      transitionPublication({ type: "draft-changed" });
       setPublicationAction(null);
       setPublicationReceipt(null);
       setPublicationIssues([]);
@@ -780,13 +577,10 @@ export function useArticleWorkspace() {
     if (!requestSnapshot) return;
     setState("loading");
     try {
-      const response = await getApiClient()
-        .admin.articles({ articleId: requestSnapshot.id })
-        .get();
-      if (response.status !== 200 || !response.data)
-        throw new Error("Article unavailable");
+      const response = await workspaceGateway.readArticle(requestSnapshot.id);
+      if (!response.ok) throw new Error("Article unavailable");
       const merged = mergeConcurrentCurrentPublication(
-        response.data,
+        response.value,
         requestSnapshot,
         selectedRef.current,
       );
@@ -801,7 +595,7 @@ export function useArticleWorkspace() {
         ),
       );
       setState("ready");
-      setPublishState("ready");
+      transitionPublication({ type: "reset" });
       setPublicationAction(null);
     } catch {
       setState("failed");
@@ -814,24 +608,20 @@ export function useArticleWorkspace() {
     if (!local) return;
     setState("loading");
     try {
-      const response = await getApiClient()
-        .admin.articles({
-          articleId: local.id,
-        })
-        .get();
-      if (response.status !== 200 || !response.data)
-        throw new Error("Article unavailable");
+      const response = await workspaceGateway.readArticle(local.id);
+      if (!response.ok) throw new Error("Article unavailable");
       const current = selectedRef.current;
-      const currentArticle = current?.id === response.data.id ? current : local;
+      const currentArticle =
+        current?.id === response.value.id ? current : local;
       const lifecycleMerged = mergeConcurrentCurrentPublication(
-        response.data,
+        response.value,
         local,
         currentArticle,
       ).article;
       const retry = preserveLocalDraft(lifecycleMerged, currentArticle);
       selectedRef.current = retry;
       setSelected(retry);
-      await persistCurrentDraft(response.data.draft.version);
+      await persistCurrentDraft(response.value.draft.version);
     } catch {
       setState("failed");
     }
@@ -886,29 +676,20 @@ export function useArticleWorkspace() {
     setPreviewState("loading");
 
     try {
-      const response = await getApiClient()
-        .admin.articles({ articleId })
-        .preview.post({ draftVersion: version });
+      const response = await workspaceGateway.previewDraft(articleId, version);
       if (previewGeneration !== previewRequestGeneration.current) return;
-      if (response.status === 200 && response.data) {
-        setPreview(response.data as PublicationPreview);
+      if (response.ok) {
+        setPreview(response.value);
         setPreviewState("ready");
         return;
       }
 
-      if (response.status === 409) {
+      if (response.reason === "conflict") {
         setPreviewState("conflict");
         return;
       }
-      const error: unknown = response.error?.value;
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "issues" in error &&
-        Array.isArray(error.issues)
-      ) {
-        const structuredIssues = error.issues.filter(isPublicationIssue);
-        setPreviewIssues(structuredIssues);
+      if (response.reason === "invalid") {
+        setPreviewIssues([...(response.issues ?? [])]);
         setPreviewState("invalid");
         return;
       }
@@ -944,10 +725,13 @@ export function useArticleWorkspace() {
       snapshot.currentPublicationId === null ? "published" : "republished",
     );
     setUnpublishState("ready");
-    setTrashActionState("ready");
+    transitionTrash({ type: "reset" });
     resetPublicationHistory();
     if (hasConcurrentDraft) setHistoryHasUnpublishedChanges(true);
-    setPublishState(hasConcurrentDraft ? "ready" : "published");
+    transitionPublication({
+      type: "confirmed",
+      concurrentDraft: hasConcurrentDraft,
+    });
   }
 
   async function reconcilePublicationState(
@@ -958,15 +742,13 @@ export function useArticleWorkspace() {
     retryablePublishAttemptRef.current = null;
     setPublicationReceipt(null);
     if (selectedRef.current?.id === snapshot.id) {
-      setPublishState("reconciling");
+      transitionPublication({ type: "reconciling" });
     }
 
     const historyGeneration = ++historyRequestGeneration.current;
     const [articleRead, historyRead] = await Promise.allSettled([
-      getApiClient().admin.articles({ articleId: snapshot.id }).get(),
-      getApiClient()
-        .admin.articles({ articleId: snapshot.id })
-        .publications.get(),
+      workspaceGateway.readArticle(snapshot.id),
+      workspaceGateway.readPublicationHistory(snapshot.id),
     ]);
 
     let articleReadCompleted = false;
@@ -975,13 +757,9 @@ export function useArticleWorkspace() {
     let refreshedCurrentPublicationId = snapshot.currentPublicationId;
     let localDraftChanged = revisionRef.current !== capturedRevision;
 
-    if (
-      articleRead.status === "fulfilled" &&
-      articleRead.value.status === 200 &&
-      articleRead.value.data
-    ) {
+    if (articleRead.status === "fulfilled" && articleRead.value.ok) {
       articleReadCompleted = true;
-      const serverArticle = articleRead.value.data as Article;
+      const serverArticle = articleRead.value.value;
       refreshedCurrentPublicationId = serverArticle.currentPublicationId;
       const local = selectedRef.current;
       const stillSelected = local?.id === snapshot.id;
@@ -1003,13 +781,9 @@ export function useArticleWorkspace() {
       }
     }
 
-    if (
-      historyRead.status === "fulfilled" &&
-      historyRead.value.status === 200 &&
-      historyRead.value.data
-    ) {
+    if (historyRead.status === "fulfilled" && historyRead.value.ok) {
       historyReadCompleted = true;
-      const history = historyRead.value.data as ArticlePublicationHistory;
+      const history = historyRead.value.value;
       publicSlug =
         history.publications.find((publication) => publication.isCurrent)
           ?.slug ?? publicSlug;
@@ -1033,20 +807,13 @@ export function useArticleWorkspace() {
     let publicReadCompleted =
       publicSlug === null && refreshedCurrentPublicationId === null;
     if (publicSlug !== null) {
-      try {
-        const publicResponse = await globalThis.fetch(
-          `/api/articles/${encodeURIComponent(publicSlug)}`,
-          {
-            cache: "no-store",
-            headers: { accept: "application/json" },
-          },
-        );
+      const publicResponse =
+        await workspaceGateway.readPublicArticle(publicSlug);
+      if (publicResponse.ok) {
         publicReadCompleted =
           refreshedCurrentPublicationId === null
-            ? publicResponse.status === 404 || publicResponse.status === 410
-            : publicResponse.status === 200;
-      } catch {
-        publicReadCompleted = false;
+            ? publicResponse.value.availability === "absent"
+            : publicResponse.value.availability === "present";
       }
     }
 
@@ -1056,59 +823,48 @@ export function useArticleWorkspace() {
           ? "reconciled"
           : "failed",
       );
-      setPublishState(terminalState);
+      transitionPublication({ type: "reconciled", state: terminalState });
     }
   }
 
   async function performPublish(attempt: PublishAttempt) {
     const { snapshot } = attempt;
     publishPendingRef.current = true;
-    setPublishState("publishing");
+    transitionPublication({ type: "begin" });
     setPublicationAction(null);
     setPublicationIssues([]);
     setPublicationReceipt(null);
     setPublicationReconciliationState("idle");
     try {
-      const response = await getApiClient()
-        .admin.articles({ articleId: snapshot.id })
-        .publications.post({
-          draftVersion: snapshot.draft.version,
-          expectedCurrentPublicationId: snapshot.currentPublicationId,
-        });
-      if (response.status === 201) {
-        const receipt = publicationReceiptConfirmationFromApi(
-          response.data,
-          snapshot.id,
-        );
-        if (receipt && receipt.draftVersion === snapshot.draft.version) {
-          acceptPublicationReceipt(attempt, receipt);
-        } else {
-          await reconcilePublicationState(attempt, "state-unconfirmed");
-        }
+      const response = await workspaceGateway.publishDraft({
+        articleId: snapshot.id,
+        draftVersion: snapshot.draft.version,
+        expectedCurrentPublicationId: snapshot.currentPublicationId,
+      });
+      if (response.ok) {
+        acceptPublicationReceipt(attempt, response.value);
         return;
       }
-      if (!response.response) {
+      if (response.reason === "transport-error") {
         await reconcilePublicationState(attempt, "transport-error");
         return;
       }
 
-      const error: unknown = response.error?.value;
-      const errorCode = publicationErrorCode(error);
       if (selectedRef.current?.id !== snapshot.id) return;
-      if (errorCode === "PUBLICATION_CONFLICT") {
+      if (response.reason === "conflict") {
         await reconcilePublicationState(attempt, "conflict");
-      } else if (errorCode === "PUBLICATION_INVALID") {
+      } else if (response.reason === "invalid") {
         retryablePublishAttemptRef.current = null;
-        setPublicationIssues(publicationErrorIssues(error));
-        setPublishState("invalid");
-      } else if (errorCode === "PUBLICATION_NOT_COMPLETED") {
+        setPublicationIssues([...(response.issues ?? [])]);
+        transitionPublication({ type: "invalid" });
+      } else if (response.reason === "not-completed") {
         retryablePublishAttemptRef.current = attempt;
-        setPublishState("not-completed");
-      } else if (errorCode === "PUBLICATION_STATE_UNCONFIRMED") {
+        transitionPublication({ type: "not-completed" });
+      } else if (response.reason === "state-unconfirmed") {
         await reconcilePublicationState(attempt, "state-unconfirmed");
       } else {
         retryablePublishAttemptRef.current = null;
-        setPublishState("error");
+        transitionPublication({ type: "error" });
       }
     } catch {
       await reconcilePublicationState(attempt, "transport-error");
@@ -1160,7 +916,7 @@ export function useArticleWorkspace() {
     ) {
       return;
     }
-    setPublishState("ready");
+    transitionPublication({ type: "acknowledge" });
     setPublicationReconciliationState("idle");
   }
 
@@ -1172,10 +928,8 @@ export function useArticleWorkspace() {
 
     setUnpublishState("unpublishing");
     try {
-      const response = await getApiClient()
-        .admin.articles({ articleId: snapshot.id })
-        ["current-publication"].delete();
-      if (response.status === 200 && response.data) {
+      const response = await workspaceGateway.unpublishArticle(snapshot.id);
+      if (response.ok) {
         resetPublicationHistory();
         setArticles((current) =>
           current.map((article) =>
@@ -1189,7 +943,7 @@ export function useArticleWorkspace() {
           const unpublished = { ...local, currentPublicationId: null };
           selectedRef.current = unpublished;
           setSelected(unpublished);
-          setPublishState("ready");
+          transitionPublication({ type: "unpublished" });
           setPublicationAction(null);
           setPublicationReceipt(null);
           setPublicationReconciliationState("idle");
@@ -1212,20 +966,20 @@ export function useArticleWorkspace() {
     setRestoreState("ready");
     setRestoreIssues([]);
     try {
-      const response = await getApiClient()
-        .admin.articles({ articleId: snapshot.id })
-        .publications.get();
+      const response = await workspaceGateway.readPublicationHistory(
+        snapshot.id,
+      );
       if (
         selectedRef.current?.id !== snapshot.id ||
         requestGeneration !== historyRequestGeneration.current
       ) {
         return;
       }
-      if (response.status !== 200 || !response.data) {
+      if (!response.ok) {
         setHistoryState("error");
         return;
       }
-      const history = response.data as ArticlePublicationHistory;
+      const history = response.value;
       setPublicationHistory(history.publications);
       setHistoryHasUnpublishedChanges(
         (locallyKnown) => locallyKnown || history.hasUnpublishedChanges,
@@ -1258,16 +1012,14 @@ export function useArticleWorkspace() {
     setRestoreIssues([]);
 
     try {
-      const response = await getApiClient()
-        .admin.articles({ articleId: snapshot.id })
-        .publications({ publicationId: publication.id })
-        .restore.post({
-          draftVersion: snapshot.draft.version,
-          confirmDiscardUnpublishedChanges: true,
-        });
+      const response = await workspaceGateway.restorePublication({
+        articleId: snapshot.id,
+        publicationId: publication.id,
+        draftVersion: snapshot.draft.version,
+      });
       if (selectedRef.current?.id !== snapshot.id) return;
-      if (response.status === 200 && response.data) {
-        const serverArticle = response.data as Article;
+      if (response.ok) {
+        const serverArticle = response.value;
         selectServerDraft(serverArticle, { preservePublicationHistory: true });
         setState("saved");
         setArticles((current) =>
@@ -1276,24 +1028,17 @@ export function useArticleWorkspace() {
           ),
         );
         setHistoryHasUnpublishedChanges(true);
-        setPublishState("ready");
+        transitionPublication({ type: "reset" });
         setPublicationAction(null);
         setUnpublishState("ready");
         setRestoreState("restored");
         return;
       }
 
-      const error: unknown = response.error?.value;
-      if (
-        response.status === 400 &&
-        typeof error === "object" &&
-        error !== null &&
-        "issues" in error &&
-        Array.isArray(error.issues)
-      ) {
-        setRestoreIssues(error.issues.filter(isPublicationRestorationIssue));
+      if (response.reason === "invalid") {
+        setRestoreIssues([...(response.issues ?? [])]);
         setRestoreState("invalid");
-      } else if (response.status === 409) {
+      } else if (response.reason === "conflict") {
         setRestoreState("conflict");
       } else {
         setRestoreState("error");
@@ -1307,16 +1052,25 @@ export function useArticleWorkspace() {
 
   function clearSelectedArticle() {
     draftLoadGeneration.current += 1;
-    selectedRef.current = null;
-    revisionRef.current = 0;
-    confirmedRevisionRef.current = 0;
-    setSelected(null);
-    setRevision(0);
-    setConfirmedRevision(0);
+    const editor = reduceArticleWorkspace(
+      {
+        selected: selectedRef.current,
+        revision: revisionRef.current,
+        confirmedRevision: confirmedRevisionRef.current,
+        state,
+      },
+      { type: "clear" },
+    );
+    selectedRef.current = editor.selected;
+    revisionRef.current = editor.revision;
+    confirmedRevisionRef.current = editor.confirmedRevision;
+    setSelected(editor.selected);
+    setRevision(editor.revision);
+    setConfirmedRevision(editor.confirmedRevision);
     setConflictCopy(null);
     setIssues([]);
-    setState("ready");
-    setPublishState("ready");
+    setState(editor.state);
+    transitionPublication({ type: "reset" });
     setPublicationAction(null);
     retryablePublishAttemptRef.current = null;
     setPublicationIssues([]);
@@ -1330,7 +1084,9 @@ export function useArticleWorkspace() {
   async function reloadTrashView() {
     setTrashViewState("loading");
     try {
-      setTrashedArticles(await loadTrashedArticles());
+      const response = await workspaceGateway.listTrashedArticles();
+      if (!response.ok) throw new Error("Trash unavailable");
+      setTrashedArticles(response.value);
       setTrashViewState("ready");
     } catch {
       setTrashViewState("error");
@@ -1342,13 +1098,11 @@ export function useArticleWorkspace() {
     if (!snapshot || trashActionDisabled || trashLifecyclePendingRef.current)
       return;
     trashLifecyclePendingRef.current = true;
-    setTrashActionState("trashing");
+    transitionTrash({ type: "begin", action: "trash" });
     try {
-      const response = await getApiClient()
-        .admin.articles({ articleId: snapshot.id })
-        .trash.post();
-      if (response.status !== 200 || !response.data) {
-        setTrashActionState("trash-error");
+      const response = await workspaceGateway.trashArticle(snapshot.id);
+      if (!response.ok) {
+        transitionTrash({ type: "failed", action: "trash" });
         return;
       }
 
@@ -1356,10 +1110,10 @@ export function useArticleWorkspace() {
         current.filter((article) => article.id !== snapshot.id),
       );
       if (selectedRef.current?.id === snapshot.id) clearSelectedArticle();
-      setTrashActionState("trashed");
+      transitionTrash({ type: "succeeded", action: "trash" });
       await reloadTrashView();
     } catch {
-      setTrashActionState("trash-error");
+      transitionTrash({ type: "failed", action: "trash" });
     } finally {
       trashLifecyclePendingRef.current = false;
     }
@@ -1373,14 +1127,12 @@ export function useArticleWorkspace() {
     )
       return;
     trashLifecyclePendingRef.current = true;
-    setTrashActionState("restoring");
+    transitionTrash({ type: "begin", action: "restore" });
     let restoreConfirmed = false;
     try {
-      const response = await getApiClient()
-        .admin.trash.articles({ articleId: article.id })
-        .restore.post();
-      if (response.status !== 200 || !response.data) {
-        setTrashActionState("restore-error");
+      const response = await workspaceGateway.restoreTrashedArticle(article.id);
+      if (!response.ok) {
+        transitionTrash({ type: "failed", action: "restore" });
         return;
       }
       restoreConfirmed = true;
@@ -1388,26 +1140,28 @@ export function useArticleWorkspace() {
       setTrashedArticles((current) =>
         current.filter((candidate) => candidate.id !== article.id),
       );
-      setTrashActionState("restored");
+      transitionTrash({ type: "succeeded", action: "restore" });
 
-      const restored = await getApiClient()
-        .admin.articles({ articleId: article.id })
-        .get();
-      if (restored.status === 200 && restored.data) {
-        const serverArticle = restored.data as Article;
+      const restored = await workspaceGateway.readArticle(article.id);
+      if (restored.ok) {
+        const serverArticle = restored.value;
         setArticles((current) => [
           serverArticle,
           ...current.filter((candidate) => candidate.id !== serverArticle.id),
         ]);
         selectServerDraft(serverArticle);
         setState("saved");
-        setPublishState("ready");
+        transitionPublication({ type: "reset" });
         setPublicationAction(null);
         setUnpublishState("ready");
-        setTrashActionState("restored");
+        transitionTrash({ type: "succeeded", action: "restore" });
       }
     } catch {
-      setTrashActionState(restoreConfirmed ? "restored" : "restore-error");
+      transitionTrash(
+        restoreConfirmed
+          ? { type: "succeeded", action: "restore" }
+          : { type: "failed", action: "restore" },
+      );
     } finally {
       trashLifecyclePendingRef.current = false;
     }
@@ -1419,21 +1173,22 @@ export function useArticleWorkspace() {
   ) {
     if (articleSelectionDisabled || trashLifecyclePendingRef.current) return;
     trashLifecyclePendingRef.current = true;
-    setTrashActionState("purging");
+    transitionTrash({ type: "begin", action: "purge" });
     try {
-      const response = await getApiClient()
-        .admin.trash.articles({ articleId: article.id })
-        .delete({ confirmationTitle });
-      if (response.status !== 200 || !response.data) {
-        setTrashActionState("purge-error");
+      const response = await workspaceGateway.purgeTrashedArticle(
+        article.id,
+        confirmationTitle,
+      );
+      if (!response.ok) {
+        transitionTrash({ type: "failed", action: "purge" });
         return;
       }
       setTrashedArticles((current) =>
         current.filter((candidate) => candidate.id !== article.id),
       );
-      setTrashActionState("purged");
+      transitionTrash({ type: "succeeded", action: "purge" });
     } catch {
-      setTrashActionState("purge-error");
+      transitionTrash({ type: "failed", action: "purge" });
     } finally {
       trashLifecyclePendingRef.current = false;
     }
@@ -1505,4 +1260,88 @@ export function useArticleWorkspace() {
   };
 }
 
-export type ArticleWorkspace = ReturnType<typeof useArticleWorkspace>;
+type ArticleWorkspaceBinding = ReturnType<typeof useArticleWorkspace>;
+
+export type ArticleListWorkspace = Pick<
+  ArticleWorkspaceBinding,
+  | "articles"
+  | "state"
+  | "selected"
+  | "articleSelectionDisabled"
+  | "listError"
+  | "createError"
+  | "listActionPendingId"
+  | "createDraft"
+  | "reloadArticles"
+  | "publishListedArticle"
+  | "unpublishListedArticle"
+  | "moveListedArticleToTrash"
+  | "loadDraft"
+  | "previewSavedDraft"
+>;
+
+export type ArticleWorkspaceAlerts = Pick<
+  ArticleWorkspaceBinding,
+  | "state"
+  | "issues"
+  | "conflictCopy"
+  | "blocker"
+  | "publishState"
+  | "publicationAction"
+  | "publicationIssues"
+  | "publicationReceipt"
+  | "publicationReconciliationState"
+  | "unpublishState"
+  | "trashActionState"
+  | "lifecycleActionPending"
+  | "persistCurrentDraft"
+  | "reloadDraft"
+  | "retryConflict"
+  | "retryPublishDraft"
+  | "acknowledgePublicationReconciliation"
+  | "clearSelectedArticle"
+>;
+
+export type ArticleEditorWorkspace = ArticleWorkspaceAlerts &
+  Pick<
+    ArticleWorkspaceBinding,
+    | "selected"
+    | "editorLocked"
+    | "editorGeneration"
+    | "serverConfirmed"
+    | "historyState"
+    | "historyHasUnpublishedChanges"
+    | "loadPublicationHistory"
+    | "hasUnsavedChanges"
+    | "updateDraft"
+    | "preview"
+    | "previewState"
+    | "previewIssues"
+    | "previewSavedDraft"
+    | "publishActionDisabled"
+    | "publishDraft"
+    | "unpublishActionDisabled"
+    | "unpublishCurrentPublication"
+    | "trashActionDisabled"
+    | "moveSelectedArticleToTrash"
+    | "publicationHistory"
+    | "restoreState"
+    | "restoreIssues"
+    | "restoreFromHistory"
+  >;
+
+export type ArticleTrashWorkspace = Pick<
+  ArticleWorkspaceBinding,
+  | "trashedArticles"
+  | "trashViewState"
+  | "trashActionState"
+  | "articleSelectionDisabled"
+  | "reloadTrashView"
+  | "restoreArticleFromTrash"
+  | "purgeArticleFromTrash"
+>;
+
+/** Route-level composition; each view consumes one narrower role interface. */
+export type ArticleWorkspace = ArticleListWorkspace &
+  ArticleEditorWorkspace &
+  ArticleTrashWorkspace;
