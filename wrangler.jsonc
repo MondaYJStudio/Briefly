@@ -8,7 +8,23 @@
   },
   "compatibility_date": "2026-07-28",
   "compatibility_flags": ["nodejs_compat"],
+  "keep_vars": true,
   "workers_dev": true,
+  "observability": {
+    "enabled": false,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": true,
+    },
+    "traces": {
+      "enabled": false,
+      "persist": true,
+      "head_sampling_rate": 1,
+    },
+  },
   "vars": {
     "APP_ENV": "production",
     "SETUP_SECRET": "replace-with-an-independent-random-secret",
@@ -51,29 +67,38 @@
     },
     "production": {
       "name": "briefly",
-      "workers_dev": false,
-      "routes": [
-        {
-          "pattern": "briefly.example.com",
-          "custom_domain": true,
+      "workers_dev": true,
+      "observability": {
+        "enabled": false,
+        "head_sampling_rate": 1,
+        "logs": {
+          "enabled": true,
+          "head_sampling_rate": 1,
+          "persist": true,
+          "invocation_logs": true,
         },
-      ],
+        "traces": {
+          "enabled": false,
+          "persist": true,
+          "head_sampling_rate": 1,
+        },
+      },
       "vars": {
         "APP_ENV": "production",
-        "APP_ORIGIN": "https://briefly.example.com",
+        "APP_ORIGIN": "https://briefly.mondayj.workers.dev",
       },
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "briefly-production",
-          "database_id": "00000000-0000-0000-0000-000000000000",
+          "database_name": "briefly",
+          "database_id": "7cdcb15d-5859-41a4-9b4b-d1e6b9597c48",
           "migrations_dir": "src/db/migrations",
         },
       ],
       "r2_buckets": [
         {
           "binding": "MEDIA_BUCKET",
-          "bucket_name": "briefly-production",
+          "bucket_name": "briefly-media",
         },
       ],
     },
