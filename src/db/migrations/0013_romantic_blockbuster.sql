@@ -1,0 +1,1 @@
+ALTER TABLE `site_settings` ADD `public_site_enabled` integer DEFAULT true NOT NULL;

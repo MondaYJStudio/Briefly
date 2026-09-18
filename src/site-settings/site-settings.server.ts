@@ -114,6 +114,8 @@ const persistedSiteSettings = z.object({
   defaultBylineName: z.string().trim().min(1).max(BYLINE_NAME_MAXIMUM_LENGTH),
   defaultBylineUrl: bylineUrl.nullable(),
   defaultLanguage: bcp47Language,
+  // Older rows / rolling binaries may omit the column until migration lands.
+  publicSiteEnabled: z.boolean().optional().default(true),
 });
 
 const siteSettingsInput = z
@@ -141,6 +143,8 @@ const siteSettingsInput = z
       url: bylineUrl.nullable(),
     }),
     defaultLanguage: bcp47Language,
+    // Optional so older admin clients keep working; omitted means "leave as-is".
+    publicSiteEnabled: z.boolean().optional(),
   })
   .refine(
     (input) =>
@@ -218,6 +222,7 @@ export async function readSiteSettings(
       url: parsed.defaultBylineUrl,
     },
     defaultLanguage: parsed.defaultLanguage,
+    publicSiteEnabled: parsed.publicSiteEnabled,
   };
 }
 
@@ -294,6 +299,8 @@ export async function updateSiteSettings(
       defaultBylineName: parsed.data.defaultByline.name,
       defaultBylineUrl: parsed.data.defaultByline.url,
       defaultLanguage: parsed.data.defaultLanguage,
+      publicSiteEnabled:
+        parsed.data.publicSiteEnabled ?? current.publicSiteEnabled,
     })
     .where(eq(siteSettings.id, 1));
 

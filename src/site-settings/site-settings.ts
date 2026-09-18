@@ -37,6 +37,11 @@ export interface SiteSettings {
   siteDescriptions: SiteDescriptionTranslations;
   defaultByline: Byline;
   defaultLanguage: string;
+  /**
+   * Whether public reader HTML paths are served. When false, those paths
+   * redirect to Admin; the public content API and public media stay available.
+   */
+  publicSiteEnabled: boolean;
 }
 
 export interface LocalizedSiteSettings extends SiteSettings {

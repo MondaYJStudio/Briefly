@@ -286,6 +286,8 @@
   "settings_saved_description": "New defaults apply to Articles that inherit them. Articles with overrides are unchanged.",
   "site_information": "Site information",
   "site_name": "Site name",
+  "public_site_enabled": "Public site",
+  "public_site_enabled_description": "When off, visitors are sent to Admin. The public content API and media stay available.",
   "site_description": "Site description",
   "site_description_languages": "Site description languages",
   "invalid_site_description": "Use a valid site description.",

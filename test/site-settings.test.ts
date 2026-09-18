@@ -46,6 +46,7 @@ describe("site identity and Byline defaults", () => {
       },
       defaultByline: { name: "Briefly", url: null },
       defaultLanguage: "en",
+      publicSiteEnabled: true,
     });
   }, 15_000);
 
@@ -83,6 +84,7 @@ describe("site identity and Byline defaults", () => {
         ja: null,
         ko: null,
       },
+      publicSiteEnabled: true,
     });
     const readResponse = await SELF.fetch(
       "http://briefly.test/api/admin/site-settings",
@@ -98,6 +100,7 @@ describe("site identity and Byline defaults", () => {
         ja: null,
         ko: null,
       },
+      publicSiteEnabled: true,
     });
     expect(JSON.stringify(persisted)).not.toContain(administrator.email);
   }, 15_000);
@@ -147,6 +150,7 @@ describe("site identity and Byline defaults", () => {
         ja: null,
         ko: null,
       },
+      publicSiteEnabled: true,
     });
   }, 15_000);
 

@@ -62,6 +62,7 @@ const adminSiteSettingsContract = t.Object({
     url: t.Any(),
   }),
   defaultLanguage: t.String(),
+  publicSiteEnabled: t.Boolean(),
 });
 const siteSettingsInputContract = t.Object({
   siteName: t.String(),
@@ -72,6 +73,7 @@ const siteSettingsInputContract = t.Object({
     url: t.Any(),
   }),
   defaultLanguage: t.String(),
+  publicSiteEnabled: t.Optional(t.Boolean()),
 });
 const authenticationRequiredContract = t.Object({
   status: t.Literal("error"),
@@ -257,7 +259,12 @@ async function publicSiteSettingsResponse(
   const settings = await readSiteSettings(database);
   const locale = resolveSiteLocale(request);
   const localized = localizedSiteSettings(settings, locale);
-  return publicJsonResponse(request, localized, {
+  // Public Site Enabled is an administration gate, not public identity.
+  const {
+    publicSiteEnabled: _publicSiteEnabled,
+    ...publicIdentity
+  } = localized;
+  return publicJsonResponse(request, publicIdentity, {
     head,
     etag: true,
     headers: {

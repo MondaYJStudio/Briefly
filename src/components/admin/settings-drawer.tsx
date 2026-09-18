@@ -7,6 +7,7 @@ import {
   ListBox,
   Select,
   Spinner,
+  Switch,
   TextArea,
 } from "@heroui/react";
 import {
@@ -435,6 +436,30 @@ export function SettingsDrawer({
                     {m.site_information()}
                   </h2>
                   <div className={`flex flex-col gap-5`}>
+                    <SettingsField
+                      label={m.public_site_enabled()}
+                      htmlFor="publicSiteEnabled"
+                      description={m.public_site_enabled_description()}
+                    >
+                      <Switch
+                        id="publicSiteEnabled"
+                        name="publicSiteEnabled"
+                        isSelected={settings.publicSiteEnabled}
+                        isDisabled={disabled}
+                        onChange={(selected) =>
+                          update({
+                            ...settings,
+                            publicSiteEnabled: selected,
+                          })
+                        }
+                      >
+                        <Switch.Content>
+                          <Switch.Control>
+                            <Switch.Thumb />
+                          </Switch.Control>
+                        </Switch.Content>
+                      </Switch>
+                    </SettingsField>
                     <SettingsField
                       label={m.site_name()}
                       htmlFor="siteName"

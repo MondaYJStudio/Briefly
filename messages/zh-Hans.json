@@ -286,6 +286,8 @@
   "settings_saved_description": "新的默认值适用于继承它们的文章。已覆盖的文章不受影响。",
   "site_information": "站点信息",
   "site_name": "站点名称",
+  "public_site_enabled": "公开站",
+  "public_site_enabled_description": "关闭后，访客会被导向管理端。公开内容 API 与媒体仍可用。",
   "site_description": "站点简介",
   "site_description_languages": "站点简介语言",
   "invalid_site_description": "请输入有效的站点简介。",

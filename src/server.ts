@@ -14,7 +14,10 @@ import {
 } from "./env/origin.server";
 import { mergeVary, resolveSiteLocale } from "./locales/locale";
 import { canonicalizeAppLocale } from "./locales/registry";
-import { normalizeLocalePathUrl } from "./locales/locale-path";
+import {
+  isReservedApplicationPath,
+  normalizeLocalePathUrl,
+} from "./locales/locale-path";
 import { registerParaglideServerLocaleStrategy } from "./locales/paraglide-strategy.server";
 import { deLocalizeUrl } from "./paraglide/runtime.js";
 
@@ -253,10 +256,33 @@ const worker = {
         );
         response.headers.set("cache-control", "no-store");
       } else {
-        response = withRequestId(
-          await handleStartRequest(request, configuration.bindings),
-          requestId,
-        );
+        let publicSiteRedirected = false;
+        if (
+          (request.method === "GET" || request.method === "HEAD") &&
+          !isReservedApplicationPath(routedPathname)
+        ) {
+          const { readSiteSettings } =
+            await import("./site-settings/site-settings.server");
+          const settings = await readSiteSettings(configuration.bindings.DB);
+          if (!settings.publicSiteEnabled) {
+            const applicationOrigin = applicationOriginForRequest(
+              configuration.bindings,
+              request,
+            );
+            response = withRequestId(
+              Response.redirect(new URL("/admin", applicationOrigin), 302),
+              requestId,
+            );
+            response.headers.set("cache-control", "no-store");
+            publicSiteRedirected = true;
+          }
+        }
+        if (!publicSiteRedirected) {
+          response = withRequestId(
+            await handleStartRequest(request, configuration.bindings),
+            requestId,
+          );
+        }
       }
 
       return finishResponse(response, diagnosisCode);

@@ -29,8 +29,12 @@ Public authorship metadata carried by a Draft and stored in each Publication. A 
 _Avoid_: Administrator, user account, author login
 
 **Site Settings**:
-Site-wide public identity and default publication metadata. A default Byline or language participates in publication preparation only when the Draft does not provide an override.
+Site-wide public identity and default publication metadata. A default Byline or language participates in publication preparation only when the Draft does not provide an override. Site Settings also carry **Public Site Enabled**, the gate for public reader HTML.
 _Avoid_: Administrator profile
+
+**Public Site Enabled**:
+Whether public reader HTML paths are served to visitors. When off, those paths redirect to Admin; the public content API and public media remain available.
+_Avoid_: site published, maintenance mode, unpublish all Articles
 
 **Administrator**:
 The single account that authors and administers a Briefly site. It is the identity behind a sign-in session and is never public authorship metadata.
@@ -119,6 +123,7 @@ Settings. Identity terms use **管理员** for Administrator and **管理员会�
 Administrator Session. The workflow verbs are **预览** (Preview) and **发布** (Publish);
 `Changes pending` is **有待发布的修改**, and `Unpublished` is **未发布**.
 Public presentation terms use **内建公开站** for Built-in Public Site,
+**公开站开关** for Public Site Enabled,
 **公开模板** for Public Template, **模板清单** for Template Manifest,
 **已安装公开模板** for Installed Public Template, and **启用中的公开模板**
 for Active Public Template.

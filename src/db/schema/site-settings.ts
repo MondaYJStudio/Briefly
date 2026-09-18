@@ -14,4 +14,9 @@ export const siteSettings = sqliteTable("site_settings", {
   defaultBylineName: text("default_byline_name").notNull().default("Briefly"),
   defaultBylineUrl: text("default_byline_url"),
   defaultLanguage: text("default_language").notNull().default("en"),
+  // When false, Worker redirects public reader HTML to /admin while the
+  // public content API and /media remain available (headless CMS mode).
+  publicSiteEnabled: integer("public_site_enabled", { mode: "boolean" })
+    .notNull()
+    .default(true),
 });
