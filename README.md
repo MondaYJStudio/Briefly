@@ -8,13 +8,14 @@ Briefly is a modern, self-hosted publishing engine built for content that deserv
 
 ## Status
 
-Briefly is **pre-alpha**. Its Cloudflare runtime foundation is runnable, but article authoring and publication features are still under development.
+Briefly is **pre-alpha** (`0.x`). Draft authoring, Publish, Channels, private media, and the public content API are usable on Cloudflare Workers, but the product is not yet stable: expect breaking changes to APIs, schemas, and the Admin UI before a `1.0` release.
 
 ## Why Briefly
 
 - A polished private workspace for writing rich, media-backed articles
 - Deliberate publishing that keeps every unfinished change safely out of public view
 - Immutable Publications that preserve history and make every release trustworthy
+- Optional Channels so one install can partition public content for different sites or apps without polluting Article tags
 - Private asset management with permanent, publication-ready media URLs
 - A presentation-neutral content API ready to power any frontend
 - A complete publishing stack delivered as one efficient Cloudflare Worker
@@ -22,6 +23,8 @@ Briefly is **pre-alpha**. Its Cloudflare runtime foundation is runnable, but art
 ## Publishing model
 
 Each Article has one mutable Draft and a history of immutable Publications. Publishing validates and renders a saved Draft, creates a new Publication, and atomically makes it current. If validation, rendering, media resolution, or storage fails, the previous public version remains unchanged.
+
+An Article may belong to at most one Channel, or to none. Channels are an Administrator-managed registry of stable slugs and display names—not freeform tags, sites, or tenants. The Draft holds the Channel selection; Publish freezes it into the Publication. Public filtering uses that frozen Publication Channel only.
 
 Public consumers receive stored semantic HTML and resolved metadata. Drafts, authentication records, and editable ProseMirror JSON are never exposed by the public API.
 
@@ -31,7 +34,7 @@ Public consumers receive stored semantic HTML and resolved metadata. Drafts, aut
 - Elysia with Eden Treaty
 - Cloudflare Workers, D1, and private R2 storage
 - Drizzle ORM and ordered database migrations
-- Better Auth for the sole administrator
+- Better Auth for the sole Administrator
 - Tiptap with a constrained, versioned ProseMirror document model
 - HeroUI for the administration interface
 
@@ -44,6 +47,7 @@ src/
 ├── articles/                         # Draft, publication, and article rules
 ├── assets/                           # Image metadata and R2 lifecycle rules
 ├── auth/                             # Authentication and authorization
+├── channels/                         # Channel registry and Draft assignment
 ├── components/                       # UI shared across multiple routes
 ├── db/
 │   ├── migrations/                   # Ordered database migrations
@@ -120,7 +124,7 @@ Briefly requires `BETTER_AUTH_SECRET` (at least 32 characters, permanent authent
 
 For self-hosting, click the Deploy to Cloudflare button near the top of this README. Cloudflare clones this public repository, asks for `BETTER_AUTH_SECRET` (encrypted, at least 32 characters) and `SETUP_SECRET` (visible var, any non-empty value), provisions the D1 database and private R2 bucket, applies the committed D1 migrations, and deploys the Worker. Keep `SETUP_SECRET` available until setup is complete, and paste that same value into the First-run setup page.
 
-After deployment succeeds, open the Worker URL shown by Cloudflare. Visiting `/admin` automatically opens `/admin/setup` on an uninitialized installation. Enter the administrator email and password, then paste the same `SETUP_SECRET` from the deployment form. No `APP_ORIGIN` value is needed for the automatically assigned `workers.dev` address.
+After deployment succeeds, open the Worker URL shown by Cloudflare. Visiting `/admin` automatically opens `/admin/setup` on an uninitialized installation. Enter the Administrator email and password, then paste the same `SETUP_SECRET` from the deployment form. No `APP_ORIGIN` value is needed for the automatically assigned `workers.dev` address.
 
 The button requires this repository (or a fork of it) to be publicly readable by Cloudflare. Maintainers using a fixed custom domain should instead configure the `production` placeholders in `wrangler.jsonc` and follow the protected GitHub Actions release process in [OPERATIONS.md](OPERATIONS.md). That workflow builds first, applies pending migrations, deploys only after migration success, and finishes with a read-only `GET /health` probe.
 
@@ -145,7 +149,13 @@ The baseline contains no product telemetry, phone-home behavior, third-party ana
 - `GET /api/openapi.json` — inspect the machine-readable OpenAPI 3.1 contract
 - `/media/...` — serve controlled private media and immutable public media
 
-The public content API is anonymous, cross-origin readable, and independent of administrator cookies. List and detail responses use deterministic ETags and require shared caches to revalidate so a successful publish is visible immediately. The OpenAPI source is committed with the application and its schemas are tested against real Worker responses.
+### Channels
+
+Administrators manage Channels at `/admin/channels` (create, rename, delete). Assign a Channel on the Article Draft in the editor; it appears in the public API only after a successful Publish. The Articles list can filter by Channel.
+
+On the public list endpoint, `?channel=<slug>` returns only Current Publications whose frozen Channel slug matches. An unknown slug yields an empty list. Omit the parameter to list every Current Publication regardless of Channel. List and detail payloads expose `channel: { slug, name } | null` so consumers can render the partition without a separate lookup.
+
+The public content API is anonymous, cross-origin readable, and independent of Administrator cookies. List and detail responses use deterministic ETags and require shared caches to revalidate so a successful publish is visible immediately. The OpenAPI source is committed with the application and its schemas are tested against real Worker responses.
 
 Article slugs use one normalization policy. The saved display slug is trimmed and normalized to Unicode NFC while preserving its casing. The global uniqueness key lowercases that value with the locale-independent `und` locale, then normalizes the result to NFC again so case mapping cannot reintroduce a decomposed equivalent. Slugs must be well-formed Unicode and cannot contain control characters, URI path-reserved characters, percent signs, backslashes, or be the dot path segments `.` or `..`. A successful Publication makes its normalized slug claim permanent. Later successful slug changes redirect every former public slug directly to the current canonical URL; while the Article is unpublished, all of those locators return the same non-disclosing 404.
 
