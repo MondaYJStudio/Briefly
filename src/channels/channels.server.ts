@@ -37,6 +37,15 @@ const channelUpdateInput = z
   })
   .strict();
 
+function validationIssues(
+  error: z.ZodError,
+): Array<{ path: string; message: string }> {
+  return error.issues.map((issue) => ({
+    path: issue.path.join("."),
+    message: issue.message,
+  }));
+}
+
 const persistedChannel = z.object({
   id: z.string().uuid(),
   slug: z.string().min(1),
@@ -113,10 +122,7 @@ export async function createChannel(
     return {
       ok: false,
       reason: "invalid",
-      issues: parsed.error.issues.map((issue) => ({
-        path: issue.path.join("."),
-        message: issue.message,
-      })),
+      issues: validationIssues(parsed.error),
     };
   }
 
@@ -152,10 +158,7 @@ export async function updateChannelName(
     return {
       ok: false,
       reason: "invalid",
-      issues: parsed.error.issues.map((issue) => ({
-        path: issue.path.join("."),
-        message: issue.message,
-      })),
+      issues: validationIssues(parsed.error),
     };
   }
 

@@ -1,12 +1,11 @@
 import { Alert, Button, Dropdown, ListBox, Select, Tooltip } from "@heroui/react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import type {
   Article,
   ArticleLifecycleProjection,
 } from "../../articles/articles";
-import type { Channel } from "../../channels/channels";
-import { getApiClient } from "../../routes/api.$";
+import { useAdminChannels } from "../../channels/use-admin-channels";
 import { m } from "../../paraglide/messages.js";
 import { AdminIcon } from "./icons";
 import styles from "./articles-view.module.css";
@@ -91,26 +90,8 @@ export function ArticlesView({
     moveListedArticleToTrash,
   } = workspace;
   const [filter, setFilter] = useState<ArticleFilter>("all");
-  const [channels, setChannels] = useState<Channel[]>([]);
+  const channels = useAdminChannels();
   const selectedChannel: ChannelFilter = channelFilter ?? null;
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const client = getApiClient();
-        const response = await client.admin.channels.get();
-        if (cancelled || response.status !== 200 || !response.data) return;
-        const body = response.data as { channels: Channel[] };
-        setChannels(body.channels);
-      } catch {
-        /* Channel filter stays empty when the registry is unavailable. */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const counts = useMemo(() => {
     const next = {

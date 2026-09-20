@@ -32,6 +32,7 @@ import {
 } from "../../assets/verified-asset-picker";
 import { m } from "../../paraglide/messages.js";
 import { APP_LOCALE_OPTIONS } from "../../locales/registry";
+import { useAdminChannels } from "../../channels/use-admin-channels";
 import { getApiClient } from "../../routes/api.$";
 import type { SiteSettings } from "../../site-settings/site-settings";
 import styles from "./editor-view.module.css";
@@ -1047,29 +1048,7 @@ function ChannelPicker({
   channelSlug: string | null;
   onChange: (channelSlug: string | null) => void;
 }>) {
-  const [channels, setChannels] = useState<
-    Array<{ slug: string; name: string }>
-  >([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const client = getApiClient();
-        const response = await client.admin.channels.get();
-        if (cancelled || response.status !== 200 || !response.data) return;
-        const body = response.data as {
-          channels: Array<{ slug: string; name: string }>;
-        };
-        setChannels(body.channels);
-      } catch {
-        /* Picker stays empty when the registry is unavailable. */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const channels = useAdminChannels();
 
   return (
     <Select

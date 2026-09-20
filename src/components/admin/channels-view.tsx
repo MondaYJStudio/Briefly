@@ -3,13 +3,24 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 
 import type { Channel } from "../../channels/channels";
-import { getApiClient } from "../../routes/api.$";
+import {
+  createAdminChannel,
+  deleteAdminChannel,
+  listAdminChannels,
+  updateAdminChannelName,
+} from "../../channels/channels-client";
 import { m } from "../../paraglide/messages.js";
 import { AdminIcon } from "./icons";
 import styles from "./articles-view.module.css";
 import { SettingsField } from "./fields";
 
 type LoadState = "loading" | "ready" | "error";
+
+function draftNamesFrom(channels: Channel[]): Record<string, string> {
+  return Object.fromEntries(
+    channels.map((channel) => [channel.id, channel.name]),
+  );
+}
 
 /**
  * Channel registry: create, rename, delete, and jump to the article list
@@ -32,24 +43,14 @@ export function ChannelsView() {
   const reload = useCallback(async () => {
     setLoadState("loading");
     setActionError(null);
-    try {
-      const client = getApiClient();
-      const response = await client.admin.channels.get();
-      if (response.status !== 200 || !response.data) {
-        setLoadState("error");
-        return;
-      }
-      const body = response.data as { channels: Channel[] };
-      setChannels(body.channels);
-      setDraftNames(
-        Object.fromEntries(
-          body.channels.map((channel) => [channel.id, channel.name]),
-        ),
-      );
-      setLoadState("ready");
-    } catch {
+    const listed = await listAdminChannels();
+    if (!listed) {
       setLoadState("error");
+      return;
     }
+    setChannels(listed);
+    setDraftNames(draftNamesFrom(listed));
+    setLoadState("ready");
   }, []);
 
   useEffect(() => {
@@ -59,24 +60,18 @@ export function ChannelsView() {
   async function createChannel() {
     setCreating(true);
     setCreateError(false);
-    try {
-      const client = getApiClient();
-      const response = await client.admin.channels.post({
-        name: name.trim(),
-        slug: slug.trim(),
-      });
-      if (response.status !== 201) {
-        setCreateError(true);
-        return;
-      }
-      setName("");
-      setSlug("");
-      await reload();
-    } catch {
+    const created = await createAdminChannel({
+      name: name.trim(),
+      slug: slug.trim(),
+    });
+    setCreating(false);
+    if (!created) {
       setCreateError(true);
-    } finally {
-      setCreating(false);
+      return;
     }
+    setName("");
+    setSlug("");
+    await reload();
   }
 
   async function saveName(channel: Channel) {
@@ -84,45 +79,25 @@ export function ChannelsView() {
     if (nextName === channel.name) return;
     setPendingId(channel.id);
     setActionError(null);
-    try {
-      const client = getApiClient();
-      const response = await client.admin.channels({ channelId: channel.id }).put({
-        name: nextName,
-      });
-      if (response.status !== 200) {
-        setActionError("save");
-        return;
-      }
-      await reload();
-    } catch {
+    const updated = await updateAdminChannelName(channel.id, nextName);
+    setPendingId(null);
+    if (!updated) {
       setActionError("save");
-    } finally {
-      setPendingId(null);
+      return;
     }
+    await reload();
   }
 
   async function removeChannel(channel: Channel) {
     setPendingId(channel.id);
     setActionError(null);
-    try {
-      const client = getApiClient();
-      const response = await client.admin
-        .channels({ channelId: channel.id })
-        .delete();
-      if (response.status === 409) {
-        setActionError("blocked");
-        return;
-      }
-      if (response.status !== 204) {
-        setActionError("delete");
-        return;
-      }
-      await reload();
-    } catch {
-      setActionError("delete");
-    } finally {
-      setPendingId(null);
+    const result = await deleteAdminChannel(channel.id);
+    setPendingId(null);
+    if (!result.ok) {
+      setActionError(result.reason === "blocked" ? "blocked" : "delete");
+      return;
     }
+    await reload();
   }
 
   return (
