@@ -149,6 +149,7 @@ type EditableArticleDraft = Pick<
   | "tags"
   | "byline"
   | "language"
+  | "channelSlug"
   | "cover"
   | "document"
 >;
@@ -371,6 +372,7 @@ function editableArticleDraft(draft: Article["draft"]): EditableArticleDraft {
     tags,
     byline,
     language,
+    channelSlug,
     cover,
     document,
   } = draft;
@@ -382,6 +384,7 @@ function editableArticleDraft(draft: Article["draft"]): EditableArticleDraft {
     tags,
     byline,
     language,
+    channelSlug,
     cover,
     document,
   };

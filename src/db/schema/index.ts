@@ -16,5 +16,6 @@ export {
   publicationAssetReference,
 } from "./articles";
 export { asset } from "./assets";
+export { channel } from "./channels";
 export { runtimeMetadata } from "./runtime-metadata";
 export { siteSettings } from "./site-settings";

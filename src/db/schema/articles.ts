@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 import { asset } from "./assets";
+import { channel } from "./channels";
 import type { VideoProviderFacts } from "../../articles/video-embeds";
 
 export const article = sqliteTable(
@@ -80,6 +81,8 @@ export const publication = sqliteTable(
       .notNull()
       .default({ name: "", url: null }),
     language: text("language").notNull().default(""),
+    channelSlug: text("channel_slug"),
+    channelName: text("channel_name"),
     cover: text("cover", { mode: "json" }).$type<unknown | null>(),
     documentSchemaVersion: integer("document_schema_version")
       .notNull()
@@ -118,6 +121,7 @@ export const publication = sqliteTable(
     }),
     index("publication_slug_key_idx").on(table.slugKey),
     index("publication_article_id_idx").on(table.articleId),
+    index("publication_channel_slug_idx").on(table.channelSlug),
   ],
 );
 
@@ -141,6 +145,10 @@ export const articleDraft = sqliteTable(
       url: string | null;
     } | null>(),
     language: text("language"),
+    channelSlug: text("channel_slug").references(() => channel.slug, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
     cover: text("cover", { mode: "json" }).$type<{
       assetId: string;
       alt: string;
@@ -156,6 +164,7 @@ export const articleDraft = sqliteTable(
       name: "article_draft_slug_belongs_to_article",
     }),
     check("article_draft_version_positive", sql`${table.version} >= 1`),
+    index("article_draft_channel_slug_idx").on(table.channelSlug),
   ],
 );
 

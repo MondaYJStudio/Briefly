@@ -136,7 +136,7 @@ const worker = {
     }
 
     try {
-      let response: Response;
+      let response!: Response;
       let diagnosisCode: LogCode | undefined;
       const authenticationRateLimit = authenticationRateLimitFor(
         request,

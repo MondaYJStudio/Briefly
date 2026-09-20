@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { LANGUAGE_TAG_MAXIMUM_LENGTH } from "../site-settings/site-settings";
+import { channelSlugSchema } from "../channels/channels.server";
 import { normalizeArticleTag } from "./articles.server";
 import type { PublicArticle, PublicArticleListItem } from "./articles";
 import { articleSlugKey } from "./article-slug";
@@ -77,6 +78,7 @@ const publicArticleListQuery = z
       .default(PUBLIC_ARTICLE_LIST_DEFAULT_PAGE_SIZE),
     tag: z.string().optional(),
     language: articleContentLanguage.optional(),
+    channel: channelSlugSchema.optional(),
   })
   .strict();
 
@@ -87,6 +89,7 @@ const publicArticleListCursor = z
     articleId: z.string().uuid(),
     tag: z.string().nullable(),
     language: articleContentLanguage.nullable().optional(),
+    channel: channelSlugSchema.nullable().optional(),
   })
   .strict();
 
@@ -132,9 +135,13 @@ async function publicArticleListCursorIsCurrent(
   const languagePredicate = cursor.language
     ? "AND publication.language = ?"
     : "";
+  const channelPredicate = cursor.channel
+    ? "AND publication.channel_slug = ?"
+    : "";
   const bindings: unknown[] = [cursor.articleId, cursor.publishedAt];
   if (cursor.tag) bindings.push(cursor.tag);
   if (cursor.language) bindings.push(cursor.language);
+  if (cursor.channel) bindings.push(cursor.channel);
   const anchor = await database
     .prepare(
       `${publicArticleProjectionSelection}
@@ -143,6 +150,7 @@ async function publicArticleListCursorIsCurrent(
          AND article.published_at = ?
          ${tagPredicate}
          ${languagePredicate}
+         ${channelPredicate}
        LIMIT 1`,
     )
     .bind(...bindings)
@@ -163,6 +171,7 @@ export async function listPublicArticles(
     return { ok: false, reason: "invalid-query" };
   }
   const normalizedLanguage = parsedQuery.data.language ?? null;
+  const normalizedChannel = parsedQuery.data.channel ?? null;
 
   let cursor: PublicArticleListCursor | null = null;
   if (parsedQuery.data.cursor) {
@@ -171,6 +180,7 @@ export async function listPublicArticles(
     if (
       (cursor.tag ?? null) !== normalizedTag ||
       (cursor.language ?? null) !== normalizedLanguage ||
+      (cursor.channel ?? null) !== normalizedChannel ||
       !(await publicArticleListCursorIsCurrent(database, cursor))
     ) {
       return { ok: false, reason: "stale-cursor" };
@@ -189,6 +199,10 @@ export async function listPublicArticles(
   if (normalizedLanguage) {
     predicates.push("publication.language = ?");
     bindings.push(normalizedLanguage);
+  }
+  if (normalizedChannel) {
+    predicates.push("publication.channel_slug = ?");
+    bindings.push(normalizedChannel);
   }
   if (cursor) {
     predicates.push(`(
@@ -222,6 +236,7 @@ export async function listPublicArticles(
               articleId: lastRow.id,
               tag: normalizedTag,
               language: normalizedLanguage,
+              channel: normalizedChannel,
             })
           : null,
     },

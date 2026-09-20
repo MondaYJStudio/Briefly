@@ -501,6 +501,7 @@ describe("first immutable Publication", () => {
     expect(Object.keys(expected).sort()).toEqual(
       [
         "byline",
+        "channel",
         "cover",
         "html",
         "id",

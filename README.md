@@ -140,7 +140,7 @@ The baseline contains no product telemetry, phone-home behavior, third-party ana
 
 ## Public content API
 
-- `GET` / `HEAD /api/articles` — list only current Publications using opaque cursor pagination; `limit` defaults to 20 and is capped at 100, and optional normalized `tag` plus exact canonical BCP 47 `language` filters are supported
+- `GET` / `HEAD /api/articles` — list only current Publications using opaque cursor pagination; `limit` defaults to 20 and is capped at 100, and optional normalized `tag`, exact canonical BCP 47 `language`, and optional `channel` (Current Publication Channel slug) filters are supported; list and detail items include `channel: { slug, name } | null`
 - `GET` / `HEAD /api/articles/:slug` — retrieve the Current Publication by canonical slug; while the Article is public, a formerly public slug returns `308 Permanent Redirect` to the current canonical URL
 - `GET /api/openapi.json` — inspect the machine-readable OpenAPI 3.1 contract
 - `/media/...` — serve controlled private media and immutable public media

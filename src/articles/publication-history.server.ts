@@ -54,6 +54,7 @@ interface PublicationSourceRow {
   tags: string;
   byline: string;
   language: string;
+  channel_slug: string | null;
   cover: string | null;
   document_schema_version: number;
   document: string;
@@ -77,6 +78,7 @@ interface RestorableDraft {
   tags: string[];
   byline: { name: string; url: string | null };
   language: string;
+  channelSlug: string | null;
   cover: ArticleCoverUsage | null;
   document: ArticleDocument;
 }
@@ -402,6 +404,7 @@ function convertPublicationSource(
       tags: metadata.data.tags,
       byline: metadata.data.byline,
       language: metadata.data.language,
+      channelSlug: source.row.channel_slug ?? null,
       cover: cover.cover,
       document: migrated.document,
     },
@@ -422,7 +425,8 @@ async function readPublicationSource(
       `SELECT publication.id, publication.article_id,
               publication.publication_number, publication.title,
               publication.slug, publication.summary, publication.tags,
-              publication.byline, publication.language, publication.cover,
+              publication.byline, publication.language,
+              publication.channel_slug, publication.cover,
               publication.document_schema_version, publication.document
        FROM publication
        JOIN article ON article.id = publication.article_id
@@ -458,6 +462,7 @@ function draftMatchesPublication(
       tags: article.draft.tags,
       byline: resolvedByline,
       language: resolvedLanguage,
+      channelSlug: article.draft.channelSlug,
       cover: article.draft.cover,
       document: article.draft.document,
     }) ===
@@ -468,6 +473,7 @@ function draftMatchesPublication(
       tags: restored.tags,
       byline: restored.byline,
       language: restored.language,
+      channelSlug: restored.channelSlug,
       cover: restored.cover,
       document: restored.document,
     })
@@ -706,6 +712,14 @@ export async function restoreArticlePublication(
   }
 
   const restored = converted.draft;
+  let channelSlug = restored.channelSlug;
+  if (channelSlug !== null) {
+    const channel = await database
+      .prepare(`SELECT slug FROM channel WHERE slug = ? LIMIT 1`)
+      .bind(channelSlug)
+      .first<{ slug: string }>();
+    if (!channel) channelSlug = null;
+  }
   const { updated, article: articleAfterRestore } =
     await replaceArticleDraftState(
       database,
@@ -719,6 +733,7 @@ export async function restoreArticlePublication(
         tags: restored.tags,
         byline: restored.byline,
         language: restored.language,
+        channelSlug,
         cover: restored.cover,
         document: restored.document,
       },

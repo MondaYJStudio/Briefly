@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminArticlesRouteImport } from './routes/admin/articles'
+import { Route as AdminChannelsRouteImport } from './routes/admin/channels'
 import { Route as AdminMediaRouteImport } from './routes/admin/media'
 import { Route as AdminTrashRouteImport } from './routes/admin/trash'
 import { Route as AdminLoginRouteImport } from './routes/admin_.login'
@@ -43,6 +44,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const AdminArticlesRoute = AdminArticlesRouteImport.update({
   id: '/articles',
   path: '/articles',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminChannelsRoute = AdminChannelsRouteImport.update({
+  id: '/channels',
+  path: '/channels',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminMediaRoute = AdminMediaRouteImport.update({
@@ -105,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/admin/articles': typeof AdminArticlesRouteWithChildren
+  '/admin/channels': typeof AdminChannelsRoute
   '/admin/media': typeof AdminMediaRoute
   '/admin/trash': typeof AdminTrashRoute
   '/admin/login': typeof AdminLoginRoute
@@ -120,6 +127,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin/channels': typeof AdminChannelsRoute
   '/admin/media': typeof AdminMediaRoute
   '/admin/trash': typeof AdminTrashRoute
   '/admin/login': typeof AdminLoginRoute
@@ -138,6 +146,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/admin/articles': typeof AdminArticlesRouteWithChildren
+  '/admin/channels': typeof AdminChannelsRoute
   '/admin/media': typeof AdminMediaRoute
   '/admin/trash': typeof AdminTrashRoute
   '/admin_/login': typeof AdminLoginRoute
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/admin/articles'
+    | '/admin/channels'
     | '/admin/media'
     | '/admin/trash'
     | '/admin/login'
@@ -172,6 +182,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin/channels'
     | '/admin/media'
     | '/admin/trash'
     | '/admin/login'
@@ -189,6 +200,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/admin/articles'
+    | '/admin/channels'
     | '/admin/media'
     | '/admin/trash'
     | '/admin_/login'
@@ -243,6 +255,13 @@ declare module '@tanstack/react-router' {
       path: '/articles'
       fullPath: '/admin/articles'
       preLoaderRoute: typeof AdminArticlesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/channels': {
+      id: '/admin/channels'
+      path: '/channels'
+      fullPath: '/admin/channels'
+      preLoaderRoute: typeof AdminChannelsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/media': {
@@ -341,6 +360,7 @@ const AdminArticlesRouteWithChildren = AdminArticlesRoute._addFileChildren(
 
 interface AdminRouteChildren {
   AdminArticlesRoute: typeof AdminArticlesRouteWithChildren
+  AdminChannelsRoute: typeof AdminChannelsRoute
   AdminMediaRoute: typeof AdminMediaRoute
   AdminTrashRoute: typeof AdminTrashRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -348,6 +368,7 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminArticlesRoute: AdminArticlesRouteWithChildren,
+  AdminChannelsRoute: AdminChannelsRoute,
   AdminMediaRoute: AdminMediaRoute,
   AdminTrashRoute: AdminTrashRoute,
   AdminIndexRoute: AdminIndexRoute,

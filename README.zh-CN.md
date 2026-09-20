@@ -140,7 +140,7 @@ Drizzle schema 文件是数据库结构的事实来源；Drizzle Kit 生成提�
 
 ## 公开内容 API
 
-- `GET` / `HEAD /api/articles` — 使用不透明游标仅列出当前发布版本；`limit` 默认为 20、上限为 100，并支持可选的归一化 `tag` 和规范化 BCP 47 `language` 精确过滤条件
+- `GET` / `HEAD /api/articles` — 使用不透明游标仅列出当前发布版本；`limit` 默认为 20、上限为 100，并支持可选的归一化 `tag`、规范化 BCP 47 `language`，以及可选的 `channel`（Current Publication 的 Channel slug）精确过滤条件；列表与详情项包含 `channel: { slug, name } | null`
 - `GET` / `HEAD /api/articles/:slug` — 根据规范 slug 获取当前发布版本；Article 公开期间，曾经公开的 slug 会以 `308 Permanent Redirect` 跳转到当前规范 URL
 - `GET /api/openapi.json` — 查看机器可读的 OpenAPI 3.1 契约
 - `/media/...` — 交付受控的私有媒体与不可变公开媒体

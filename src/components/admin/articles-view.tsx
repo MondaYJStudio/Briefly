@@ -1,10 +1,12 @@
-import { Alert, Button, Dropdown, Tooltip } from "@heroui/react";
-import { useMemo, useState } from "react";
+import { Alert, Button, Dropdown, ListBox, Select, Tooltip } from "@heroui/react";
+import { useEffect, useMemo, useState } from "react";
 
 import type {
   Article,
   ArticleLifecycleProjection,
 } from "../../articles/articles";
+import type { Channel } from "../../channels/channels";
+import { getApiClient } from "../../routes/api.$";
 import { m } from "../../paraglide/messages.js";
 import { AdminIcon } from "./icons";
 import styles from "./articles-view.module.css";
@@ -13,10 +15,18 @@ import { articleLifecycleProjection } from "../../articles/article-workspace";
 import type { ArticleListWorkspace } from "./use-article-workspace";
 
 type ArticleFilter = "all" | ArticleLifecycleProjection;
+type ChannelFilter = string | null;
 
-function articleVisible(article: Article, filter: ArticleFilter): boolean {
-  if (filter === "all") return true;
-  return articleLifecycleProjection(article) === filter;
+function articleVisible(
+  article: Article,
+  filter: ArticleFilter,
+  channelFilter: ChannelFilter,
+): boolean {
+  if (filter !== "all" && articleLifecycleProjection(article) !== filter) {
+    return false;
+  }
+  if (channelFilter === null) return true;
+  return article.draft.channelSlug === channelFilter;
 }
 
 function lifecycleChip(projection: ArticleLifecycleProjection) {
@@ -54,11 +64,15 @@ function lifecycleChip(projection: ArticleLifecycleProjection) {
  */
 export function ArticlesView({
   workspace,
+  channelFilter = null,
+  onChannelFilterChange,
   onCreate,
   onOpen,
   onPreview,
 }: Readonly<{
   workspace: ArticleListWorkspace;
+  channelFilter?: string | null;
+  onChannelFilterChange?: (channel: string | null) => void;
   onCreate: () => void;
   onOpen: (article: Article) => void;
   onPreview: (article: Article) => void;
@@ -77,6 +91,26 @@ export function ArticlesView({
     moveListedArticleToTrash,
   } = workspace;
   const [filter, setFilter] = useState<ArticleFilter>("all");
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const selectedChannel: ChannelFilter = channelFilter ?? null;
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const client = getApiClient();
+        const response = await client.admin.channels.get();
+        if (cancelled || response.status !== 200 || !response.data) return;
+        const body = response.data as { channels: Channel[] };
+        setChannels(body.channels);
+      } catch {
+        /* Channel filter stays empty when the registry is unavailable. */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const counts = useMemo(() => {
     const next = {
@@ -91,7 +125,9 @@ export function ArticlesView({
     }
     return next;
   }, [articles]);
-  const visible = articles.filter((article) => articleVisible(article, filter));
+  const visible = articles.filter((article) =>
+    articleVisible(article, filter, selectedChannel),
+  );
   const creating = state === "creating";
   const loadingEmpty = state === "loading" && articles.length === 0;
   const failedEmpty = state === "failed" && articles.length === 0;
@@ -236,6 +272,41 @@ export function ArticlesView({
                 </button>
               ))}
             </div>
+            {onChannelFilterChange ? (
+              <Select
+                aria-label={m.filter_by_channel()}
+                selectedKey={selectedChannel ?? "all"}
+                onSelectionChange={(key) => {
+                  if (key === null || key === "all") {
+                    onChannelFilterChange(null);
+                    return;
+                  }
+                  onChannelFilterChange(String(key));
+                }}
+                className="min-w-[10rem]"
+              >
+                <Select.Trigger className="flex items-center">
+                  <Select.Value />
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox aria-label={m.filter_by_channel()}>
+                    <ListBox.Item id="all" textValue={m.filter_channel_all()}>
+                      {m.filter_channel_all()}
+                    </ListBox.Item>
+                    {channels.map((channel) => (
+                      <ListBox.Item
+                        key={channel.slug}
+                        id={channel.slug}
+                        textValue={channel.name}
+                      >
+                        {channel.name}
+                      </ListBox.Item>
+                    ))}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+            ) : null}
             <Tooltip.Root delay={500}>
               <Tooltip.Trigger
                 className={`${styles.searchMarker} flex items-center max-[860px]:w-full`}

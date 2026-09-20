@@ -30,19 +30,20 @@ interface AdminShellProps {
 }
 
 const NAV_ITEMS: ReadonlyArray<{
-  to: "/admin/articles" | "/admin/media" | "/admin/trash";
-  icon: "articles" | "media" | "trash";
+  to: "/admin/articles" | "/admin/channels" | "/admin/media" | "/admin/trash";
+  icon: "articles" | "channels" | "media" | "trash";
   label: () => string;
 }> = [
   { to: "/admin/articles", icon: "articles", label: () => m.articles() },
+  { to: "/admin/channels", icon: "channels", label: () => m.channels() },
   { to: "/admin/media", icon: "media", label: () => m.media() },
   { to: "/admin/trash", icon: "trash", label: () => m.trash() },
 ];
 
 /**
- * Admin shell: persistent left rail (Articles / Media / Trash) with the
- * identity menu in the footer — Settings, Account, theme, locale and sign-out
- * live there, matching the approved administration shell.
+ * Admin shell: persistent left rail (Articles / Channels / Media / Trash) with
+ * the identity menu in the footer — Settings, Account, theme, locale and
+ * sign-out live there, matching the approved administration shell.
  */
 export function AdminShell({
   identity,

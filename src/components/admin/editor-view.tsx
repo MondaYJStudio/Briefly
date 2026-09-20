@@ -958,6 +958,18 @@ function EditorRail({
                     })}
                   </p>
                 ) : null}
+                <SettingsField
+                  label={m.channel_picker_label()}
+                  htmlFor="articleChannel"
+                  optional={m.optional()}
+                >
+                  <ChannelPicker
+                    channelSlug={draft.channelSlug}
+                    onChange={(channelSlug) =>
+                      workspace.updateDraft({ channelSlug })
+                    }
+                  />
+                </SettingsField>
               </div>
             </section>
           )}
@@ -1024,6 +1036,72 @@ function EditorRail({
         <HistoryPanel workspace={workspace} />
       )}
     </aside>
+  );
+}
+
+/** Channel registry picker for an optional single Draft Channel. */
+function ChannelPicker({
+  channelSlug,
+  onChange,
+}: Readonly<{
+  channelSlug: string | null;
+  onChange: (channelSlug: string | null) => void;
+}>) {
+  const [channels, setChannels] = useState<
+    Array<{ slug: string; name: string }>
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const client = getApiClient();
+        const response = await client.admin.channels.get();
+        if (cancelled || response.status !== 200 || !response.data) return;
+        const body = response.data as {
+          channels: Array<{ slug: string; name: string }>;
+        };
+        setChannels(body.channels);
+      } catch {
+        /* Picker stays empty when the registry is unavailable. */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <Select
+      fullWidth
+      id="articleChannel"
+      aria-label={m.channel_picker_label()}
+      selectedKey={channelSlug ?? ""}
+      onSelectionChange={(key) =>
+        onChange(key === null || key === "" ? null : String(key))
+      }
+    >
+      <Select.Trigger className="flex items-center">
+        <Select.Value />
+        <Select.Indicator />
+      </Select.Trigger>
+      <Select.Popover>
+        <ListBox aria-label={m.channel_picker_label()}>
+          <ListBox.Item id="" textValue={m.channel_picker_none()}>
+            {m.channel_picker_none()}
+          </ListBox.Item>
+          {channels.map((channel) => (
+            <ListBox.Item
+              key={channel.slug}
+              id={channel.slug}
+              textValue={channel.name}
+            >
+              {channel.name}
+            </ListBox.Item>
+          ))}
+        </ListBox>
+      </Select.Popover>
+    </Select>
   );
 }
 

@@ -103,6 +103,13 @@ const payloads: Record<string, RequestInit> = {
     defaultByline: { name: "Briefly", url: null },
     defaultLanguage: "en",
   }),
+  "POST /api/admin/channels": json({
+    slug: "docs",
+    name: "Documentation",
+  }),
+  "PUT /api/admin/channels/:channelId": json({
+    name: "Documentation",
+  }),
   "DELETE /api/admin/trash/articles/:articleId": json({
     confirmationTitle: "Any title",
   }),
@@ -141,7 +148,8 @@ describe("every administration route requires an Administrator Session", () => {
         `http://briefly.test${path
           .replace(":articleId", uuid)
           .replace(":publicationId", uuid)
-          .replace(":assetId", uuid)}`,
+          .replace(":assetId", uuid)
+          .replace(":channelId", uuid)}`,
         { method, ...payloads[`${method} ${path}`] },
       );
 

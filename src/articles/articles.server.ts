@@ -16,6 +16,7 @@ import {
 } from "./article-document";
 import { articleSlugKey, articleSlugSchema } from "./article-slug";
 import { articleTagSchema, normalizeArticleTag } from "./tag-chips";
+import { channelSlugSchema } from "../channels/channels.server";
 import {
   BYLINE_NAME_MAXIMUM_LENGTH,
   LANGUAGE_TAG_MAXIMUM_LENGTH,
@@ -74,6 +75,7 @@ const draftInput = z
     tags: z.array(tag).max(ARTICLE_TAGS_MAXIMUM_COUNT),
     byline: byline.nullable(),
     language: language.nullable(),
+    channelSlug: channelSlugSchema.nullable().optional(),
     cover: coverUsage.nullable().optional(),
     document: z.unknown().optional(),
   })
@@ -81,6 +83,7 @@ const draftInput = z
   .transform((value) => ({
     ...value,
     tags: [...new Set(value.tags)],
+    channelSlug: value.channelSlug === undefined ? null : value.channelSlug,
   }));
 
 const persistedArticleBase = z.object({
@@ -120,6 +123,7 @@ const persistedArticleBase = z.object({
       }
     }),
   language: z.string().nullable(),
+  channel_slug: z.string().nullable().optional().transform((value) => value ?? null),
   cover: z
     .string()
     .nullable()
@@ -173,6 +177,7 @@ type ArticleDraftMetadata = Pick<
   | "tags"
   | "byline"
   | "language"
+  | "channelSlug"
   | "cover"
 >;
 
@@ -195,6 +200,7 @@ function articleDraftMetadataFromRow(
     tags: row.tags,
     byline: row.byline,
     language: row.language,
+    channelSlug: row.channel_slug,
     cover: row.cover,
   });
   const metadata = {
@@ -206,6 +212,7 @@ function articleDraftMetadataFromRow(
     tags: parsed.tags,
     byline: parsed.byline,
     language: parsed.language,
+    channelSlug: parsed.channelSlug,
     cover: parsed.cover ?? null,
   };
   const persistedMetadata = {
@@ -217,6 +224,7 @@ function articleDraftMetadataFromRow(
     tags: row.tags,
     byline: row.byline,
     language: row.language,
+    channelSlug: row.channel_slug,
     cover: row.cover,
   };
   if (JSON.stringify(metadata) !== JSON.stringify(persistedMetadata)) {
@@ -248,8 +256,8 @@ const articleSelection = `
          article.updated_at AS article_updated_at,
          article_draft.version, article_draft.title, article_draft.slug,
          article_draft.slug_is_manual, article_draft.summary, article_draft.tags,
-         article_draft.byline, article_draft.language, article_draft.cover,
-         article_draft.document,
+         article_draft.byline, article_draft.language, article_draft.channel_slug,
+         article_draft.cover, article_draft.document,
          article_draft.created_at AS draft_created_at,
          article_draft.updated_at AS draft_updated_at
   FROM article
@@ -374,7 +382,7 @@ export async function replaceArticleDraftState(
         `UPDATE article_draft
          SET version = version + 1, title = ?, slug = ?, slug_key = ?,
              slug_is_manual = ?, summary = ?, tags = ?, byline = ?, language = ?,
-             cover = ?, document = ?, updated_at = ?
+             channel_slug = ?, cover = ?, document = ?, updated_at = ?
          WHERE article_id = ? AND version = ?
            AND (
              ? IS NULL OR EXISTS (
@@ -407,6 +415,7 @@ export async function replaceArticleDraftState(
         JSON.stringify(replacement.tags),
         replacement.byline === null ? null : JSON.stringify(replacement.byline),
         replacement.language,
+        replacement.channelSlug,
         serializedCover,
         serializedDocument,
         now,
@@ -541,8 +550,9 @@ export async function createArticle(database: D1Database): Promise<Article> {
       .prepare(
         `INSERT INTO article_draft
            (article_id, version, title, slug, slug_key, slug_is_manual, summary,
-            tags, byline, language, cover, document, created_at, updated_at)
-         VALUES (?, 1, '', NULL, NULL, 0, NULL, '[]', NULL, NULL, NULL, ?, ?, ?)`,
+            tags, byline, language, channel_slug, cover, document, created_at,
+            updated_at)
+         VALUES (?, 1, '', NULL, NULL, 0, NULL, '[]', NULL, NULL, NULL, NULL, ?, ?, ?)`,
       )
       .bind(id, JSON.stringify(emptyDocument), now, now),
   ]);
@@ -551,13 +561,23 @@ export async function createArticle(database: D1Database): Promise<Article> {
   return created;
 }
 
-export async function listArticles(database: D1Database): Promise<Article[]> {
+export async function listArticles(
+  database: D1Database,
+  options: { channelSlug?: string } = {},
+): Promise<Article[]> {
+  const channelSlug = options.channelSlug;
   const { results } = await database
     .prepare(
-      `${articleSelection}
-       WHERE article.trashed_at IS NULL
-       ORDER BY article.updated_at DESC, article.id ASC`,
+      channelSlug === undefined
+        ? `${articleSelection}
+           WHERE article.trashed_at IS NULL
+           ORDER BY article.updated_at DESC, article.id ASC`
+        : `${articleSelection}
+           WHERE article.trashed_at IS NULL
+             AND article_draft.channel_slug = ?
+           ORDER BY article.updated_at DESC, article.id ASC`,
     )
+    .bind(...(channelSlug === undefined ? [] : [channelSlug]))
     .all<ArticleRow>();
   return results.map(articleFromRow);
 }
@@ -613,6 +633,25 @@ export async function updateArticleDraft(
     };
   }
   const cover = value.cover === undefined ? before.draft.cover : value.cover;
+  const channelSlug = value.channelSlug;
+  if (channelSlug !== null) {
+    const channel = await database
+      .prepare(`SELECT slug FROM channel WHERE slug = ? LIMIT 1`)
+      .bind(channelSlug)
+      .first<{ slug: string }>();
+    if (!channel) {
+      return {
+        ok: false,
+        reason: "invalid",
+        issues: [
+          {
+            path: "channelSlug",
+            message: "Channel must exist in the registry.",
+          },
+        ],
+      };
+    }
+  }
   const assetReferences = draftAssetReferences(documentResult.document, cover);
   const assetIssues = await unavailableDraftAssetIssues(
     database,
@@ -630,6 +669,7 @@ export async function updateArticleDraft(
     tags: value.tags,
     byline: value.byline,
     language: value.language,
+    channelSlug,
     cover,
     document: documentResult.document,
   };

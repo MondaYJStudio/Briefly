@@ -200,6 +200,7 @@ describe("public Article API", () => {
     expect(Object.keys(payload.items[0] ?? {}).sort()).toEqual(
       [
         "byline",
+        "channel",
         "cover",
         "id",
         "language",
@@ -620,6 +621,7 @@ describe("public Article API", () => {
       "limit",
       "tag",
       "language",
+      "channel",
     ]);
     const limit = inlineParameters.find(
       (parameter) => parameter.name === "limit",

@@ -62,6 +62,7 @@ interface SavedDraftRow {
   tags: unknown;
   byline: unknown;
   language: unknown;
+  channel_slug: unknown;
   cover: unknown;
   document: unknown;
 }
@@ -76,6 +77,7 @@ interface SavedDraft {
   tags: string[];
   byline: Byline | null;
   language: string | null;
+  channelSlug: string | null;
   cover: ArticleCoverUsage | null;
   document: { documentSchemaVersion: number; doc: unknown };
 }
@@ -83,6 +85,7 @@ interface SavedDraft {
 interface ResolvedMetadata {
   byline: Byline;
   language: string;
+  channel: { slug: string; name: string } | null;
 }
 
 interface PreparedPublication {
@@ -323,6 +326,13 @@ function decodeSavedDraft(
     row.language === null ? null : parseCanonical(languageSchema, row.language);
   if (language === undefined) issues.push(invalidPersistedField("language"));
 
+  const channelSlug =
+    row.channel_slug === null
+      ? null
+      : parseCanonical(z.string().min(1), row.channel_slug);
+  if (channelSlug === undefined)
+    issues.push(invalidPersistedField("channelSlug"));
+
   const rawCover =
     row.cover === null
       ? { ok: true as const, value: null }
@@ -351,6 +361,7 @@ function decodeSavedDraft(
       tags: tags!,
       byline: byline!,
       language: language!,
+      channelSlug: channelSlug!,
       cover: cover!,
       document: document!.data!,
     },
@@ -368,7 +379,8 @@ async function readSavedDraft(
                 article_draft.version, article_draft.title, article_draft.slug,
                 article_draft.summary, article_draft.tags,
                 article_draft.byline, article_draft.language,
-                article_draft.cover, article_draft.document
+                article_draft.channel_slug, article_draft.cover,
+                article_draft.document
          FROM article
          JOIN article_draft ON article_draft.article_id = article.id
          WHERE article.id = ? AND article.trashed_at IS NULL
@@ -459,11 +471,39 @@ async function resolveMetadata(
     }
   }
   if (issues.length > 0) return { issues };
+
+  let channel: { slug: string; name: string } | null = null;
+  if (draft.channelSlug !== null) {
+    let row: { slug: string; name: string } | null;
+    try {
+      row = await database
+        .prepare(`SELECT slug, name FROM channel WHERE slug = ? LIMIT 1`)
+        .bind(draft.channelSlug)
+        .first<{ slug: string; name: string }>();
+    } catch (error) {
+      throw new PublicationWorkflowError("PUBLICATION_NOT_COMPLETED", error);
+    }
+    if (!row) {
+      return {
+        issues: [
+          issue(
+            "metadata",
+            "CHANNEL_NOT_FOUND",
+            "draft.channelSlug",
+            "Channel must exist in the registry.",
+          ),
+        ],
+      };
+    }
+    channel = { slug: row.slug, name: row.name };
+  }
+
   return {
     issues,
     metadata: {
       byline: draft.byline ?? defaultByline!,
       language: draft.language ?? defaultLanguage!,
+      channel,
     },
   };
 }
@@ -821,16 +861,16 @@ async function commitPublication(
       .prepare(
         `INSERT INTO publication
            (id, article_id, slug, slug_key, publication_number, title,
-            summary, tags, byline, language, cover, document_schema_version,
-            document, renderer_version, provider_facts, html, published_at,
-            created_at)
+            summary, tags, byline, language, channel_slug, channel_name, cover,
+            document_schema_version, document, renderer_version, provider_facts,
+            html, published_at, created_at)
          SELECT ?, ?, ?, ?,
                 COALESCE(
                   (SELECT MAX(publication_number) + 1
                    FROM publication WHERE article_id = ?),
                   1
                 ),
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          WHERE EXISTS (
            SELECT 1
            FROM article_draft
@@ -852,6 +892,8 @@ async function commitPublication(
         JSON.stringify(draft.tags),
         JSON.stringify(metadata.byline),
         metadata.language,
+        metadata.channel?.slug ?? null,
+        metadata.channel?.name ?? null,
         cover === null ? null : JSON.stringify(cover),
         draft.document.documentSchemaVersion,
         JSON.stringify(draft.document),

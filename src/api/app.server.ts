@@ -27,6 +27,12 @@ import {
 } from "../articles/publications.server";
 import { recognizeVideoEmbed } from "../articles/video-embeds";
 import { cleanupAsset, listAssets, uploadAsset } from "../assets/assets.server";
+import {
+  createChannel,
+  deleteChannel,
+  listChannels,
+  updateChannelName,
+} from "../channels/channels.server";
 import { readAdministratorSession } from "../auth/administrator-session.server";
 import {
   initializeAdministrator,
@@ -414,6 +420,98 @@ function createApi(getBindings: () => RuntimeBindings) {
         },
       },
     )
+    .get(
+      "/admin/channels",
+      async () => {
+        const bindings = getBindings();
+        return { channels: await listChannels(bindings.DB) };
+      },
+      { administrator: true },
+    )
+    .post(
+      "/admin/channels",
+      async ({ body, status }) => {
+        const bindings = getBindings();
+        const result = await createChannel(bindings.DB, body);
+        if (result.ok) return status(201, result.channel);
+        if (result.reason === "slug-conflict") {
+          return status(409, {
+            status: "error" as const,
+            code: "CHANNEL_SLUG_CONFLICT" as const,
+          });
+        }
+        return status(400, {
+          status: "error" as const,
+          code: "CHANNEL_INVALID" as const,
+          issues: result.issues,
+        });
+      },
+      {
+        administrator: true,
+        body: t.Object({
+          slug: t.String(),
+          name: t.String(),
+        }),
+      },
+    )
+    .put(
+      "/admin/channels/:channelId",
+      async ({ body, params, status }) => {
+        const bindings = getBindings();
+        const result = await updateChannelName(
+          bindings.DB,
+          params.channelId,
+          body,
+        );
+        if (result.ok) return result.channel;
+        if (result.reason === "not-found") {
+          return status(404, {
+            status: "error" as const,
+            code: "CHANNEL_NOT_FOUND" as const,
+          });
+        }
+        return status(400, {
+          status: "error" as const,
+          code: "CHANNEL_INVALID" as const,
+          issues: result.issues,
+        });
+      },
+      {
+        administrator: true,
+        params: t.Object({ channelId: t.String({ format: "uuid" }) }),
+        body: t.Object({
+          name: t.String(),
+        }),
+      },
+    )
+    .delete(
+      "/admin/channels/:channelId",
+      async ({ params, status }) => {
+        const bindings = getBindings();
+        const result = await deleteChannel(bindings.DB, params.channelId);
+        if (result.ok) {
+          return new Response(null, {
+            status: 204,
+            headers: { "cache-control": "no-store" },
+          });
+        }
+        if (result.reason === "referenced") {
+          return status(409, {
+            status: "error" as const,
+            code: "CHANNEL_IN_USE" as const,
+            references: result.references,
+          });
+        }
+        return status(404, {
+          status: "error" as const,
+          code: "CHANNEL_NOT_FOUND" as const,
+        });
+      },
+      {
+        administrator: true,
+        params: t.Object({ channelId: t.String({ format: "uuid" }) }),
+      },
+    )
     .post(
       "/admin/articles",
       async ({ status }) => {
@@ -424,12 +522,15 @@ function createApi(getBindings: () => RuntimeBindings) {
     )
     .get(
       "/admin/articles",
-      async () => {
+      async ({ request }) => {
         const bindings = getBindings();
+        const channel = new URL(request.url).searchParams.get("channel");
         return {
           articles: await projectAdminArticles(
             bindings.DB,
-            await listArticles(bindings.DB),
+            await listArticles(bindings.DB, {
+              channelSlug: channel && channel.length > 0 ? channel : undefined,
+            }),
           ),
         };
       },

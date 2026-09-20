@@ -98,6 +98,18 @@ const listParameters = [
       maxLength: LANGUAGE_TAG_MAXIMUM_LENGTH,
     },
   },
+  {
+    name: "channel",
+    in: "query",
+    required: false,
+    description:
+      "Exact Channel slug filter against the Current Publication. Unknown slugs return an empty list. Multiple Channel expressions are not supported.",
+    schema: {
+      type: "string",
+      minLength: 1,
+      maxLength: 80,
+    },
+  },
 ] satisfies OpenAPIV3_1.ParameterObject[];
 
 const articleMetadataProperties = {
@@ -125,6 +137,11 @@ const articleMetadataProperties = {
     type: "string",
     description: "Canonical BCP 47 language tag resolved at publication time.",
   },
+  channel: {
+    oneOf: [{ $ref: "#/components/schemas/Channel" }, { type: "null" }],
+    description:
+      "Channel frozen into the Current Publication, or null when unassigned.",
+  },
   cover: {
     oneOf: [{ $ref: "#/components/schemas/Cover" }, { type: "null" }],
   },
@@ -151,6 +168,7 @@ const articleMetadataRequired = [
   "tags",
   "byline",
   "language",
+  "channel",
   "cover",
   "publishedAt",
   "updatedAt",
@@ -216,7 +234,7 @@ export const publicOpenApiDocument = {
         operationId: "listArticles",
         summary: "List Current Publications",
         description:
-          "Returns Current Publications ordered by first Published At descending and stable Article ID ascending. An optional language filter matches the canonical Article Content Language, and an optional tag filter is normalized as Draft metadata. List items omit Publication HTML and all source content.",
+          "Returns Current Publications ordered by first Published At descending and stable Article ID ascending. An optional language filter matches the canonical Article Content Language, an optional tag filter is normalized as Draft metadata, and an optional channel filter matches the Current Publication Channel slug. List items omit Publication HTML and all source content.",
         parameters: listParameters,
         responses: {
           200: {
@@ -472,6 +490,23 @@ export const publicOpenApiDocument = {
           name: { type: "string", minLength: 1 },
           url: {
             oneOf: [{ type: "string", format: "uri" }, { type: "null" }],
+          },
+        },
+      },
+      Channel: {
+        type: "object",
+        additionalProperties: false,
+        required: ["slug", "name"],
+        properties: {
+          slug: {
+            type: "string",
+            minLength: 1,
+            description: "Stable Channel registry slug.",
+          },
+          name: {
+            type: "string",
+            minLength: 1,
+            description: "Display name frozen at Publish time.",
           },
         },
       },

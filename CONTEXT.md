@@ -93,6 +93,18 @@ retains arbitrary valid tags so authored content is not rewritten by an
 interface-language choice.
 _Avoid_: Interface Locale, Site Description translation
 
+**Channel**:
+A named content partition on one Briefly installation, used so public API
+consumers can request different Current Publication sets without sharing
+Article tags. An Article belongs to at most one Channel, and may belong to
+none. Channels are maintained as an Administrator-managed registry (stable
+slug and display name), not as freeform Article metadata. Like other Draft
+publication metadata, an Article's Channel is selected on the Draft and
+becomes part of a Publication only through Publish. Channel is not a Site,
+deployment, or tenant.
+_Avoid_: Site, Tag, tenant, multi-site, multi-channel Article, required Channel,
+live Draft override of public Channel filtering
+
 **Built-in Public Site**:
 The product's own public reader UI. It serves public reader paths whenever no Active Public Template is selected.
 _Avoid_: default template, official template, theme
@@ -126,4 +138,4 @@ Public presentation terms use **内建公开站** for Built-in Public Site,
 **公开站开关** for Public Site Enabled,
 **公开模板** for Public Template, **模板清单** for Template Manifest,
 **已安装公开模板** for Installed Public Template, and **启用中的公开模板**
-for Active Public Template.
+for Active Public Template. Content partition terms use **频道** for Channel.

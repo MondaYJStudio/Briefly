@@ -37,6 +37,8 @@ const persistedPublicArticle = z.object({
     }
   }),
   language: z.string().min(1),
+  channel_slug: z.string().nullable(),
+  channel_name: z.string().nullable(),
   cover: z
     .string()
     .nullable()
@@ -55,6 +57,27 @@ const persistedPublicArticle = z.object({
   article_published_at: z.number().int(),
   publication_published_at: z.number().int(),
   html: z.string(),
+}).superRefine((value, context) => {
+  const hasSlug = value.channel_slug !== null;
+  const hasName = value.channel_name !== null;
+  if (hasSlug !== hasName) {
+    context.addIssue({
+      code: "custom",
+      message: "Invalid Publication Channel",
+    });
+  }
+  if (hasSlug && value.channel_slug!.length === 0) {
+    context.addIssue({
+      code: "custom",
+      message: "Invalid Publication Channel",
+    });
+  }
+  if (hasName && value.channel_name!.length === 0) {
+    context.addIssue({
+      code: "custom",
+      message: "Invalid Publication Channel",
+    });
+  }
 });
 
 export type PublicArticleProjectionRow = z.input<typeof persistedPublicArticle>;
@@ -62,7 +85,8 @@ export type PublicArticleProjectionRow = z.input<typeof persistedPublicArticle>;
 export const publicArticleProjectionSelection = `
   SELECT article.id, publication.id AS publication_id, publication.slug,
          publication.title, publication.summary, publication.tags,
-         publication.byline, publication.language, publication.cover,
+         publication.byline, publication.language,
+         publication.channel_slug, publication.channel_name, publication.cover,
          article.published_at AS article_published_at,
          publication.published_at AS publication_published_at,
          publication.html
@@ -85,6 +109,13 @@ export function decodePublicArticleProjection(
       tags: publication.tags,
       byline: publication.byline,
       language: publication.language,
+      channel:
+        publication.channel_slug === null || publication.channel_name === null
+          ? null
+          : {
+              slug: publication.channel_slug,
+              name: publication.channel_name,
+            },
       cover: publication.cover,
       publishedAt: new Date(publication.article_published_at).toISOString(),
       updatedAt: new Date(publication.publication_published_at).toISOString(),

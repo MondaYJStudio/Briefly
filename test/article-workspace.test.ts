@@ -32,6 +32,8 @@ function article(
     draft?: Partial<Article["draft"]>;
   } = {},
 ): Article {
+  const { channelSlug: overrideChannelSlug, ...draftOverrides } =
+    overrides.draft ?? {};
   return {
     id: overrides.id ?? "article-1",
     currentPublicationId: overrides.currentPublicationId ?? null,
@@ -50,7 +52,8 @@ function article(
       document,
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      ...overrides.draft,
+      ...draftOverrides,
+      channelSlug: overrideChannelSlug ?? null,
     },
   };
 }
@@ -110,6 +113,7 @@ describe("Article Workspace pure interface", () => {
       tags: [],
       byline: null,
       language: "zh-Hans",
+      channelSlug: null,
       cover: null,
       document,
     });

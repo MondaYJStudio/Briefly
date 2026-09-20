@@ -35,6 +35,7 @@ const persistedFieldLabels: Record<string, () => string> = {
   tags: () => m.pub_field_tags(),
   byline: () => m.pub_field_byline(),
   language: () => m.pub_field_language(),
+  channelSlug: () => m.pub_field_channel(),
   cover: () => m.pub_field_cover(),
   document: () => m.pub_field_document(),
 };
@@ -47,6 +48,7 @@ const publicationIssueByCode: Partial<
   BODY_REQUIRED: () => m.pub_issue_body_required(),
   BYLINE_INVALID: () => m.pub_issue_byline_invalid(),
   LANGUAGE_INVALID: () => m.pub_issue_language_invalid(),
+  CHANNEL_NOT_FOUND: () => m.pub_issue_channel_not_found(),
   ASSET_NOT_RESOLVED: () => m.pub_issue_asset_not_resolved(),
   FIGURE_ALT_REQUIRED: () => m.pub_issue_figure_alt_required(),
   INVALID_ASSET_IDENTITY: () => m.pub_issue_invalid_asset_identity(),

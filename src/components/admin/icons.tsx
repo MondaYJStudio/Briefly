@@ -43,7 +43,8 @@ export type AdminIconName =
   | "trash"
   | "undo"
   | "upload"
-  | "video";
+  | "video"
+  | "channels";
 
 const STROKE_ICONS: Record<Exclude<AdminIconName, "more">, string> = {
   account:
@@ -51,6 +52,8 @@ const STROKE_ICONS: Record<Exclude<AdminIconName, "more">, string> = {
   alert: "M12 12m-9 0a9 9 0 1 0 18 0 9 9 0 1 0-18 0|M12 8v5m0 3v.01",
   articles:
     "M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z|M14 3v6h6M9 13h6M9 17h6",
+  channels:
+    "M4 6h16M4 12h10M4 18h14|M17 10v8m0 0 3-3m-3 3-3-3",
   back: "M19 12H5m7-7-7 7 7 7",
   bold: "M7 4h6a3.5 3.5 0 0 1 0 7H7zM7 11h7a3.5 3.5 0 0 1 0 7H7z",
   break: "M9 10 4 15l5 5|M4 15h10a6 6 0 0 0 6-6V4",

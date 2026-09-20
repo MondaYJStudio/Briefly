@@ -35,6 +35,8 @@ export interface ArticleDraft {
   tags: string[];
   byline: Byline | null;
   language: string | null;
+  /** Optional Channel registry slug; null means unassigned. */
+  channelSlug: string | null;
   cover: ArticleCoverUsage | null;
   document: ArticleDocument;
   createdAt: string;
@@ -105,6 +107,7 @@ export interface ArticleDraftUpdate {
   tags: string[];
   byline: Byline | null;
   language: string | null;
+  channelSlug: string | null;
   cover: ArticleCoverUsage | null;
   document: ArticleDocument;
 }
@@ -117,6 +120,7 @@ export interface PublicArticle {
   tags: string[];
   byline: Byline;
   language: string;
+  channel: PublicArticleChannel | null;
   cover: PublicArticleCover | null;
   publishedAt: string;
   updatedAt: string;
@@ -124,6 +128,11 @@ export interface PublicArticle {
 }
 
 export type PublicArticleListItem = Omit<PublicArticle, "html">;
+
+export interface PublicArticleChannel {
+  slug: string;
+  name: string;
+}
 
 export interface PublicArticleCover {
   url: string;
