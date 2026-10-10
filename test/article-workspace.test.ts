@@ -407,7 +407,12 @@ function inMemoryGateway(seed: Article[]): ArticleWorkspaceGateway {
       return articles.some((value) => value.id === articleId)
         ? {
             ok: true as const,
-            value: { publications: [], hasUnpublishedChanges: false },
+            value: {
+              publications: [],
+              hasUnpublishedChanges: false,
+              changedFields: [],
+              publishedDocument: null,
+            },
           }
         : { ok: false as const, reason: "not-found" as const };
     },

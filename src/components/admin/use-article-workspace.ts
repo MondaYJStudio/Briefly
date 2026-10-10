@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ARTICLE_DRAFT_AUTOSAVE_DEBOUNCE_MS,
   type Article,
+  type ArticleDocument,
+  type ArticleDraftField,
   type ArticleDraftUpdate,
   type ArticlePublicationHistoryEntry,
   type ArticleTrashEntry,
@@ -109,6 +111,11 @@ export function useArticleWorkspace(gateway?: ArticleWorkspaceGateway) {
   >([]);
   const [historyHasUnpublishedChanges, setHistoryHasUnpublishedChanges] =
     useState(false);
+  const [historyChangedFields, setHistoryChangedFields] = useState<
+    ArticleDraftField[]
+  >([]);
+  const [historyPublishedDocument, setHistoryPublishedDocument] =
+    useState<ArticleDocument | null>(null);
   const [historyState, setHistoryState] = useState<
     "idle" | "loading" | "ready" | "error"
   >("idle");
@@ -124,6 +131,8 @@ export function useArticleWorkspace(gateway?: ArticleWorkspaceGateway) {
     historyRequestGeneration.current += 1;
     setPublicationHistory([]);
     setHistoryHasUnpublishedChanges(false);
+    setHistoryChangedFields([]);
+    setHistoryPublishedDocument(null);
     setHistoryState("idle");
     setRestoreState("ready");
     setRestoreIssues([]);
@@ -567,6 +576,7 @@ export function useArticleWorkspace(gateway?: ArticleWorkspaceGateway) {
     if (current.currentPublicationId !== null || historyState === "ready") {
       setHistoryHasUnpublishedChanges(true);
     }
+    setHistoryChangedFields([]);
     setRestoreState((current) => (current === "restoring" ? current : "ready"));
     setRestoreIssues([]);
   }
@@ -641,11 +651,17 @@ export function useArticleWorkspace(gateway?: ArticleWorkspaceGateway) {
     trashActionState === "trashing" ||
     trashActionState === "restoring" ||
     trashActionState === "purging";
+  const nothingToRepublish =
+    selected?.currentPublicationId != null &&
+    historyState === "ready" &&
+    !historyHasUnpublishedChanges &&
+    !hasUnsavedChanges;
   const publishActionDisabled =
     !selected ||
     !serverConfirmed ||
     publishState !== "ready" ||
-    lifecycleActionPending;
+    lifecycleActionPending ||
+    nothingToRepublish;
   const unpublishActionDisabled =
     !selected?.currentPublicationId ||
     lifecycleActionPending ||
@@ -795,6 +811,8 @@ export function useArticleWorkspace(gateway?: ArticleWorkspaceGateway) {
         setHistoryHasUnpublishedChanges(
           localDraftChanged || history.hasUnpublishedChanges,
         );
+        setHistoryChangedFields(localDraftChanged ? [] : history.changedFields);
+        setHistoryPublishedDocument(history.publishedDocument);
         setHistoryState("ready");
       }
     } else if (
@@ -984,6 +1002,8 @@ export function useArticleWorkspace(gateway?: ArticleWorkspaceGateway) {
       setHistoryHasUnpublishedChanges(
         (locallyKnown) => locallyKnown || history.hasUnpublishedChanges,
       );
+      setHistoryChangedFields(history.changedFields);
+      setHistoryPublishedDocument(history.publishedDocument);
       setHistoryState("ready");
     } catch {
       if (
@@ -1001,7 +1021,7 @@ export function useArticleWorkspace(gateway?: ArticleWorkspaceGateway) {
     const snapshot = selectedRef.current;
     if (
       !snapshot ||
-      publication.isCurrent ||
+      (publication.isCurrent && !historyHasUnpublishedChanges) ||
       !serverConfirmed ||
       lifecycleActionPending ||
       restorePendingRef.current
@@ -1027,7 +1047,8 @@ export function useArticleWorkspace(gateway?: ArticleWorkspaceGateway) {
             article.id === serverArticle.id ? serverArticle : article,
           ),
         );
-        setHistoryHasUnpublishedChanges(true);
+        setHistoryHasUnpublishedChanges(!publication.isCurrent);
+        setHistoryChangedFields([]);
         transitionPublication({ type: "reset" });
         setPublicationAction(null);
         setUnpublishState("ready");
@@ -1222,6 +1243,8 @@ export function useArticleWorkspace(gateway?: ArticleWorkspaceGateway) {
     unpublishState,
     historyState,
     historyHasUnpublishedChanges,
+    historyChangedFields,
+    historyPublishedDocument,
     restoreState,
     isOnline,
     // derived
@@ -1311,6 +1334,8 @@ export type ArticleEditorWorkspace = ArticleWorkspaceAlerts &
     | "serverConfirmed"
     | "historyState"
     | "historyHasUnpublishedChanges"
+    | "historyChangedFields"
+    | "historyPublishedDocument"
     | "loadPublicationHistory"
     | "hasUnsavedChanges"
     | "updateDraft"

@@ -197,6 +197,70 @@ describe("Publication history and restore", () => {
     ]);
   });
 
+  it("names changed fields and discards them by restoring the Current Publication", async () => {
+    const cookie = await initializeAndSignIn();
+    const articleId = await createArticle(cookie);
+    const published: DraftPayload = {
+      version: 1,
+      title: "Live title",
+      slug: "live-title",
+      summary: null,
+      tags: ["live"],
+      byline: null,
+      language: null,
+      cover: null,
+      document: textDocument("Live body"),
+    };
+    expect((await saveDraft(cookie, articleId, published)).status).toBe(200);
+    const publishResponse = await publish(cookie, articleId, 2, null);
+    expect(publishResponse.status).toBe(201);
+    const { publicationId } = await publishResponse.json<{
+      publicationId: string;
+    }>();
+
+    expect(
+      (
+        await saveDraft(cookie, articleId, {
+          ...published,
+          version: 2,
+          title: "Edited title",
+          document: textDocument("Edited body"),
+        })
+      ).status,
+    ).toBe(200);
+    const edited = await (
+      await listHistory(cookie, articleId)
+    ).json<ArticlePublicationHistory>();
+    expect(edited.hasUnpublishedChanges).toBe(true);
+    expect(edited.changedFields).toEqual(["title", "document"]);
+    expect(edited.publishedDocument).toEqual(textDocument("Live body"));
+
+    const restored = await restorePublication(
+      cookie,
+      articleId,
+      publicationId,
+      3,
+      true,
+    );
+    expect(restored.status).toBe(200);
+    const discarded = await (
+      await listHistory(cookie, articleId)
+    ).json<ArticlePublicationHistory>();
+    expect(discarded.hasUnpublishedChanges).toBe(false);
+    expect(discarded.changedFields).toEqual([]);
+    expect(await readPrivateArticle(cookie, articleId)).toMatchObject({
+      draft: { title: "Live title" },
+    });
+
+    await env.DB.prepare(
+      "UPDATE site_settings SET default_byline_name = 'Renamed' WHERE id = 1",
+    ).run();
+    const afterSettings = await (
+      await listHistory(cookie, articleId)
+    ).json<ArticlePublicationHistory>();
+    expect(afterSettings.changedFields).toEqual([]);
+  });
+
   it("lists every retained Publication in deterministic newest-first order without autosaves", async () => {
     const cookie = await initializeAndSignIn();
     const articleId = await createArticle(cookie);

@@ -470,3 +470,67 @@
     min-height: 2.75rem;
   }
 }
+
+.bodyDiff {
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-m);
+  line-height: 1.6;
+}
+
+.diffLine {
+  padding: 2px 8px 2px 20px;
+  position: relative;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--foreground-muted);
+}
+
+.diffAdded,
+.diffRemoved {
+  color: var(--foreground);
+}
+
+.diffAdded {
+  background: var(--success-soft-bg);
+}
+
+.diffRemoved {
+  background: var(--danger-soft-bg);
+}
+
+.diffAdded::before,
+.diffRemoved::before {
+  position: absolute;
+  left: 7px;
+}
+
+.diffAdded::before {
+  content: "+";
+  color: var(--success-strong);
+}
+
+.diffRemoved::before {
+  content: "−";
+  color: var(--danger-strong);
+}
+
+.diffMark {
+  border-radius: 2px;
+  text-decoration: none;
+}
+
+.diffAdded .diffMark {
+  background: color-mix(in srgb, var(--success-strong) 22%, transparent);
+}
+
+.diffRemoved .diffMark {
+  background: color-mix(in srgb, var(--danger-strong) 22%, transparent);
+  text-decoration: line-through;
+}
+
+.diffSkipped {
+  padding: 0 8px 0 20px;
+  color: var(--foreground-faint);
+}

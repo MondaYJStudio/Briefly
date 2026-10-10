@@ -27,6 +27,7 @@ import {
   type Article,
   type ArticleCoverUsage,
   type ArticleDocument,
+  type ArticleDraftField,
   type ArticleLifecycleProjection,
   type ArticlePublicationHistory,
 } from "./articles";
@@ -448,6 +449,30 @@ async function readPublicationSource(
   return { row, references: results };
 }
 
+function changedDraftFields(
+  article: Article,
+  restored: RestorableDraft,
+  resolvedByline: { name: string; url: string | null },
+  resolvedLanguage: string,
+): ArticleDraftField[] {
+  const pairs: [ArticleDraftField, unknown, unknown][] = [
+    ["title", article.draft.title, restored.title],
+    ["slug", article.draft.slug, restored.slug],
+    ["summary", article.draft.summary, restored.summary],
+    ["tags", article.draft.tags, restored.tags],
+    ["byline", resolvedByline, restored.byline],
+    ["language", resolvedLanguage, restored.language],
+    ["channel", article.draft.channelSlug, restored.channelSlug],
+    ["cover", article.draft.cover, restored.cover],
+    ["document", article.draft.document, restored.document],
+  ];
+  return pairs
+    .filter(([, draft, published]) => {
+      return JSON.stringify(draft) !== JSON.stringify(published);
+    })
+    .map(([field]) => field);
+}
+
 function draftMatchesPublication(
   article: Article,
   restored: RestorableDraft,
@@ -455,35 +480,29 @@ function draftMatchesPublication(
   resolvedLanguage: string,
 ): boolean {
   return (
-    JSON.stringify({
-      title: article.draft.title,
-      slug: article.draft.slug,
-      summary: article.draft.summary,
-      tags: article.draft.tags,
-      byline: resolvedByline,
-      language: resolvedLanguage,
-      channelSlug: article.draft.channelSlug,
-      cover: article.draft.cover,
-      document: article.draft.document,
-    }) ===
-    JSON.stringify({
-      title: restored.title,
-      slug: restored.slug,
-      summary: restored.summary,
-      tags: restored.tags,
-      byline: restored.byline,
-      language: restored.language,
-      channelSlug: restored.channelSlug,
-      cover: restored.cover,
-      document: restored.document,
-    })
+    changedDraftFields(article, restored, resolvedByline, resolvedLanguage)
+      .length === 0
   );
 }
 
-async function articleHasUnpublishedChanges(
+/**
+ * Compare the Draft with the Current Publication (or the latest Publication).
+ * `changedFields` is empty when divergence is assumed but cannot be located.
+ */
+async function articleUnpublishedChanges(
   database: D1Database,
   article: Article,
-): Promise<boolean> {
+): Promise<
+  Pick<
+    ArticlePublicationHistory,
+    "hasUnpublishedChanges" | "changedFields" | "publishedDocument"
+  >
+> {
+  const unknown = {
+    hasUnpublishedChanges: true,
+    changedFields: [],
+    publishedDocument: null,
+  };
   try {
     const source = article.currentPublicationId
       ? await readPublicationSource(
@@ -492,20 +511,39 @@ async function articleHasUnpublishedChanges(
           article.currentPublicationId,
         )
       : await readPublicationSource(database, article.id);
-    if (!source) return false;
+    if (!source) {
+      return {
+        hasUnpublishedChanges: false,
+        changedFields: [],
+        publishedDocument: null,
+      };
+    }
     const converted = convertPublicationSource(source);
-    if (!converted.ok) return true;
+    if (!converted.ok) return unknown;
     const settings = await readSiteSettings(database);
     const metadata = resolveArticleMetadata(settings, article.draft);
-    return !draftMatchesPublication(
+    const changedFields = changedDraftFields(
       article,
       converted.draft,
       metadata.byline,
       metadata.language,
     );
+    return {
+      hasUnpublishedChanges: changedFields.length > 0,
+      changedFields,
+      publishedDocument: converted.draft.document,
+    };
   } catch {
-    return true;
+    return unknown;
   }
+}
+
+async function articleHasUnpublishedChanges(
+  database: D1Database,
+  article: Article,
+): Promise<boolean> {
+  return (await articleUnpublishedChanges(database, article))
+    .hasUnpublishedChanges;
 }
 
 function lifecycleProjectionForArticle(
@@ -673,10 +711,13 @@ export async function listArticlePublicationHistory(
     ok: true,
     history: {
       publications,
-      hasUnpublishedChanges:
-        publications.length > 0
-          ? await articleHasUnpublishedChanges(database, article)
-          : false,
+      ...(publications.length > 0
+        ? await articleUnpublishedChanges(database, article)
+        : {
+            hasUnpublishedChanges: false,
+            changedFields: [],
+            publishedDocument: null,
+          }),
     },
   };
 }

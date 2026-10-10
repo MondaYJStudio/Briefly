@@ -14,12 +14,24 @@ import {
   TextArea,
 } from "@heroui/react";
 import { ClientOnly } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 import type {
   ArticleCoverUsage,
+  ArticleDraftField,
   ArticlePublicationHistoryEntry,
 } from "../../articles/articles";
+import {
+  diffDocuments,
+  type DocumentDiffLine,
+} from "../../articles/document-diff";
 import {
   slugAfterManualEdit,
   slugAfterReset,
@@ -1403,6 +1415,69 @@ function CoverPickerDialog({
   );
 }
 
+function BodyDiff({ lines }: Readonly<{ lines: DocumentDiffLine[] }>) {
+  return (
+    <section aria-label={m.body_diff()}>
+      <h4 className="text-xs mb-2">{m.body_diff()}</h4>
+      <ol
+        className={`${styles.bodyDiff} ${styles.issueListReset} m-0 p-0 text-xs`}
+      >
+        {lines.map((line, index) =>
+          line.kind === "skipped" ? (
+            <li key={index} className={styles.diffSkipped} aria-hidden="true">
+              ⋯
+            </li>
+          ) : line.kind === "same" ? (
+            <li key={index} className={styles.diffLine}>
+              {line.text || "\u00a0"}
+            </li>
+          ) : (
+            <li
+              key={index}
+              className={`${styles.diffLine} ${
+                line.kind === "added" ? styles.diffAdded : styles.diffRemoved
+              }`}
+            >
+              {line.kind === "added" ? (
+                <span className="visually-hidden">{m.diff_added()}</span>
+              ) : (
+                <span className="visually-hidden">{m.diff_removed()}</span>
+              )}
+              {line.segments.map((segment, segmentIndex) =>
+                segment.changed ? (
+                  line.kind === "added" ? (
+                    <ins key={segmentIndex} className={styles.diffMark}>
+                      {segment.text}
+                    </ins>
+                  ) : (
+                    <del key={segmentIndex} className={styles.diffMark}>
+                      {segment.text}
+                    </del>
+                  )
+                ) : (
+                  <span key={segmentIndex}>{segment.text}</span>
+                ),
+              )}
+            </li>
+          ),
+        )}
+      </ol>
+    </section>
+  );
+}
+
+const changedFieldLabels: Record<ArticleDraftField, () => string> = {
+  title: () => m.changed_field_title(),
+  slug: () => m.changed_field_slug(),
+  summary: () => m.changed_field_summary(),
+  tags: () => m.changed_field_tags(),
+  byline: () => m.changed_field_byline(),
+  language: () => m.changed_field_language(),
+  channel: () => m.changed_field_channel(),
+  cover: () => m.changed_field_cover(),
+  document: () => m.changed_field_document(),
+};
+
 function HistoryPanel({
   workspace,
 }: Readonly<{ workspace: ArticleEditorWorkspace }>) {
@@ -1410,13 +1485,25 @@ function HistoryPanel({
     publicationHistory,
     historyState,
     historyHasUnpublishedChanges,
+    historyChangedFields,
+    historyPublishedDocument,
     restoreState,
     restoreIssues,
     serverConfirmed,
     lifecycleActionPending,
   } = workspace;
+  const draftDocument = workspace.selected?.draft.document ?? null;
+  const bodyDiff = useMemo(
+    () =>
+      historyPublishedDocument && draftDocument
+        ? diffDocuments(historyPublishedDocument, draftDocument)
+        : [],
+    [historyPublishedDocument, draftDocument],
+  );
   const [restoreTarget, setRestoreTarget] =
     useState<ArticlePublicationHistoryEntry | null>(null);
+  const [discardedChanges, setDiscardedChanges] = useState(false);
+  const discarding = restoreTarget?.isCurrent === true;
 
   return (
     <div role="tabpanel" aria-label={m.rail_tab_history()}>
@@ -1436,10 +1523,17 @@ function HistoryPanel({
                   {m.unpublished_changes()}
                 </div>
                 <div className={styles.alertBody}>
-                  {m.unpublished_changes_description()}
+                  {historyChangedFields.length > 0
+                    ? historyChangedFields
+                        .map((field) => changedFieldLabels[field]())
+                        .join(" · ")
+                    : m.unpublished_changes_description()}
                 </div>
               </div>
             </div>
+          ) : null}
+          {historyHasUnpublishedChanges && bodyDiff.length > 0 ? (
+            <BodyDiff lines={bodyDiff} />
           ) : null}
           <Button
             fullWidth
@@ -1471,7 +1565,7 @@ function HistoryPanel({
               <p>{m.no_publications_yet_description()}</p>
             </div>
           ) : null}
-          {restoreState === "restored" ? (
+          {restoreState === "restored" && !discardedChanges ? (
             <Alert status="success" role="status">
               <Alert.Content>
                 <Alert.Title>{m.publication_restored_into_draft()}</Alert.Title>
@@ -1551,16 +1645,19 @@ function HistoryPanel({
                         type="button"
                         variant="secondary"
                         isDisabled={
-                          publication.isCurrent ||
+                          (publication.isCurrent &&
+                            !historyHasUnpublishedChanges) ||
                           !serverConfirmed ||
                           lifecycleActionPending
                         }
                         isPending={restoreState === "restoring"}
                         onPress={() => setRestoreTarget(publication)}
                       >
-                        {m.restore_publication({
-                          number: publication.publicationNumber,
-                        })}
+                        {publication.isCurrent
+                          ? m.discard_unpublished_changes()
+                          : m.restore_publication({
+                              number: publication.publicationNumber,
+                            })}
                       </Button>
                     </div>
                   </div>
@@ -1584,18 +1681,22 @@ function HistoryPanel({
           <AlertDialog.Dialog>
             <AlertDialog.Header>
               <AlertDialog.Heading>
-                {m.restore_publication_question({
-                  number: restoreTarget?.publicationNumber ?? "",
-                })}
+                {discarding
+                  ? m.discard_unpublished_changes_question()
+                  : m.restore_publication_question({
+                      number: restoreTarget?.publicationNumber ?? "",
+                    })}
               </AlertDialog.Heading>
             </AlertDialog.Header>
-            <AlertDialog.Body>
-              <p>
-                {historyHasUnpublishedChanges
-                  ? m.restore_publication_body_with_changes()
-                  : m.restore_publication_body()}
-              </p>
-            </AlertDialog.Body>
+            {discarding ? null : (
+              <AlertDialog.Body>
+                <p>
+                  {historyHasUnpublishedChanges
+                    ? m.restore_publication_body_with_changes()
+                    : m.restore_publication_body()}
+                </p>
+              </AlertDialog.Body>
+            )}
             <AlertDialog.Footer>
               <Button type="button" variant="secondary" slot="close">
                 {m.cancel()}
@@ -1605,12 +1706,15 @@ function HistoryPanel({
                 variant="danger-soft"
                 slot="close"
                 isDisabled={!serverConfirmed || lifecycleActionPending}
-                onPress={() =>
-                  restoreTarget &&
-                  void workspace.restoreFromHistory(restoreTarget)
-                }
+                onPress={() => {
+                  if (!restoreTarget) return;
+                  setDiscardedChanges(restoreTarget.isCurrent);
+                  void workspace.restoreFromHistory(restoreTarget);
+                }}
               >
-                {m.confirm_and_restore_publication()}
+                {discarding
+                  ? m.discard_unpublished_changes()
+                  : m.confirm_and_restore_publication()}
               </Button>
             </AlertDialog.Footer>
           </AlertDialog.Dialog>

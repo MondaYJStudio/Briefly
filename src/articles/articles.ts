@@ -93,9 +93,25 @@ export interface ArticlePublicationHistoryEntry {
   isCurrent: boolean;
 }
 
+/** Draft fields compared against the Current Publication. */
+export type ArticleDraftField =
+  | "title"
+  | "slug"
+  | "summary"
+  | "tags"
+  | "byline"
+  | "language"
+  | "channel"
+  | "cover"
+  | "document";
+
 export interface ArticlePublicationHistory {
   publications: ArticlePublicationHistoryEntry[];
   hasUnpublishedChanges: boolean;
+  /** Fields that differ from the Current Publication; empty when unknown. */
+  changedFields: ArticleDraftField[];
+  /** Body the Draft is compared against, for a client-side body diff. */
+  publishedDocument: ArticleDocument | null;
 }
 
 export interface ArticleDraftUpdate {
