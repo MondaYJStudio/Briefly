@@ -22,18 +22,26 @@ export async function listAdminChannels(): Promise<Channel[] | null> {
   }
 }
 
+export type CreateAdminChannelResult =
+  | { ok: true; channel: Channel }
+  | { ok: false; reason: "conflict" | "invalid" | "error" };
+
 export async function createAdminChannel(input: {
   slug: string;
   name: string;
-}): Promise<Channel | null> {
+}): Promise<CreateAdminChannelResult> {
   try {
     const response = (await getApiClient().admin.channels.post(
       input,
     )) as ApiResponse<Channel>;
-    if (response.status !== 201 || !response.data) return null;
-    return response.data;
+    if (response.status === 201 && response.data) {
+      return { ok: true, channel: response.data };
+    }
+    if (response.status === 409) return { ok: false, reason: "conflict" };
+    if (response.status === 400) return { ok: false, reason: "invalid" };
+    return { ok: false, reason: "error" };
   } catch {
-    return null;
+    return { ok: false, reason: "error" };
   }
 }
 

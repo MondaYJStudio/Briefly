@@ -1,0 +1,158 @@
+.pageTitle {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.pageDesc {
+  color: var(--foreground-muted);
+
+  max-width: 46rem;
+}
+
+.card {
+  background: var(--content1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-s);
+}
+
+.listHead {
+  color: var(--foreground-muted);
+
+  border-bottom: 1px solid var(--divider);
+}
+
+.count {
+  font-variant-numeric: tabular-nums;
+}
+
+.list {
+  list-style: none;
+}
+
+.row {
+  border-bottom: 1px solid var(--divider);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row:hover {
+  background: var(--hover);
+}
+
+.channelIcon {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+
+  border-radius: var(--radius-m);
+  background: var(--content2);
+  color: var(--foreground-muted);
+}
+
+.name {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+
+.slug {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.4;
+
+  padding: 0.0625rem 0.375rem;
+  border-radius: var(--radius-s);
+  background: var(--content2);
+  color: var(--foreground-muted);
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  color: var(--foreground-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.menuTrigger {
+  width: 2rem;
+  height: 2rem;
+
+  border-radius: var(--radius-s);
+  background: none;
+
+  color: var(--foreground-muted);
+}
+
+.menuTrigger:hover {
+  background: var(--content2);
+  color: var(--foreground);
+}
+
+.emptyIcon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-l);
+  background: var(--content2);
+  color: var(--foreground-faint);
+}
+
+.emptyIconDanger {
+  background: var(--danger-soft-bg);
+  color: var(--danger-strong);
+}
+
+.emptyTitle {
+  font-weight: 600;
+}
+
+.emptyCopy {
+  color: var(--foreground-muted);
+  max-width: 26rem;
+}
+
+.fieldError {
+  color: var(--danger-strong);
+}
+
+.skeletonRow {
+  border-bottom: 1px solid var(--divider);
+}
+
+.skeletonRow:last-child {
+  border-bottom: 0;
+}
+
+.skeleton {
+  border-radius: var(--radius-s);
+  background: linear-gradient(
+    90deg,
+    var(--content2) 25%,
+    var(--content3) 50%,
+    var(--content2) 75%
+  );
+  background-size: 200% 100%;
+  animation: briefly-shimmer 1.4s var(--ease-in-out) infinite;
+}
+
+@keyframes briefly-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .viewArticles {
+    display: none !important;
+  }
+}
