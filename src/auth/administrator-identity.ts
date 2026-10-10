@@ -21,3 +21,13 @@ export function administratorInitialsFromEmail(email: string): string {
   const alnum = local.replace(/[^a-zA-Z0-9]/g, "");
   return (alnum.slice(0, 2) || "?").toUpperCase();
 }
+
+/**
+ * Display-safe form of the sign-in email for the identity menu: keeps the
+ * first character of the local part and the domain, e.g. `a***@example.com`.
+ */
+export function maskAdministratorEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  if (at <= 0) return email;
+  return `${email[0]!}***${email.slice(at)}`;
+}

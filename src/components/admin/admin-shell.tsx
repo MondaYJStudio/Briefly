@@ -9,7 +9,10 @@ import {
   canonicalizeAppLocale,
 } from "../../locales/registry";
 import { useHydrated } from "../../locales/use-hydrated";
-import type { AdministratorIdentity } from "../../auth/administrator-identity";
+import {
+  maskAdministratorEmail,
+  type AdministratorIdentity,
+} from "../../auth/administrator-identity";
 import { AdminIcon } from "./icons";
 import styles from "./admin-shell.module.css";
 
@@ -64,7 +67,8 @@ export function AdminShell({
   const locale = getLocale();
   const hydrated = useHydrated();
   const selectedLocale = canonicalizeAppLocale(locale) ?? (locale as string);
-  const { email, initials } = identity;
+  const { initials } = identity;
+  const email = maskAdministratorEmail(identity.email);
 
   useEffect(() => {
     if (!mobileNavigationOpen) return;

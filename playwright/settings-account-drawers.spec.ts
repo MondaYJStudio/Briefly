@@ -1,5 +1,7 @@
 import { expect, test } from "playwright/test";
 
+import { maskAdministratorEmail } from "../src/auth/administrator-identity";
+
 const setupSecret = "playwright-only-setup-secret-32-characters";
 const administratorEmail = "administrator@example.test";
 const administratorPassword = "playwright-only-password";
@@ -16,7 +18,7 @@ async function openIdentityMenu(
   const triggerPrefix =
     options.triggerPrefix ?? "Settings and account menu — ";
   const trigger = page.getByRole("button", {
-    name: `${triggerPrefix}${options.email}`,
+    name: `${triggerPrefix}${maskAdministratorEmail(options.email)}`,
   });
   await expect(trigger).toBeVisible();
   await trigger.click();
