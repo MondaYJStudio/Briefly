@@ -21,6 +21,24 @@ describe("channelIntegrationPrompt", () => {
     expect(prompt).toContain("ARTICLE_LIST_CURSOR_STALE");
   });
 
+  it("explains how to fetch a single article safely", () => {
+    for (const locale of ["en", "zh-CN"]) {
+      const prompt = channelIntegrationPrompt({
+        origin: "https://news.example.test",
+        name: "Tech News",
+        slug: "tech-news",
+        locale,
+      });
+
+      expect(prompt).toContain("encodeURIComponent");
+      expect(prompt).toContain('channel.slug');
+      expect(prompt).toContain('"tech-news"');
+      expect(prompt).toContain("ARTICLE_NOT_FOUND");
+      expect(prompt).toContain("ARTICLE_GONE");
+      expect(prompt).toContain("308");
+    }
+  });
+
   it("percent-encodes non-ASCII slugs in the list URL", () => {
     const prompt = channelIntegrationPrompt({
       origin: "https://news.example.test",

@@ -25,8 +25,11 @@ export function channelIntegrationPrompt(input: {
   - 翻页：保持相同的 channel 参数，追加 &cursor=<nextCursor>，直到 nextCursor 为 null。
   - 可选筛选：tag（标签）、language（BCP 47 语言代码，如 zh-CN）。
 - 文章详情：GET ${detail}
-  - 在列表字段基础上多一个 html（正文 HTML）。
+  - 在列表字段基础上多一个 html（正文 HTML）。列表已含标题、摘要、封面等，只在需要正文时请求详情。
+  - {slug} 取自本频道列表项的 slug 字段，拼入路径前先用 encodeURIComponent 编码（slug 可能含中文等字符）。
+  - 详情接口不按频道过滤：若 slug 来源不确定，请确认返回的 channel.slug 为 "${input.slug}"。
   - 若返回 308，请跟随 Location 跳转到新的规范地址。
+  - 404（ARTICLE_NOT_FOUND，不存在或已撤下）或 410（ARTICLE_GONE，已永久删除）表示该文章不可用，不要重试，应从本地缓存中移除。
 - 完整契约：GET ${openApi}（OpenAPI 3.1）
 
 ## 列表项字段
@@ -51,8 +54,11 @@ Public, anonymous, CORS-enabled; no authentication.
   - Paginate by keeping the same channel parameter and appending &cursor=<nextCursor> until nextCursor is null.
   - Optional filters: tag, language (BCP 47 tag such as en-US).
 - Article detail: GET ${detail}
-  - Same fields as a list item plus html (the rendered body).
+  - Same fields as a list item plus html (the rendered body). The list already carries title, summary, cover, and so on, so request detail only when you need the body.
+  - Take {slug} from a list item of this Channel and encode it with encodeURIComponent before putting it in the path (slugs may contain non-ASCII characters).
+  - The detail endpoint is not Channel-scoped: if a slug did not come from this Channel's list, check that the returned channel.slug is "${input.slug}".
   - On 308, follow the Location header to the current canonical URL.
+  - 404 (ARTICLE_NOT_FOUND: missing or unpublished) or 410 (ARTICLE_GONE: permanently deleted) means the article is unavailable; do not retry, and drop it from any local cache.
 - Full contract: GET ${openApi} (OpenAPI 3.1)
 
 ## List item fields
