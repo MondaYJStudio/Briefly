@@ -115,6 +115,27 @@
   max-width: 26rem;
 }
 
+.prompt {
+  max-height: min(60vh, 32rem);
+  overflow: auto;
+
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--content2);
+  color: var(--foreground);
+
+  font-family: var(--font-mono);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.prompt:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .fieldError {
   color: var(--danger-strong);
 }
@@ -152,7 +173,7 @@
 }
 
 @media (max-width: 860px) {
-  .viewArticles {
+  .rowAction {
     display: none !important;
   }
 }

@@ -7,6 +7,7 @@ import {
   CHANNEL_SLUG_MAXIMUM_LENGTH,
   type Channel,
 } from "../../channels/channels";
+import { channelIntegrationPrompt } from "../../channels/channel-prompt";
 import {
   createAdminChannel,
   deleteAdminChannel,
@@ -56,6 +57,7 @@ export function ChannelsView() {
   const [actionError, setActionError] = useState<
     "save" | "delete" | "blocked" | null
   >(null);
+  const [promptChannel, setPromptChannel] = useState<Channel | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Channel | null>(null);
@@ -230,6 +232,7 @@ export function ChannelsView() {
                   onCancelRename={() => setRenamingId(null)}
                   onSaveName={(draft) => void saveName(channel, draft)}
                   onViewArticles={() => viewArticles(channel)}
+                  onShowPrompt={() => setPromptChannel(channel)}
                   onDelete={() => setDeleteTarget(channel)}
                 />
               ))}
@@ -250,6 +253,11 @@ export function ChannelsView() {
             if (listed) setChannels(listed);
           });
         }}
+      />
+
+      <PromptDialog
+        channel={promptChannel}
+        onClose={() => setPromptChannel(null)}
       />
 
       <AlertDialog.Backdrop
@@ -298,6 +306,7 @@ function ChannelRow({
   onCancelRename,
   onSaveName,
   onViewArticles,
+  onShowPrompt,
   onDelete,
 }: Readonly<{
   channel: Channel;
@@ -307,6 +316,7 @@ function ChannelRow({
   onCancelRename: () => void;
   onSaveName: (draft: string) => void;
   onViewArticles: () => void;
+  onShowPrompt: () => void;
   onDelete: () => void;
 }>) {
   const [draft, setDraft] = useState(channel.name);
@@ -380,7 +390,18 @@ function ChannelRow({
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <Button
-              className={styles.viewArticles}
+              className={styles.rowAction}
+              type="button"
+              size="sm"
+              variant="ghost"
+              aria-label={m.channel_copy_prompt_for({ name: channel.name })}
+              onPress={onShowPrompt}
+            >
+              <AdminIcon name="copy" size={15} />
+              {m.channel_copy_prompt()}
+            </Button>
+            <Button
+              className={styles.rowAction}
               type="button"
               size="sm"
               variant="ghost"
@@ -402,12 +423,16 @@ function ChannelRow({
                   aria-label={m.actions_for({ title: channel.name })}
                   onAction={(key) => {
                     if (key === "view") onViewArticles();
+                    else if (key === "copy") onShowPrompt();
                     else if (key === "rename") onStartRename();
                     else if (key === "delete") onDelete();
                   }}
                 >
                   <Dropdown.Item id="view" textValue={m.channel_view_articles()}>
                     {m.channel_view_articles()}
+                  </Dropdown.Item>
+                  <Dropdown.Item id="copy" textValue={m.channel_copy_prompt()}>
+                    {m.channel_copy_prompt()}
                   </Dropdown.Item>
                   <Dropdown.Item id="rename" textValue={m.channel_rename()}>
                     {m.channel_rename()}
@@ -574,6 +599,120 @@ function CreateChannelDialog({
               </Button>
             </Modal.Footer>
           </form>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
+  );
+}
+
+function PromptDialog({
+  channel,
+  onClose,
+}: Readonly<{ channel: Channel | null; onClose: () => void }>) {
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
+    "idle",
+  );
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Keep the last Channel while the dialog animates out.
+  const lastChannel = useRef<Channel | null>(null);
+  if (channel) lastChannel.current = channel;
+  const shown = channel ?? lastChannel.current;
+
+  const prompt = shown
+    ? channelIntegrationPrompt({
+        origin: globalThis.location?.origin ?? "",
+        name: shown.name,
+        slug: shown.slug,
+        locale: getLocale(),
+      })
+    : "";
+
+  useEffect(() => {
+    setCopyState("idle");
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+  }, [channel]);
+
+  useEffect(
+    () => () => {
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    },
+    [],
+  );
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(prompt);
+    } catch {
+      setCopyState("failed");
+      return;
+    }
+    setCopyState("copied");
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopyState("idle"), 2000);
+  }
+
+  return (
+    <Modal.Backdrop
+      isOpen={channel !== null}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <Modal.Container size="lg">
+        <Modal.Dialog
+          aria-label={
+            shown ? m.channel_prompt_heading({ name: shown.name }) : undefined
+          }
+        >
+          <Modal.Header>
+            <div className="flex items-center justify-between gap-3 w-full">
+              <Modal.Heading>
+                {shown ? m.channel_prompt_heading({ name: shown.name }) : ""}
+              </Modal.Heading>
+              <Modal.CloseTrigger aria-label={m.close_prompt_dialog()} />
+            </div>
+          </Modal.Header>
+          <Modal.Body>
+            <div className="grid gap-3 py-1">
+              <pre
+                className={`${styles.prompt} m-0 text-xs`}
+                tabIndex={0}
+                aria-label={
+                  shown
+                    ? m.channel_prompt_heading({ name: shown.name })
+                    : undefined
+                }
+              >
+                {prompt}
+              </pre>
+              {copyState === "failed" ? (
+                <Alert status="danger" role="alert">
+                  <Alert.Content>
+                    <Alert.Title>{m.channel_prompt_copy_failed()}</Alert.Title>
+                  </Alert.Content>
+                </Alert>
+              ) : null}
+              <p className="visually-hidden" role="status">
+                {copyState === "copied" && shown
+                  ? m.channel_prompt_copied_for({ name: shown.name })
+                  : ""}
+              </p>
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button type="button" variant="secondary" slot="close">
+              {m.channel_prompt_close()}
+            </Button>
+            <Button type="button" onPress={() => void copy()}>
+              <AdminIcon
+                name={copyState === "copied" ? "check" : "copy"}
+                size={16}
+              />
+              {copyState === "copied"
+                ? m.channel_prompt_copied()
+                : m.channel_prompt_copy()}
+            </Button>
+          </Modal.Footer>
         </Modal.Dialog>
       </Modal.Container>
     </Modal.Backdrop>

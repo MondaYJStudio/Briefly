@@ -16,6 +16,7 @@ export type AdminIconName =
   | "code"
   | "code-block"
   | "conflict"
+  | "copy"
   | "divider"
   | "external"
   | "eye"
@@ -64,6 +65,7 @@ const STROKE_ICONS: Record<Exclude<AdminIconName, "more">, string> = {
   clock: "M12 12m-9 0a9 9 0 1 0 18 0 9 9 0 1 0-18 0|M12 7v5l3 2",
   close: "M18 6 6 18M6 6l12 12",
   code: "m16 18 6-6-6-6M8 6l-6 6 6 6",
+  copy: "M10 8h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z|M4 16a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2",
   "code-block":
     "M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z|m8 10-2 2 2 2m4-4 2 2-2 2m2-8-4 12",
   conflict: "M8 7h12M8 12h12M8 17h12M4 7v.01M4 12v.01M4 17v.01",

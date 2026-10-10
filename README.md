@@ -151,7 +151,7 @@ The baseline contains no product telemetry, phone-home behavior, third-party ana
 
 ### Channels
 
-Administrators manage Channels at `/admin/channels` (create, rename, delete). Assign a Channel on the Article Draft in the editor; it appears in the public API only after a successful Publish. The Articles list can filter by Channel.
+Administrators manage Channels at `/admin/channels` (create, rename, delete). Each row has **Copy prompt**, which previews and copies a ready-to-paste instruction telling an LLM agent how to read that Channel's articles from this site's public API (endpoints, pagination, fields, and error handling). Assign a Channel on the Article Draft in the editor; it appears in the public API only after a successful Publish. The Articles list can filter by Channel.
 
 On the public list endpoint, `?channel=<slug>` returns only Current Publications whose frozen Channel slug matches. An unknown slug yields an empty list. Omit the parameter to list every Current Publication regardless of Channel. List and detail payloads expose `channel: { slug, name } | null` so consumers can render the partition without a separate lookup.
 
