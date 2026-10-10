@@ -16,7 +16,9 @@ import {
   type PublicationPreview,
 } from "../../articles/publication-workflow";
 import {
+  articleLifecycleProjection,
   draftUpdate,
+  editorLifecycleProjection,
   mergeConcurrentCurrentPublication,
   preserveLocalDraft,
   preserveNewestLocalDraft,
@@ -656,6 +658,31 @@ export function useArticleWorkspace(gateway?: ArticleWorkspaceGateway) {
     historyState === "ready" &&
     !historyHasUnpublishedChanges &&
     !hasUnsavedChanges;
+  const selectedChangesPending =
+    hasUnsavedChanges || historyHasUnpublishedChanges;
+  useEffect(() => {
+    if (!selected) return;
+    setArticles((current) => {
+      let changed = false;
+      const next = current.map((row) => {
+        if (row.id !== selected.id) return row;
+        const projection = editorLifecycleProjection(row, {
+          currentPublicationId: selected.currentPublicationId,
+          changesPending: selectedChangesPending,
+          divergenceKnown: historyState === "ready",
+        });
+        if (
+          "lifecycleProjection" in row &&
+          articleLifecycleProjection(row) === projection
+        ) {
+          return row;
+        }
+        changed = true;
+        return withLifecycleProjection(row, projection);
+      });
+      return changed ? next : current;
+    });
+  }, [articles, selected, selectedChangesPending, historyState]);
   const publishActionDisabled =
     !selected ||
     !serverConfirmed ||

@@ -9,6 +9,7 @@ import {
   articleLifecycleProjection,
   applyDraftChanges,
   draftUpdate,
+  editorLifecycleProjection,
   mergeConcurrentCurrentPublication,
   preserveLocalDraft,
   preserveNewestLocalDraft,
@@ -73,6 +74,37 @@ describe("Article Workspace pure interface", () => {
       ),
     ).toBe("published");
     expect(articleLifecycleProjection(article())).toBe("draft");
+  });
+
+  it("keeps the open Article's list projection in step with the editor", () => {
+    const published = Object.assign(
+      article({ currentPublicationId: "publication-1" }),
+      { lifecycleProjection: "changes-pending" as const },
+    );
+    const live = {
+      currentPublicationId: "publication-1",
+      changesPending: false,
+      divergenceKnown: true,
+    };
+    expect(editorLifecycleProjection(published, live)).toBe("published");
+    expect(
+      editorLifecycleProjection(published, { ...live, changesPending: true }),
+    ).toBe("changes-pending");
+    expect(
+      editorLifecycleProjection(published, { ...live, divergenceKnown: false }),
+    ).toBe("changes-pending");
+    expect(
+      editorLifecycleProjection(published, {
+        ...live,
+        currentPublicationId: null,
+      }),
+    ).toBe("unpublished");
+    expect(
+      editorLifecycleProjection(
+        Object.assign(article(), { lifecycleProjection: "draft" as const }),
+        { ...live, currentPublicationId: null },
+      ),
+    ).toBe("draft");
   });
 
   it("applies Draft commands with automatic Slug following and manual lock", () => {

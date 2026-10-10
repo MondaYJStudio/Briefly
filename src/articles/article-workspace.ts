@@ -356,6 +356,29 @@ function isArticleLifecycleProjection(
   );
 }
 
+/**
+ * Projection for the open Article from what the editor knows, so its list row
+ * follows edits, discards, publishes, and unpublishes without a list reload.
+ * Returns the row's existing projection when the editor cannot tell.
+ */
+export function editorLifecycleProjection(
+  row: Article,
+  editor: Readonly<{
+    currentPublicationId: string | null;
+    changesPending: boolean;
+    divergenceKnown: boolean;
+  }>,
+): ArticleLifecycleProjection {
+  const previous = articleLifecycleProjection(row);
+  if (editor.currentPublicationId === null) {
+    return previous === "published" || previous === "changes-pending"
+      ? "unpublished"
+      : previous;
+  }
+  if (editor.changesPending) return "changes-pending";
+  return editor.divergenceKnown ? "published" : previous;
+}
+
 export function withLifecycleProjection(
   article: Article,
   lifecycleProjection: ArticleLifecycleProjection,
