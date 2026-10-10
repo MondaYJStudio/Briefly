@@ -40,6 +40,7 @@ async function saveDraft(
     tags?: string[];
     byline?: { name: string; url: string | null } | null;
     language?: string | null;
+    channelSlug?: string | null;
     document?: unknown;
   },
 ): Promise<number> {
@@ -179,6 +180,33 @@ describe("Admin Article list lifecycle projection", () => {
     expect(byId[pendingId]?.currentPublicationId).toBe(pendingPublicationId);
     expect(byId[unpublishedId]?.currentPublicationId).toBeNull();
   }, 30_000);
+
+  it("projects a published Article in a Channel as Published", async () => {
+    const cookie = await initializeAndSignIn();
+    await env.DB.prepare(
+      "DELETE FROM channel WHERE slug = 'field-notes'",
+    ).run();
+    const channel = await SELF.fetch("http://briefly.test/api/admin/channels", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ slug: "field-notes", name: "Field notes" }),
+    });
+    expect(channel.status).toBe(201);
+
+    const articleId = await createArticle(cookie);
+    const version = await saveDraft(cookie, articleId, {
+      version: 1,
+      title: "Channel article",
+      slug: "channel-article",
+      channelSlug: "field-notes",
+    });
+    await publish(cookie, articleId, version, null);
+
+    const listed = await listArticles(cookie);
+    expect(
+      listed.find((article) => article.id === articleId)?.lifecycleProjection,
+    ).toBe("published");
+  });
 
   it("marks Changes pending when inherited Site Settings diverge from the Current Publication", async () => {
     const cookie = await initializeAndSignIn();

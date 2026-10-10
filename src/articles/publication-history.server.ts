@@ -600,7 +600,8 @@ export async function projectAdminArticles(
         `SELECT publication.id, publication.article_id,
                 publication.publication_number, publication.title,
                 publication.slug, publication.summary, publication.tags,
-                publication.byline, publication.language, publication.cover,
+                publication.byline, publication.language,
+                publication.channel_slug, publication.cover,
                 publication.document_schema_version, publication.document
          FROM publication
          WHERE publication.id IN (${publicationPlaceholders})`,
