@@ -316,7 +316,7 @@
 /* ============ Index-First opening ============ */
 
 .public-site .intro {
-  max-width: var(--measure);
+  max-width: none;
 }
 
 .public-site .intro p {
