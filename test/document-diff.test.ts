@@ -111,4 +111,38 @@ describe("Article body diff", () => {
       }),
     ).toEqual(["## Heading", "1. First", "> Quote"]);
   });
+
+  it("flattens each table row to one line of cells", () => {
+    const cell = (type: string, text: string) => ({
+      type,
+      attrs: { colspan: 1, rowspan: 1 },
+      content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+    });
+    expect(
+      documentLines({
+        documentSchemaVersion: 1,
+        doc: {
+          type: "doc",
+          content: [
+            {
+              type: "table",
+              content: [
+                {
+                  type: "tableRow",
+                  content: [
+                    cell("tableHeader", "Plan"),
+                    cell("tableHeader", "Price"),
+                  ],
+                },
+                {
+                  type: "tableRow",
+                  content: [cell("tableCell", "Free"), cell("tableCell", "0")],
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ).toEqual(["| Plan | Price |", "| Free | 0 |"]);
+  });
 });

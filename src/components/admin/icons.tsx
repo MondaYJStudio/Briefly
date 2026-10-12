@@ -41,6 +41,7 @@ export type AdminIconName =
   | "settings"
   | "strike"
   | "sun"
+  | "table"
   | "trash"
   | "undo"
   | "upload"
@@ -53,8 +54,7 @@ const STROKE_ICONS: Record<Exclude<AdminIconName, "more">, string> = {
   alert: "M12 12m-9 0a9 9 0 1 0 18 0 9 9 0 1 0-18 0|M12 8v5m0 3v.01",
   articles:
     "M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z|M14 3v6h6M9 13h6M9 17h6",
-  channels:
-    "M4 6h16M4 12h10M4 18h14|M17 10v8m0 0 3-3m-3 3-3-3",
+  channels: "M4 6h16M4 12h10M4 18h14|M17 10v8m0 0 3-3m-3 3-3-3",
   back: "M19 12H5m7-7-7 7 7 7",
   bold: "M7 4h6a3.5 3.5 0 0 1 0 7H7zM7 11h7a3.5 3.5 0 0 1 0 7H7z",
   break: "M9 10 4 15l5 5|M4 15h10a6 6 0 0 0 6-6V4",
@@ -102,6 +102,8 @@ const STROKE_ICONS: Record<Exclude<AdminIconName, "more">, string> = {
   strike:
     "M5 12h14M16 6c-.6-1.2-2.1-2-4-2-2.5 0-4 1.3-4 3 0 1 .5 1.7 1.3 2.2M8 18c.6 1.2 2.1 2 4 2 2.5 0 4-1.3 4-3 0-.8-.4-1.5-1-2",
   sun: "M12 12m-4 0a4 4 0 1 0 8 0 4 4 0 1 0-8 0|M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
+  table:
+    "M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z|M3 10h18M3 15h18M10 4v16",
   trash:
     "M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6",
   undo: "M3 7v6h6M3 13a9 9 0 1 0 3-7.7L3 7",

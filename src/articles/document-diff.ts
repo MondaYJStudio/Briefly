@@ -64,6 +64,20 @@ function blockLines(node: JSONContent, prefix: string): string[] {
       ];
     case "videoEmbed":
       return [prefix + `[video] ${String(node.attrs?.title ?? "")}`];
+    case "table":
+      return (node.content ?? []).map(
+        (row) =>
+          prefix +
+          "| " +
+          (row.content ?? [])
+            .map((cell) =>
+              (cell.content ?? [])
+                .map((paragraph) => inlineText(paragraph.content))
+                .join(" "),
+            )
+            .join(" | ") +
+          " |",
+      );
     default:
       return [];
   }

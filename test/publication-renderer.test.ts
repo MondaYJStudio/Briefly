@@ -822,6 +822,144 @@ describe("Publication renderer", () => {
     });
   });
 
+  it("renders a table with header cells and spans inside a scroll wrapper", async () => {
+    const cell = (
+      type: "tableCell" | "tableHeader",
+      text: string,
+      attrs = { colspan: 1, rowspan: 1 },
+    ) => ({
+      type,
+      attrs,
+      content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+    });
+    const result = await renderPublication(
+      {
+        documentSchemaVersion: 1,
+        doc: {
+          type: "doc",
+          content: [
+            {
+              type: "table",
+              content: [
+                {
+                  type: "tableRow",
+                  content: [
+                    cell("tableHeader", "Plan"),
+                    cell("tableHeader", "Price"),
+                  ],
+                },
+                {
+                  type: "tableRow",
+                  content: [
+                    cell("tableCell", "<b>Free</b>", {
+                      colspan: 2,
+                      rowspan: 1,
+                    }),
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+      { resolveAsset: async () => null },
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        html:
+          '<div class="table-scroll"><table><tbody>' +
+          "<tr><th><p>Plan</p></th><th><p>Price</p></th></tr>" +
+          '<tr><td colspan="2"><p>&lt;b&gt;Free&lt;/b&gt;</p></td></tr>' +
+          "</tbody></table></div>",
+      },
+    });
+  });
+
+  it("rejects presentation attributes and nested blocks inside table cells", async () => {
+    const table = (cell: Record<string, unknown>) => ({
+      documentSchemaVersion: 1,
+      doc: {
+        type: "doc",
+        content: [
+          {
+            type: "table",
+            content: [{ type: "tableRow", content: [cell] }],
+          },
+        ],
+      },
+    });
+
+    const styled = await renderPublication(
+      table({
+        type: "tableCell",
+        attrs: { colspan: 1, rowspan: 1, style: "color:red" },
+        content: [{ type: "paragraph" }],
+      }),
+      { resolveAsset: async () => null },
+    );
+    expect(styled).toMatchObject({
+      ok: false,
+      issues: [{ code: "INVALID_NODE_ATTRIBUTES" }],
+    });
+
+    const nested = await renderPublication(
+      table({
+        type: "tableCell",
+        attrs: { colspan: 1, rowspan: 1 },
+        content: [{ type: "horizontalRule" }],
+      }),
+      { resolveAsset: async () => null },
+    );
+    expect(nested.ok).toBe(false);
+  });
+
+  it("rejects a table nested inside a list item", async () => {
+    const result = await renderPublication(
+      {
+        documentSchemaVersion: 1,
+        doc: {
+          type: "doc",
+          content: [
+            {
+              type: "bulletList",
+              content: [
+                {
+                  type: "listItem",
+                  content: [
+                    { type: "paragraph" },
+                    {
+                      type: "table",
+                      content: [
+                        {
+                          type: "tableRow",
+                          content: [
+                            {
+                              type: "tableCell",
+                              attrs: { colspan: 1, rowspan: 1 },
+                              content: [{ type: "paragraph" }],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+      { resolveAsset: async () => null },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      issues: [{ code: "UNSUPPORTED_NODE" }],
+    });
+  });
+
   it("executes the renderer in workerd without browser DOM globals", async () => {
     const result = await renderPublication(
       {

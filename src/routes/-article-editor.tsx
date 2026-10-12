@@ -37,6 +37,92 @@ import { m } from "../paraglide/messages.js";
 import { getApiClient } from "./api.$";
 import styles from "./article-editor.module.css";
 
+const tableActions = [
+  "insert",
+  "rowBefore",
+  "rowAfter",
+  "columnBefore",
+  "columnAfter",
+  "deleteRow",
+  "deleteColumn",
+  "headerRow",
+  "mergeOrSplit",
+  "deleteTable",
+] as const;
+type TableAction = (typeof tableActions)[number];
+
+const tableActionLabels: Record<TableAction, () => string> = {
+  insert: m.insert_table,
+  rowBefore: m.add_row_above,
+  rowAfter: m.add_row_below,
+  columnBefore: m.add_column_left,
+  columnAfter: m.add_column_right,
+  deleteRow: m.delete_row,
+  deleteColumn: m.delete_column,
+  headerRow: m.toggle_header_row,
+  mergeOrSplit: m.merge_or_split_cells,
+  deleteTable: m.delete_table,
+};
+
+function emptyTableRow(type: "tableCell" | "tableHeader") {
+  return {
+    type: "tableRow",
+    content: Array.from({ length: 3 }, () => ({
+      type,
+      attrs: { colspan: 1, rowspan: 1 },
+      content: [{ type: "paragraph" }],
+    })),
+  };
+}
+
+/** Runs on a real chain or a `can()` chain, so enablement matches behavior. */
+function runTableAction(
+  editor: Editor,
+  chain: ReturnType<Editor["chain"]>,
+  action: TableAction,
+): boolean {
+  switch (action) {
+    case "insert": {
+      // Tables only live in the document body; from inside a list, quote, or
+      // table, add the new one after that block instead of splitting it.
+      const { $from } = editor.state.selection;
+      if ($from.depth <= 1) {
+        return chain
+          .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+          .run();
+      }
+      return chain
+        .insertContentAt($from.after(1), {
+          type: "table",
+          content: [
+            emptyTableRow("tableHeader"),
+            emptyTableRow("tableCell"),
+            emptyTableRow("tableCell"),
+          ],
+        })
+        .run();
+    }
+    case "rowBefore":
+      return chain.addRowBefore().run();
+    case "rowAfter":
+      return chain.addRowAfter().run();
+    case "columnBefore":
+      return chain.addColumnBefore().run();
+    case "columnAfter":
+      return chain.addColumnAfter().run();
+    case "deleteRow":
+      return chain.deleteRow().run();
+    case "deleteColumn":
+      return chain.deleteColumn().run();
+    case "headerRow":
+      return chain.toggleHeaderRow().run();
+    case "mergeOrSplit":
+      return chain.mergeOrSplit().run();
+    case "deleteTable":
+      return chain.deleteTable().run();
+  }
+}
+
 export interface ArticleEditorProps {
   title: string;
   document: ArticleDocument;
@@ -398,6 +484,45 @@ export function ArticleEditor({
         >
           <AdminIcon name="video" size={16} />
         </Button>
+        <Dropdown.Root>
+          <Dropdown.Trigger
+            className={`${styles.fmtStyleTrigger} inline-flex items-center border-0 cursor-pointer gap-1 py-0 px-2`}
+            aria-label={m.table()}
+          >
+            <AdminIcon name="table" size={16} />
+            <AdminIcon name="chevron-down" size={12} />
+          </Dropdown.Trigger>
+          <Dropdown.Popover placement="bottom end">
+            <Dropdown.Menu
+              aria-label={m.table()}
+              disabledKeys={tableActions.filter(
+                (key) =>
+                  !runTableAction(
+                    activeEditor,
+                    activeEditor.can().chain(),
+                    key,
+                  ),
+              )}
+              onAction={(key) =>
+                runTableAction(
+                  activeEditor,
+                  activeEditor.chain().focus(),
+                  key as TableAction,
+                )
+              }
+            >
+              {tableActions.map((key) => (
+                <Dropdown.Item
+                  key={key}
+                  id={key}
+                  textValue={tableActionLabels[key]()}
+                >
+                  {tableActionLabels[key]()}
+                </Dropdown.Item>
+              ))}
+            </Dropdown.Menu>
+          </Dropdown.Popover>
+        </Dropdown.Root>
       </div>
       <article
         className="doc article-editor__surface"

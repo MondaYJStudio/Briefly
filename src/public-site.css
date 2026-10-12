@@ -701,6 +701,40 @@
   width: 100%;
 }
 
+.public-site .article-body .table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.public-site .article-body table {
+  min-width: 100%;
+  border-collapse: collapse;
+  border-top: var(--rule-hair) solid var(--divider);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.55;
+}
+
+.public-site .article-body th,
+.public-site .article-body td {
+  text-align: left;
+  vertical-align: top;
+  padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+  border-bottom: var(--rule-hair) solid var(--divider);
+  /* The body's `overflow-wrap: anywhere` would shred cells letter by letter;
+   * wrap at word boundaries and let `.table-scroll` absorb the overflow. */
+  overflow-wrap: normal;
+}
+
+.public-site .article-body th {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.public-site .article-body th > p + p,
+.public-site .article-body td > p + p {
+  margin-block-start: calc(var(--spacing) * 2);
+}
+
 /* ============ Not-found state ============ */
 
 .public-site .unavailable {

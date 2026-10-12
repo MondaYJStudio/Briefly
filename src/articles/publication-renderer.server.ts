@@ -53,7 +53,7 @@ const VIDEO_PROVIDER_POLICIES = {
 const Document = Node.create({
   name: "doc",
   topNode: true,
-  content: "block+",
+  content: "(block | topLevelBlock)+",
 });
 
 const Paragraph = Node.create({
@@ -137,6 +137,46 @@ const HorizontalRule = Node.create({
   renderHTML: () => ["hr"],
 });
 
+const TABLE_CELL_SPAN_MAXIMUM = 100;
+
+/** Wrapped so wide tables scroll inside the reading measure. */
+const Table = Node.create({
+  name: "table",
+  group: "topLevelBlock",
+  content: "tableRow+",
+  isolating: true,
+  renderHTML: () => ["div", { class: "table-scroll" }, ["table", ["tbody", 0]]],
+});
+
+const TableRow = Node.create({
+  name: "tableRow",
+  content: "(tableCell | tableHeader)+",
+  renderHTML: () => ["tr", 0],
+});
+
+function tableCellSpans(attrs: Record<string, unknown>) {
+  return {
+    ...(attrs.colspan === 1 ? {} : { colspan: attrs.colspan }),
+    ...(attrs.rowspan === 1 ? {} : { rowspan: attrs.rowspan }),
+  };
+}
+
+const TableCell = Node.create({
+  name: "tableCell",
+  content: "paragraph+",
+  isolating: true,
+  addAttributes: () => ({ colspan: { default: 1 }, rowspan: { default: 1 } }),
+  renderHTML: ({ node }) => ["td", tableCellSpans(node.attrs), 0],
+});
+
+const TableHeader = Node.create({
+  name: "tableHeader",
+  content: "paragraph+",
+  isolating: true,
+  addAttributes: () => ({ colspan: { default: 1 }, rowspan: { default: 1 } }),
+  renderHTML: ({ node }) => ["th", tableCellSpans(node.attrs), 0],
+});
+
 const Figure = Node.create({
   name: "figure",
   group: "block",
@@ -207,6 +247,10 @@ const extensions = [
   HorizontalRule,
   Figure,
   VideoEmbed,
+  Table,
+  TableRow,
+  TableCell,
+  TableHeader,
   Bold,
   Italic,
   Strike,
@@ -267,14 +311,45 @@ const inlineNodeSchema = z.discriminatedUnion("type", [
   hardBreakNodeSchema,
 ]);
 
-const blockNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
-  z.discriminatedUnion("type", [
-    z
+const paragraphNodeSchema = z
+  .object({
+    type: z.literal("paragraph"),
+    content: z.array(inlineNodeSchema).optional(),
+  })
+  .strict();
+
+const tableCellNodeSchema = z
+  .object({
+    type: z.enum(["tableCell", "tableHeader"]),
+    attrs: z
       .object({
-        type: z.literal("paragraph"),
-        content: z.array(inlineNodeSchema).optional(),
+        colspan: z.number().int().min(1).max(TABLE_CELL_SPAN_MAXIMUM),
+        rowspan: z.number().int().min(1).max(TABLE_CELL_SPAN_MAXIMUM),
       })
       .strict(),
+    content: z.array(paragraphNodeSchema).min(1),
+  })
+  .strict();
+
+const tableNodeSchema = z
+  .object({
+    type: z.literal("table"),
+    content: z
+      .array(
+        z
+          .object({
+            type: z.literal("tableRow"),
+            content: z.array(tableCellNodeSchema).min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict();
+
+function blockNodeVariants() {
+  return [
+    paragraphNodeSchema,
     z
       .object({
         type: z.literal("heading"),
@@ -321,7 +396,16 @@ const blockNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
     z.object({ type: z.literal("horizontalRule") }).strict(),
     figureNodeSchema,
     videoEmbedNodeSchema,
-  ]),
+  ] as const;
+}
+
+const blockNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
+  z.discriminatedUnion("type", blockNodeVariants()),
+);
+
+/** The document body additionally admits tables, which never nest. */
+const topLevelNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
+  z.discriminatedUnion("type", [...blockNodeVariants(), tableNodeSchema]),
 );
 
 const listItemNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
@@ -391,7 +475,7 @@ const versionedDocumentSchema = z
     doc: z
       .object({
         type: z.literal("doc"),
-        content: z.array(blockNodeSchema).min(1),
+        content: z.array(topLevelNodeSchema).min(1),
       })
       .strict(),
   })

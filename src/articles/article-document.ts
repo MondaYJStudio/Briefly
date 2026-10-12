@@ -7,6 +7,12 @@ import {
 import CodeBlock from "@tiptap/extension-code-block";
 import Link from "@tiptap/extension-link";
 import { OrderedList } from "@tiptap/extension-list";
+import {
+  Table,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@tiptap/extension-table";
 import { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import StarterKit from "@tiptap/starter-kit";
 import { z } from "zod";
@@ -21,6 +27,7 @@ import { VIDEO_PROVIDER_IDENTIFIERS } from "./video-embeds";
 
 const ARTICLE_LINK_MAXIMUM_LENGTH = 2_048;
 const ORDERED_LIST_START_MAXIMUM = 1_000_000;
+const TABLE_CELL_SPAN_MAXIMUM = 100;
 const codeBlockLanguage = z.string().regex(/^[a-z0-9][a-z0-9+#.-]{0,31}$/iu, {
   message: "Code block language must be a short language identifier.",
 });
@@ -90,6 +97,161 @@ const ArticleOrderedList = OrderedList.extend({
   },
 });
 
+function parseTableCellSpan(element: HTMLElement, name: string): number {
+  const parsed = Number.parseInt(element.getAttribute(name) ?? "1", 10);
+  return Number.isSafeInteger(parsed) &&
+    parsed >= 1 &&
+    parsed <= TABLE_CELL_SPAN_MAXIMUM
+    ? parsed
+    : 1;
+}
+
+const TABLE_CELL_FLATTENED_TAGS = new Set([
+  "ADDRESS",
+  "ARTICLE",
+  "ASIDE",
+  "BLOCKQUOTE",
+  "DD",
+  "DIV",
+  "DL",
+  "DT",
+  "FIGCAPTION",
+  "FIGURE",
+  "FOOTER",
+  "H1",
+  "H2",
+  "H3",
+  "H4",
+  "H5",
+  "H6",
+  "HEADER",
+  "LI",
+  "OL",
+  "P",
+  "PRE",
+  "SECTION",
+  "TABLE",
+  "TBODY",
+  "TD",
+  "TFOOT",
+  "TH",
+  "THEAD",
+  "TR",
+  "UL",
+]);
+
+/**
+ * Rewrites pasted cell markup into sibling paragraphs so lists, headings, and
+ * other blocks stay inside their cell (list items keep a text marker) instead
+ * of being hoisted out of the table by the `paragraph+` cell content rule.
+ */
+function flattenTableCellElement(cell: HTMLElement): HTMLElement {
+  const output = cell.ownerDocument.createElement("div");
+  let paragraph: HTMLElement | null = null;
+  let pendingMarker = "";
+
+  function currentParagraph(): HTMLElement {
+    if (!paragraph) {
+      paragraph = cell.ownerDocument.createElement("p");
+      if (pendingMarker) {
+        paragraph.appendChild(cell.ownerDocument.createTextNode(pendingMarker));
+      }
+      pendingMarker = "";
+      output.appendChild(paragraph);
+    }
+    return paragraph;
+  }
+
+  function visit(parent: HTMLElement) {
+    for (const child of Array.from(parent.childNodes)) {
+      if (child.nodeType === 1) {
+        const element = child as HTMLElement;
+        if (element.tagName === "HR") {
+          paragraph = null;
+          continue;
+        }
+        if (element.tagName === "UL" || element.tagName === "OL") {
+          const start = Number.parseInt(
+            element.getAttribute("start") ?? "1",
+            10,
+          );
+          let index = Number.isSafeInteger(start) ? start : 1;
+          for (const item of Array.from(element.children)) {
+            if (item.tagName !== "LI") continue;
+            paragraph = null;
+            pendingMarker = element.tagName === "OL" ? `${index++}. ` : "• ";
+            visit(item as HTMLElement);
+            paragraph = null;
+          }
+          pendingMarker = "";
+          continue;
+        }
+        if (TABLE_CELL_FLATTENED_TAGS.has(element.tagName)) {
+          paragraph = null;
+          visit(element);
+          paragraph = null;
+          continue;
+        }
+      } else if (
+        child.nodeType === 3 &&
+        !paragraph &&
+        (child.textContent ?? "").trim() === ""
+      ) {
+        continue;
+      }
+      currentParagraph().appendChild(child.cloneNode(true));
+    }
+  }
+
+  visit(cell);
+  return output;
+}
+
+/**
+ * Cells keep only structural spans: pasted widths, alignment, and styles are
+ * presentation the Article schema does not own, and cell bodies stay flat
+ * paragraphs so tables cannot nest lists, figures, or other tables.
+ */
+function tableCellOverrides(tag: "td" | "th") {
+  return {
+    content: "paragraph+",
+    parseHTML() {
+      return [{ tag, contentElement: flattenTableCellElement }];
+    },
+    addAttributes() {
+      return {
+        colspan: {
+          default: 1,
+          parseHTML: (element: HTMLElement) =>
+            parseTableCellSpan(element, "colspan"),
+        },
+        rowspan: {
+          default: 1,
+          parseHTML: (element: HTMLElement) =>
+            parseTableCellSpan(element, "rowspan"),
+        },
+      };
+    },
+  };
+}
+
+const ArticleTableCell = TableCell.extend(tableCellOverrides("td"));
+const ArticleTableHeader = TableHeader.extend(tableCellOverrides("th"));
+const ArticleTableRow = TableRow.extend({
+  content: "(tableCell | tableHeader)+",
+});
+
+/**
+ * Tables leave the shared `block` group so they can only sit directly in the
+ * document body, never inside lists, blockquotes, or other tables.
+ */
+const ArticleTable = Table.extend({ group: "topLevelBlock" });
+const ArticleDocumentNode = Node.create({
+  name: "doc",
+  topNode: true,
+  content: "(block | topLevelBlock)+",
+});
+
 const ArticleFigure = Node.create({
   name: "figure",
   group: "block",
@@ -138,6 +300,7 @@ const ArticleVideoEmbed = Node.create({
 export function createArticleEditorExtensions(): Extensions {
   return [
     StarterKit.configure({
+      document: false,
       codeBlock: false,
       heading: { levels: [2, 3, 4] },
       link: false,
@@ -145,10 +308,15 @@ export function createArticleEditorExtensions(): Extensions {
       trailingNode: false,
       underline: false,
     }),
+    ArticleDocumentNode,
     ArticleCodeBlock,
     ArticleOrderedList,
     ArticleFigure,
     ArticleVideoEmbed,
+    ArticleTable.configure({ resizable: false }),
+    ArticleTableRow,
+    ArticleTableHeader,
+    ArticleTableCell,
     ArticleLink.configure({
       autolink: true,
       linkOnPaste: true,
@@ -247,14 +415,45 @@ const videoEmbedNodeSchema = z
   })
   .strict();
 
-const blockNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
-  z.discriminatedUnion("type", [
-    z
+const paragraphNodeSchema = z
+  .object({
+    type: z.literal("paragraph"),
+    content: z.array(inlineNodeSchema).optional(),
+  })
+  .strict();
+
+const tableCellNodeSchema = z
+  .object({
+    type: z.enum(["tableCell", "tableHeader"]),
+    attrs: z
       .object({
-        type: z.literal("paragraph"),
-        content: z.array(inlineNodeSchema).optional(),
+        colspan: z.number().int().min(1).max(TABLE_CELL_SPAN_MAXIMUM),
+        rowspan: z.number().int().min(1).max(TABLE_CELL_SPAN_MAXIMUM),
       })
       .strict(),
+    content: z.array(paragraphNodeSchema).min(1),
+  })
+  .strict();
+
+const tableNodeSchema = z
+  .object({
+    type: z.literal("table"),
+    content: z
+      .array(
+        z
+          .object({
+            type: z.literal("tableRow"),
+            content: z.array(tableCellNodeSchema).min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict();
+
+function blockNodeVariants() {
+  return [
+    paragraphNodeSchema,
     z
       .object({
         type: z.literal("heading"),
@@ -299,7 +498,16 @@ const blockNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
     z.object({ type: z.literal("horizontalRule") }).strict(),
     figureNodeSchema,
     videoEmbedNodeSchema,
-  ]),
+  ] as const;
+}
+
+const blockNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
+  z.discriminatedUnion("type", blockNodeVariants()),
+);
+
+/** The document body additionally admits tables, which never nest. */
+const topLevelNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
+  z.discriminatedUnion("type", [...blockNodeVariants(), tableNodeSchema]),
 );
 
 const listItemNodeSchema: z.ZodType<JSONContent> = z.lazy(() =>
@@ -317,7 +525,7 @@ const articleDocumentSchema = z
     doc: z
       .object({
         type: z.literal("doc"),
-        content: z.array(blockNodeSchema).min(1),
+        content: z.array(topLevelNodeSchema).min(1),
       })
       .strict(),
   })

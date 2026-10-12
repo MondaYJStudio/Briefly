@@ -301,6 +301,31 @@ html[data-theme="dark"],
   margin: 2em auto;
   width: 40%;
 }
+.doc table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  overflow: hidden;
+}
+.doc th,
+.doc td {
+  position: relative;
+  vertical-align: top;
+  text-align: left;
+  padding: 0.4em 0.6em;
+  border: 1px solid var(--border-strong);
+}
+.doc th {
+  font-weight: 650;
+  background: var(--content2);
+}
+.doc .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  pointer-events: none;
+}
 .doc a {
   color: var(--primary);
   text-decoration: underline;

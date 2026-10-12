@@ -497,7 +497,69 @@ describe("Article Draft administration", () => {
       "an unknown node",
       {
         documentSchemaVersion: 1,
-        doc: { type: "doc", content: [{ type: "table" }] },
+        doc: { type: "doc", content: [{ type: "taskList" }] },
+      },
+    ],
+    [
+      "a table cell with pasted width and alignment",
+      {
+        documentSchemaVersion: 1,
+        doc: {
+          type: "doc",
+          content: [
+            {
+              type: "table",
+              content: [
+                {
+                  type: "tableRow",
+                  content: [
+                    {
+                      type: "tableCell",
+                      attrs: {
+                        colspan: 1,
+                        rowspan: 1,
+                        colwidth: [240],
+                        align: "center",
+                      },
+                      content: [{ type: "paragraph" }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+    [
+      "a table nested inside a blockquote",
+      {
+        documentSchemaVersion: 1,
+        doc: {
+          type: "doc",
+          content: [
+            {
+              type: "blockquote",
+              content: [
+                {
+                  type: "table",
+                  content: [
+                    {
+                      type: "tableRow",
+                      content: [
+                        {
+                          type: "tableCell",
+                          attrs: { colspan: 1, rowspan: 1 },
+                          content: [{ type: "paragraph" }],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
       },
     ],
     [
