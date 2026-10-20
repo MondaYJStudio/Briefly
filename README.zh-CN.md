@@ -159,6 +159,15 @@ Drizzle schema 文件是数据库结构的事实来源；Drizzle Kit 生成提�
 
 Article slug 采用唯一且明确的归一化策略：保存的显示 slug 会先移除首尾空白并归一化为 Unicode NFC，同时保留显示大小写；全局唯一键再使用与地区无关的 `und` locale 转为小写，并再次归一化为 NFC，避免大小写映射重新产生可绕过比较的分解等价形式。slug 必须是良构 Unicode，不能包含控制字符、URI 路径保留字符、百分号或反斜杠，也不能是点路径段 `.` 或 `..`。Publication 成功后，其归一化 slug claim 将永久保留；以后成功更改 slug 时，所有曾公开的 slug 都会直接重定向到当前规范 URL。Article 取消发布期间，这些定位符统一返回不披露内部状态的 404。
 
+## MCP 访问
+
+Briefly 在 `/mcp` 提供远程 [Model Context Protocol](https://modelcontextprotocol.io) 服务，AI 代理可以代管理员撰写、预览和发布文章。在 Claude（claude.ai 连接器、Claude Code、Claude Desktop）或任何支持 OAuth 的 MCP 客户端里，把 `https://<你的 Briefly 地址>/mcp` 添加为远程 MCP 服务器即可。
+
+- 授权使用 OAuth 2.1（PKCE + 动态客户端注册），由 Briefly 自己提供。客户端会先带你登录，再进入确认页，页面写明是哪个客户端、授权码会发往哪里。即使已经登录，每次授权也都要确认。
+- 工具：`list_channels`、`list_articles`、`get_article`、`create_article`、`update_draft`、`preview_article`、`publish_article`，草稿版本、发布冲突和发布问题的规则与编辑器完全一致。
+- 正文使用 Markdown。文章容纳不了的写法（原始 HTML、任务列表、外部图片、相对链接）会报出来，不会被悄悄丢掉。已上传的图片和视频嵌入用 `briefly-asset:`、`briefly-video:` 地址往返。
+- **账户 → 已连接应用** 列出所有已授权的客户端；断开后，它的下一次调用就会被拒绝。访问令牌有效期 1 小时，刷新令牌 1 周。
+
 ## 许可证
 
 Briefly 使用 [MIT License](LICENSE) 发布。

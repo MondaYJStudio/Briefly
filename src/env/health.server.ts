@@ -61,6 +61,21 @@ export async function checkRuntimeHealth(
             FROM auth_verification) AS verificationColumns,
          (SELECT COUNT(key) + COUNT(attempts) + COUNT(reset_at)
             FROM auth_rate_limit) AS rateLimitColumns,
+         (SELECT COUNT(id) + COUNT(name) + COUNT(icon) + COUNT(metadata) +
+                 COUNT(client_id) + COUNT(client_secret) +
+                 COUNT(redirect_urls) + COUNT(type) + COUNT(disabled) +
+                 COUNT(user_id) + COUNT(created_at) + COUNT(updated_at)
+            FROM auth_oauth_application) AS oauthApplicationColumns,
+         (SELECT COUNT(id) + COUNT(access_token) + COUNT(refresh_token) +
+                 COUNT(access_token_expires_at) +
+                 COUNT(refresh_token_expires_at) + COUNT(client_id) +
+                 COUNT(user_id) + COUNT(scopes) + COUNT(created_at) +
+                 COUNT(updated_at)
+            FROM auth_oauth_access_token) AS oauthAccessTokenColumns,
+         (SELECT COUNT(id) + COUNT(client_id) + COUNT(user_id) +
+                 COUNT(scopes) + COUNT(consent_given) + COUNT(created_at) +
+                 COUNT(updated_at)
+            FROM auth_oauth_consent) AS oauthConsentColumns,
          (SELECT COUNT(id) + COUNT(original_filename) + COUNT(mime_type) +
                  COUNT(byte_size) + COUNT(width) + COUNT(height) +
                  COUNT(uploaded_at) + COUNT(object_key) +
@@ -74,7 +89,10 @@ export async function checkRuntimeHealth(
                 'auth_user_email_unique',
                 'auth_session_token_unique',
                 'asset_object_key_unique',
-                'asset_public_asset_id_unique'
+                'asset_public_asset_id_unique',
+                'auth_oauth_application_client_id_unique',
+                'auth_oauth_access_token_access_token_unique',
+                'auth_oauth_access_token_refresh_token_unique'
               )) AS requiredIndexCount,
          (SELECT COUNT(*) FROM sqlite_master
             WHERE type = 'table' AND name = 'auth_user'
@@ -91,7 +109,7 @@ export async function checkRuntimeHealth(
     }>();
     if (
       !authentication ||
-      authentication.requiredIndexCount !== 5 ||
+      authentication.requiredIndexCount !== 8 ||
       authentication.userConstraints !== 1 ||
       authentication.assetConstraints !== 1
     ) {

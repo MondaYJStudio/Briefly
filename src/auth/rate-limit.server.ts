@@ -2,6 +2,9 @@ export const AUTH_RATE_LIMITS = {
   initialization: { attempts: 5, windowSeconds: 15 * 60 },
   recovery: { attempts: 5, windowSeconds: 15 * 60 },
   signIn: { attempts: 10, windowSeconds: 15 * 60 },
+  // MCP dynamic client registration is open by design; this only keeps one
+  // address from filling D1 with client rows.
+  clientRegistration: { attempts: 10, windowSeconds: 60 * 60 },
 } as const;
 
 export type AuthenticationRateLimit = keyof typeof AUTH_RATE_LIMITS;

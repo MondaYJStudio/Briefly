@@ -105,6 +105,14 @@ deployment, or tenant.
 _Avoid_: Site, Tag, tenant, multi-site, multi-channel Article, required Channel,
 live Draft override of public Channel filtering
 
+**Connected App**:
+An MCP client the Administrator has authorized through OAuth to act on their
+behalf: read Articles and Channels, save Drafts, Preview, and Publish. Every
+authorization passes an explicit consent page, and disconnecting a Connected
+App revokes its tokens immediately. A Connected App is not an Administrator,
+a Byline, or a second account.
+_Avoid_: API key, integration, user, bot account
+
 **Built-in Public Site**:
 The product's own public reader UI. It serves public reader paths whenever no Active Public Template is selected.
 _Avoid_: default template, official template, theme
@@ -138,4 +146,5 @@ Public presentation terms use **内建公开站** for Built-in Public Site,
 **公开站开关** for Public Site Enabled,
 **公开模板** for Public Template, **模板清单** for Template Manifest,
 **已安装公开模板** for Installed Public Template, and **启用中的公开模板**
-for Active Public Template. Content partition terms use **频道** for Channel.
+for Active Public Template. Content partition terms use **频道** for Channel. Agent access uses
+**已连接应用** for Connected App.

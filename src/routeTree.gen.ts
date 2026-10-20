@@ -24,6 +24,7 @@ import { Route as ArticlesSlugRouteImport } from './routes/articles/$slug'
 import { Route as MediaPublicAssetIdRouteImport } from './routes/media.$publicAssetId'
 import { Route as AdminArticlesIndexRouteImport } from './routes/admin/articles/index'
 import { Route as AdminArticlesArticleIdRouteImport } from './routes/admin/articles/$articleId'
+import { Route as AdminOauthConsentRouteImport } from './routes/admin_.oauth.consent'
 import { Route as MediaPrivateAssetIdRouteImport } from './routes/media.private.$assetId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -101,6 +102,11 @@ const AdminArticlesArticleIdRoute = AdminArticlesArticleIdRouteImport.update({
   path: '/$articleId',
   getParentRoute: () => AdminArticlesRoute,
 } as any)
+const AdminOauthConsentRoute = AdminOauthConsentRouteImport.update({
+  id: '/admin_/oauth/consent',
+  path: '/admin/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MediaPrivateAssetIdRoute = MediaPrivateAssetIdRouteImport.update({
   id: '/media/private/$assetId',
   path: '/media/private/$assetId',
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/articles/$articleId': typeof AdminArticlesArticleIdRoute
+  '/admin/oauth/consent': typeof AdminOauthConsentRoute
   '/media/private/$assetId': typeof MediaPrivateAssetIdRoute
   '/admin/articles/': typeof AdminArticlesIndexRoute
 }
@@ -138,6 +145,7 @@ export interface FileRoutesByTo {
   '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
   '/admin': typeof AdminIndexRoute
   '/admin/articles/$articleId': typeof AdminArticlesArticleIdRoute
+  '/admin/oauth/consent': typeof AdminOauthConsentRoute
   '/media/private/$assetId': typeof MediaPrivateAssetIdRoute
   '/admin/articles': typeof AdminArticlesIndexRoute
 }
@@ -157,6 +165,7 @@ export interface FileRoutesById {
   '/media/$publicAssetId': typeof MediaPublicAssetIdRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/articles/$articleId': typeof AdminArticlesArticleIdRoute
+  '/admin_/oauth/consent': typeof AdminOauthConsentRoute
   '/media/private/$assetId': typeof MediaPrivateAssetIdRoute
   '/admin/articles/': typeof AdminArticlesIndexRoute
 }
@@ -177,6 +186,7 @@ export interface FileRouteTypes {
     | '/media/$publicAssetId'
     | '/admin/'
     | '/admin/articles/$articleId'
+    | '/admin/oauth/consent'
     | '/media/private/$assetId'
     | '/admin/articles/'
   fileRoutesByTo: FileRoutesByTo
@@ -193,6 +203,7 @@ export interface FileRouteTypes {
     | '/media/$publicAssetId'
     | '/admin'
     | '/admin/articles/$articleId'
+    | '/admin/oauth/consent'
     | '/media/private/$assetId'
     | '/admin/articles'
   id:
@@ -211,6 +222,7 @@ export interface FileRouteTypes {
     | '/media/$publicAssetId'
     | '/admin/'
     | '/admin/articles/$articleId'
+    | '/admin_/oauth/consent'
     | '/media/private/$assetId'
     | '/admin/articles/'
   fileRoutesById: FileRoutesById
@@ -224,6 +236,7 @@ export interface RootRouteChildren {
   ApiSplatRoute: typeof ApiSplatRoute
   ArticlesSlugRoute: typeof ArticlesSlugRoute
   MediaPublicAssetIdRoute: typeof MediaPublicAssetIdRoute
+  AdminOauthConsentRoute: typeof AdminOauthConsentRoute
   MediaPrivateAssetIdRoute: typeof MediaPrivateAssetIdRoute
 }
 
@@ -334,6 +347,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminArticlesArticleIdRouteImport
       parentRoute: typeof AdminArticlesRoute
     }
+    '/admin_/oauth/consent': {
+      id: '/admin_/oauth/consent'
+      path: '/admin/oauth/consent'
+      fullPath: '/admin/oauth/consent'
+      preLoaderRoute: typeof AdminOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/media/private/$assetId': {
       id: '/media/private/$assetId'
       path: '/media/private/$assetId'
@@ -385,6 +405,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSplatRoute: ApiSplatRoute,
   ArticlesSlugRoute: ArticlesSlugRoute,
   MediaPublicAssetIdRoute: MediaPublicAssetIdRoute,
+  AdminOauthConsentRoute: AdminOauthConsentRoute,
   MediaPrivateAssetIdRoute: MediaPrivateAssetIdRoute,
 }
 export const routeTree = rootRouteImport

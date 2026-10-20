@@ -7,6 +7,7 @@ import {
   AuthenticationSurface,
 } from "../auth/auth-surface";
 import authStyles from "../auth/auth-surface.module.css";
+import { MCP_AUTHORIZE_PATH } from "../auth/policy";
 import { m } from "../paraglide/messages.js";
 
 export const Route = createFileRoute("/admin_/login")({
@@ -18,6 +19,17 @@ export const Route = createFileRoute("/admin_/login")({
   }),
   component: SignIn,
 });
+
+/**
+ * An MCP authorization that found no session redirects here with its
+ * query. After sign-in it continues to the consent page instead of the
+ * Articles list.
+ */
+function mcpAuthorizationResumeUrl(search: string): string | null {
+  const query = new URLSearchParams(search);
+  if (!query.get("client_id") || !query.get("response_type")) return null;
+  return `${MCP_AUTHORIZE_PATH}?${query.toString()}`;
+}
 
 function SignIn() {
   const { notice } = Route.useSearch();
@@ -57,7 +69,9 @@ function SignIn() {
         }),
       });
       if (response.ok) {
-        globalThis.location.replace("/admin");
+        globalThis.location.replace(
+          mcpAuthorizationResumeUrl(globalThis.location.search) ?? "/admin",
+        );
       } else {
         setState("error");
       }

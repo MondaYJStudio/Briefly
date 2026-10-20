@@ -13,4 +13,6 @@ export const RESERVED_APPLICATION_PATHS = [
   "/api",
   "/media",
   "/health",
+  "/mcp",
+  "/.well-known",
 ] as const;

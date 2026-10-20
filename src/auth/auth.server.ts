@@ -1,11 +1,17 @@
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { betterAuth } from "better-auth";
+import { mcp } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { drizzle } from "drizzle-orm/d1";
 
 import { betterAuthSchema } from "../db/schema";
 import type { RuntimeBindings } from "../env/runtime.server";
 import {
+  MCP_ACCESS_TOKEN_LIFETIME_SECONDS,
+  MCP_CONSENT_PAGE,
+  MCP_ENDPOINT_PATH,
+  MCP_LOGIN_PAGE,
+  MCP_REFRESH_TOKEN_LIFETIME_SECONDS,
   PASSWORD_MAXIMUM_LENGTH,
   PASSWORD_MINIMUM_LENGTH,
   SESSION_LIFETIME_SECONDS,
@@ -46,6 +52,23 @@ export function createAuth(
     trustedOrigins: [applicationOrigin],
     rateLimit: { enabled: false },
     logger: { disabled: true },
-    plugins: [tanstackStartCookies()],
+    plugins: [
+      tanstackStartCookies(),
+      // MCP clients authorize through OAuth 2.1. The consent page is
+      // mandatory: the Worker forces `prompt=consent` on every authorization
+      // request before it reaches this plugin.
+      mcp({
+        loginPage: MCP_LOGIN_PAGE,
+        resource: `${applicationOrigin}${MCP_ENDPOINT_PATH}`,
+        oidcConfig: {
+          loginPage: MCP_LOGIN_PAGE,
+          consentPage: MCP_CONSENT_PAGE,
+          requirePKCE: true,
+          allowPlainCodeChallengeMethod: false,
+          accessTokenExpiresIn: MCP_ACCESS_TOKEN_LIFETIME_SECONDS,
+          refreshTokenExpiresIn: MCP_REFRESH_TOKEN_LIFETIME_SECONDS,
+        },
+      }),
+    ],
   });
 }

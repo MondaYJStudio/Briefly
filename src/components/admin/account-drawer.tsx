@@ -18,6 +18,7 @@ import {
 
 import { PASSWORD_MINIMUM_LENGTH } from "../../auth/policy";
 import { m } from "../../paraglide/messages.js";
+import { ConnectedAppsCard } from "./connected-apps-card";
 import { AdminIcon } from "./icons";
 import styles from "./account-drawer.module.css";
 
@@ -53,7 +54,8 @@ function PasswordVisibilityToggle({
 
 /**
  * Account as an overlay drawer: read-only sign-in email, change password
- * (revokes every session), and sign-out for this browser session.
+ * (revokes every session), Connected Apps, and sign-out for this browser
+ * session.
  */
 export function AccountDrawer({
   open,
@@ -264,9 +266,7 @@ export function AccountDrawer({
                             ref={currentPasswordRef}
                             id={currentPasswordId}
                             name="currentPassword"
-                            type={
-                              showCurrentPassword ? "text" : "password"
-                            }
+                            type={showCurrentPassword ? "text" : "password"}
                             autoComplete="current-password"
                             required
                             aria-invalid={Boolean(currentPasswordError)}
@@ -371,6 +371,8 @@ export function AccountDrawer({
                   </Form>
                 )}
               </AccountCard>
+
+              <ConnectedAppsCard open={open} />
 
               <AccountCard>
                 <h2 className={styles.sectionTitle}>{m.session_section()}</h2>

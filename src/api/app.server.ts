@@ -35,6 +35,11 @@ import {
 } from "../channels/channels.server";
 import { readAdministratorSession } from "../auth/administrator-session.server";
 import {
+  disconnectConnectedApp,
+  listConnectedApps,
+  readOAuthClient,
+} from "../auth/connected-apps.server";
+import {
   initializeAdministrator,
   installationIsInitialized,
 } from "../auth/initialization.server";
@@ -266,10 +271,8 @@ async function publicSiteSettingsResponse(
   const locale = resolveSiteLocale(request);
   const localized = localizedSiteSettings(settings, locale);
   // Public Site Enabled is an administration gate, not public identity.
-  const {
-    publicSiteEnabled: _publicSiteEnabled,
-    ...publicIdentity
-  } = localized;
+  const { publicSiteEnabled: _publicSiteEnabled, ...publicIdentity } =
+    localized;
   return publicJsonResponse(request, publicIdentity, {
     head,
     etag: true,
@@ -510,6 +513,57 @@ function createApi(getBindings: () => RuntimeBindings) {
       {
         administrator: true,
         params: t.Object({ channelId: t.String({ format: "uuid" }) }),
+      },
+    )
+    .get(
+      "/admin/connected-apps",
+      async () => ({
+        connectedApps: await listConnectedApps(getBindings().DB),
+      }),
+      { administrator: true },
+    )
+    .delete(
+      "/admin/connected-apps/:clientId",
+      async ({ params, status }) => {
+        const removed = await disconnectConnectedApp(
+          getBindings().DB,
+          params.clientId,
+        );
+        if (removed) {
+          return new Response(null, {
+            status: 204,
+            headers: { "cache-control": "no-store" },
+          });
+        }
+        return status(404, {
+          status: "error" as const,
+          code: "CONNECTED_APP_NOT_FOUND" as const,
+        });
+      },
+      {
+        administrator: true,
+        params: t.Object({
+          clientId: t.String({ minLength: 1, maxLength: 200 }),
+        }),
+      },
+    )
+    .get(
+      "/admin/oauth-clients/:clientId",
+      async ({ params, status }) => {
+        const client = await readOAuthClient(getBindings().DB, params.clientId);
+        return (
+          client ??
+          status(404, {
+            status: "error" as const,
+            code: "OAUTH_CLIENT_NOT_FOUND" as const,
+          })
+        );
+      },
+      {
+        administrator: true,
+        params: t.Object({
+          clientId: t.String({ minLength: 1, maxLength: 200 }),
+        }),
       },
     )
     .post(

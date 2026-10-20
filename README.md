@@ -159,6 +159,15 @@ The public content API is anonymous, cross-origin readable, and independent of A
 
 Article slugs use one normalization policy. The saved display slug is trimmed and normalized to Unicode NFC while preserving its casing. The global uniqueness key lowercases that value with the locale-independent `und` locale, then normalizes the result to NFC again so case mapping cannot reintroduce a decomposed equivalent. Slugs must be well-formed Unicode and cannot contain control characters, URI path-reserved characters, percent signs, backslashes, or be the dot path segments `.` or `..`. A successful Publication makes its normalized slug claim permanent. Later successful slug changes redirect every former public slug directly to the current canonical URL; while the Article is unpublished, all of those locators return the same non-disclosing 404.
 
+## MCP access
+
+Briefly is a remote [Model Context Protocol](https://modelcontextprotocol.io) server at `/mcp`, so an AI agent can draft, preview, and publish Articles for the Administrator. Add `https://<your-briefly-origin>/mcp` as a remote MCP server in Claude (claude.ai connectors, Claude Code, Claude Desktop) or any MCP client that supports OAuth.
+
+- Authorization is OAuth 2.1 with PKCE and dynamic client registration, served by Briefly itself. The client sends you to sign in, then to a consent page that names the client and where it will send the code. Every authorization asks, even when you are already signed in.
+- Tools: `list_channels`, `list_articles`, `get_article`, `create_article`, `update_draft`, `preview_article`, and `publish_article`. They run the same Draft Version, Publication Conflict, and Publication Issue rules as the editor.
+- Bodies are Markdown. Constructs an Article cannot hold (raw HTML, task lists, external images, relative links) are reported instead of dropped. Uploaded images and video embeds travel as `briefly-asset:` and `briefly-video:` URLs.
+- **Account → Connected apps** lists every authorized client; disconnecting one revokes its access on its next call. Access tokens last an hour and refresh tokens a week.
+
 ## License
 
 Briefly is released under the [MIT License](LICENSE).

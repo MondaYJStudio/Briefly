@@ -36,6 +36,7 @@ function authenticationRateLimitFor(
   if (pathname === "/api/initialize") return "initialization";
   if (pathname === "/api/recover") return "recovery";
   if (pathname === "/api/auth/sign-in/email") return "signIn";
+  if (pathname === "/api/auth/mcp/register") return "clientRegistration";
   return undefined;
 }
 
@@ -247,11 +248,42 @@ const worker = {
           );
         }
         response.headers.set("cache-control", "no-store");
+      } else if (routedPathname === "/mcp") {
+        const { handleMcpRequest } = await import("./mcp/mcp.server");
+        response = withRequestId(
+          await handleMcpRequest(request, configuration.bindings),
+          requestId,
+        );
+      } else if (routedPathname.startsWith("/.well-known/")) {
+        const { handleWellKnownRequest, wellKnownDocument } =
+          await import("./mcp/mcp.server");
+        const document = wellKnownDocument(routedPathname);
+        response = withRequestId(
+          document
+            ? await handleWellKnownRequest(
+                request,
+                configuration.bindings,
+                document,
+              )
+            : jsonResponse(
+                { status: "error", code: "NOT_FOUND" },
+                404,
+                requestId,
+              ),
+          requestId,
+        );
       } else if (routedPathname.startsWith("/api/auth/")) {
         const { handleAuthenticationRequest } =
           await import("./auth/http.server");
+        const { isMcpAuthorizeRequest, withForcedConsent } =
+          await import("./auth/mcp-authorization");
         response = withRequestId(
-          await handleAuthenticationRequest(request, configuration.bindings),
+          await handleAuthenticationRequest(
+            isMcpAuthorizeRequest(request, routedPathname)
+              ? withForcedConsent(request)
+              : request,
+            configuration.bindings,
+          ),
           requestId,
         );
         response.headers.set("cache-control", "no-store");
