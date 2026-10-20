@@ -9,76 +9,81 @@ const publicArticleCover = z.object({
   alt: z.string().min(1),
 });
 
-const persistedPublicArticle = z.object({
-  id: z.string().uuid(),
-  publication_id: z.string().uuid(),
-  slug: z.string(),
-  title: z.string(),
-  summary: z.string().nullable(),
-  tags: z.string().transform((value, context) => {
-    try {
-      return z.array(z.string()).parse(JSON.parse(value));
-    } catch {
-      context.addIssue({ code: "custom", message: "Invalid Publication tags" });
-      return z.NEVER;
-    }
-  }),
-  byline: z.string().transform((value, context) => {
-    try {
-      return z
-        .object({ name: z.string().min(1), url: z.string().url().nullable() })
-        .parse(JSON.parse(value));
-    } catch {
-      context.addIssue({
-        code: "custom",
-        message: "Invalid Publication Byline",
-      });
-      return z.NEVER;
-    }
-  }),
-  language: z.string().min(1),
-  channel_slug: z.string().nullable(),
-  channel_name: z.string().nullable(),
-  cover: z
-    .string()
-    .nullable()
-    .transform((value, context) => {
-      if (value === null) return null;
+const persistedPublicArticle = z
+  .object({
+    id: z.string().uuid(),
+    publication_id: z.string().uuid(),
+    slug: z.string(),
+    title: z.string(),
+    summary: z.string().nullable(),
+    tags: z.string().transform((value, context) => {
       try {
-        return publicArticleCover.parse(JSON.parse(value));
+        return z.array(z.string()).parse(JSON.parse(value));
       } catch {
         context.addIssue({
           code: "custom",
-          message: "Invalid Publication cover",
+          message: "Invalid Publication tags",
         });
         return z.NEVER;
       }
     }),
-  article_published_at: z.number().int(),
-  publication_published_at: z.number().int(),
-  html: z.string(),
-}).superRefine((value, context) => {
-  const hasSlug = value.channel_slug !== null;
-  const hasName = value.channel_name !== null;
-  if (hasSlug !== hasName) {
-    context.addIssue({
-      code: "custom",
-      message: "Invalid Publication Channel",
-    });
-  }
-  if (hasSlug && value.channel_slug!.length === 0) {
-    context.addIssue({
-      code: "custom",
-      message: "Invalid Publication Channel",
-    });
-  }
-  if (hasName && value.channel_name!.length === 0) {
-    context.addIssue({
-      code: "custom",
-      message: "Invalid Publication Channel",
-    });
-  }
-});
+    byline: z.string().transform((value, context) => {
+      try {
+        return z
+          .object({ name: z.string().min(1), url: z.string().url().nullable() })
+          .parse(JSON.parse(value));
+      } catch {
+        context.addIssue({
+          code: "custom",
+          message: "Invalid Publication Byline",
+        });
+        return z.NEVER;
+      }
+    }),
+    language: z.string().min(1),
+    channel_slug: z.string().nullable(),
+    channel_name: z.string().nullable(),
+    cover: z
+      .string()
+      .nullable()
+      .transform((value, context) => {
+        if (value === null) return null;
+        try {
+          return publicArticleCover.parse(JSON.parse(value));
+        } catch {
+          context.addIssue({
+            code: "custom",
+            message: "Invalid Publication cover",
+          });
+          return z.NEVER;
+        }
+      }),
+    article_published_at: z.number().int(),
+    publication_published_at: z.number().int(),
+    html: z.string(),
+  })
+  .superRefine((value, context) => {
+    const hasSlug = value.channel_slug !== null;
+    const hasName = value.channel_name !== null;
+    if (hasSlug !== hasName) {
+      context.addIssue({
+        code: "custom",
+        message: "Invalid Publication Channel",
+      });
+    }
+    if (hasSlug && value.channel_slug!.length === 0) {
+      context.addIssue({
+        code: "custom",
+        message: "Invalid Publication Channel",
+      });
+    }
+    if (hasName && value.channel_name!.length === 0) {
+      context.addIssue({
+        code: "custom",
+        message: "Invalid Publication Channel",
+      });
+    }
+  });
 
 export type PublicArticleProjectionRow = z.input<typeof persistedPublicArticle>;
 

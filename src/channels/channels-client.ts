@@ -12,9 +12,10 @@ type ApiResponse<Value = unknown> = {
  */
 export async function listAdminChannels(): Promise<Channel[] | null> {
   try {
-    const response = (await getApiClient().admin.channels.get()) as ApiResponse<{
-      channels: Channel[];
-    }>;
+    const response =
+      (await getApiClient().admin.channels.get()) as ApiResponse<{
+        channels: Channel[];
+      }>;
     if (response.status !== 200 || !response.data) return null;
     return response.data.channels;
   } catch {
@@ -61,8 +62,7 @@ export async function updateAdminChannelName(
 }
 
 export type DeleteAdminChannelResult =
-  | { ok: true }
-  | { ok: false; reason: "blocked" | "error" };
+  { ok: true } | { ok: false; reason: "blocked" | "error" };
 
 export async function deleteAdminChannel(
   channelId: string,

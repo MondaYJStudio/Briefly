@@ -123,7 +123,11 @@ const persistedArticleBase = z.object({
       }
     }),
   language: z.string().nullable(),
-  channel_slug: z.string().nullable().optional().transform((value) => value ?? null),
+  channel_slug: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
   cover: z
     .string()
     .nullable()

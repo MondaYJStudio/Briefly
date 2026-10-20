@@ -184,7 +184,7 @@ function validateProductionWorkflow() {
   const scripts = packageScripts();
   assert.equal(
     scripts["build:production"],
-    "CLOUDFLARE_ENV=production vite build && node scripts/verify-client-boundary.mjs && node scripts/verify-admin-css-contraction.mjs",
+    "CLOUDFLARE_ENV=production vite build && node scripts/verify-client-boundary.mjs && node scripts/verify-admin-css-contraction.mjs && node scripts/verify-public-site-responsive.mjs",
   );
   assert.equal(
     scripts["db:migrate:production"],
@@ -212,7 +212,7 @@ function validatePublicDeployTemplate() {
   assert.equal(scripts.dev, "CLOUDFLARE_ENV=local vite dev");
   assert.equal(
     scripts.build,
-    "vite build && node scripts/verify-client-boundary.mjs && node scripts/verify-admin-css-contraction.mjs",
+    "vite build && node scripts/verify-client-boundary.mjs && node scripts/verify-admin-css-contraction.mjs && node scripts/verify-public-site-responsive.mjs",
   );
 
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));

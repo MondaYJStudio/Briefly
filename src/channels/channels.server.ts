@@ -8,7 +8,10 @@ import {
 } from "./channels";
 
 export type { Channel } from "./channels";
-export { CHANNEL_NAME_MAXIMUM_LENGTH, CHANNEL_SLUG_MAXIMUM_LENGTH } from "./channels";
+export {
+  CHANNEL_NAME_MAXIMUM_LENGTH,
+  CHANNEL_SLUG_MAXIMUM_LENGTH,
+} from "./channels";
 
 export const channelSlugSchema = articleSlugSchema.pipe(
   z.string().max(CHANNEL_SLUG_MAXIMUM_LENGTH),
@@ -69,12 +72,20 @@ function channelFromRow(row: ChannelRow): Channel {
 
 export type CreateChannelResult =
   | { ok: true; channel: Channel }
-  | { ok: false; reason: "invalid"; issues: Array<{ path: string; message: string }> }
+  | {
+      ok: false;
+      reason: "invalid";
+      issues: Array<{ path: string; message: string }>;
+    }
   | { ok: false; reason: "slug-conflict" };
 
 export type UpdateChannelResult =
   | { ok: true; channel: Channel }
-  | { ok: false; reason: "invalid"; issues: Array<{ path: string; message: string }> }
+  | {
+      ok: false;
+      reason: "invalid";
+      issues: Array<{ path: string; message: string }>;
+    }
   | { ok: false; reason: "not-found" };
 
 export type DeleteChannelResult =
@@ -245,7 +256,6 @@ async function channelReferenceCounts(
 
 function isUniqueConstraintError(error: unknown): boolean {
   return (
-    error instanceof Error &&
-    /UNIQUE constraint failed/iu.test(error.message)
+    error instanceof Error && /UNIQUE constraint failed/iu.test(error.message)
   );
 }

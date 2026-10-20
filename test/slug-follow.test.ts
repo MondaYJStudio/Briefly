@@ -20,10 +20,7 @@ describe("Slug Title-follow provenance", () => {
     ).toEqual({ mode: "auto", slug: "第一篇" });
 
     expect(
-      slugAfterTitleChange(
-        { mode: "auto", slug: "第一篇" },
-        "  第二篇  ",
-      ),
+      slugAfterTitleChange({ mode: "auto", slug: "第一篇" }, "  第二篇  "),
     ).toEqual({ mode: "auto", slug: "第二篇" });
 
     expect(

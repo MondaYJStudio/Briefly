@@ -15,8 +15,7 @@ async function openIdentityMenu(
     triggerPrefix?: string;
   },
 ) {
-  const triggerPrefix =
-    options.triggerPrefix ?? "Settings and account menu — ";
+  const triggerPrefix = options.triggerPrefix ?? "Settings and account menu — ";
   const trigger = page.getByRole("button", {
     name: `${triggerPrefix}${maskAdministratorEmail(options.email)}`,
   });
@@ -151,7 +150,9 @@ test("Settings and Account drawers expose localized security feedback", async ({
       .getByLabel("Current password")
       .fill(administratorPassword);
     await accountDialog.getByLabel("New password").fill("short");
-    await accountDialog.getByRole("button", { name: "Update password" }).click();
+    await accountDialog
+      .getByRole("button", { name: "Update password" })
+      .click();
     await expect(
       accountDialog.getByText("Too short — 5 of 12 required characters.", {
         exact: true,
@@ -191,7 +192,9 @@ test("Settings and Account drawers expose localized security feedback", async ({
       .getByLabel("Current password")
       .fill(administratorPassword);
     await accountDialog.getByLabel("New password").fill(replacementPassword);
-    await accountDialog.getByRole("button", { name: "Update password" }).click();
+    await accountDialog
+      .getByRole("button", { name: "Update password" })
+      .click();
     await expect(
       accountDialog.getByText("Password updated", { exact: true }),
     ).toBeVisible();

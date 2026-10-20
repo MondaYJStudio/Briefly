@@ -32,6 +32,7 @@ function makeListArticle(
       tags: [],
       byline: null,
       language: null,
+      channelSlug: null,
       cover: null,
       document: emptyDocument,
       createdAt: now,

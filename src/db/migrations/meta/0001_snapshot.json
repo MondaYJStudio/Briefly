@@ -102,9 +102,7 @@
       "indexes": {
         "auth_account_user_id_idx": {
           "name": "auth_account_user_id_idx",
-          "columns": [
-            "user_id"
-          ],
+          "columns": ["user_id"],
           "isUnique": false
         }
       },
@@ -113,12 +111,8 @@
           "name": "auth_account_user_id_auth_user_id_fk",
           "tableFrom": "auth_account",
           "tableTo": "auth_user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -155,9 +149,7 @@
       "indexes": {
         "auth_rate_limit_reset_at_idx": {
           "name": "auth_rate_limit_reset_at_idx",
-          "columns": [
-            "reset_at"
-          ],
+          "columns": ["reset_at"],
           "isUnique": false
         }
       },
@@ -259,16 +251,12 @@
       "indexes": {
         "auth_session_token_unique": {
           "name": "auth_session_token_unique",
-          "columns": [
-            "token"
-          ],
+          "columns": ["token"],
           "isUnique": true
         },
         "auth_session_user_id_idx": {
           "name": "auth_session_user_id_idx",
-          "columns": [
-            "user_id"
-          ],
+          "columns": ["user_id"],
           "isUnique": false
         }
       },
@@ -277,12 +265,8 @@
           "name": "auth_session_user_id_auth_user_id_fk",
           "tableFrom": "auth_session",
           "tableTo": "auth_user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -356,16 +340,12 @@
       "indexes": {
         "auth_user_singleton_unique": {
           "name": "auth_user_singleton_unique",
-          "columns": [
-            "singleton"
-          ],
+          "columns": ["singleton"],
           "isUnique": true
         },
         "auth_user_email_unique": {
           "name": "auth_user_email_unique",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         }
       },
@@ -428,9 +408,7 @@
       "indexes": {
         "auth_verification_identifier_idx": {
           "name": "auth_verification_identifier_idx",
-          "columns": [
-            "identifier"
-          ],
+          "columns": ["identifier"],
           "isUnique": false
         }
       },

@@ -300,9 +300,7 @@ export function AssetMediaLibrary() {
             {m.media_page_description()}
           </p>
         </div>
-        <div
-          className={`flex items-center max-[860px]:w-full gap-2`}
-        >
+        <div className={`flex items-center max-[860px]:w-full gap-2`}>
           <Button type="button" onPress={openUpload}>
             <AdminIcon name="upload" size={16} />
             {m.upload_image()}
@@ -325,11 +323,7 @@ export function AssetMediaLibrary() {
         </div>
 
         {state === "error" ? (
-          <Alert
-            className={`mb-4`}
-            status="danger"
-            role="alert"
-          >
+          <Alert className={`mb-4`} status="danger" role="alert">
             <Alert.Content>
               <Alert.Title>{m.unable_to_manage_assets()}</Alert.Title>
               <Alert.Description>
@@ -338,21 +332,13 @@ export function AssetMediaLibrary() {
             </Alert.Content>
           </Alert>
         ) : state === "uploading" ? (
-          <Alert
-            className={`mb-4`}
-            status="default"
-            role="status"
-          >
+          <Alert className={`mb-4`} status="default" role="status">
             <Alert.Content>
               <Alert.Title>{m.uploading_and_verifying_image()}</Alert.Title>
             </Alert.Content>
           </Alert>
         ) : state === "invalid" ? (
-          <Alert
-            className={`mb-4`}
-            status="danger"
-            role="alert"
-          >
+          <Alert className={`mb-4`} status="danger" role="alert">
             <Alert.Content>
               <Alert.Title>{m.image_not_accepted()}</Alert.Title>
               <Alert.Description>
@@ -365,21 +351,13 @@ export function AssetMediaLibrary() {
             </Alert.Content>
           </Alert>
         ) : state === "uploaded" ? (
-          <Alert
-            className={`mb-4`}
-            status="success"
-            role="status"
-          >
+          <Alert className={`mb-4`} status="success" role="status">
             <Alert.Content>
               <Alert.Title>{m.asset_uploaded_and_selected()}</Alert.Title>
             </Alert.Content>
           </Alert>
         ) : state === "cleaned" ? (
-          <Alert
-            className={`mb-4`}
-            status="success"
-            role="status"
-          >
+          <Alert className={`mb-4`} status="success" role="status">
             <Alert.Content>
               <Alert.Title>{m.asset_cleanup_completed()}</Alert.Title>
               <Alert.Description>
@@ -388,11 +366,7 @@ export function AssetMediaLibrary() {
             </Alert.Content>
           </Alert>
         ) : state === "cleanup-blocked" ? (
-          <Alert
-            className={`mb-4`}
-            status="warning"
-            role="alert"
-          >
+          <Alert className={`mb-4`} status="warning" role="alert">
             <Alert.Content>
               <Alert.Title>{m.asset_became_referenced()}</Alert.Title>
               <Alert.Description>
@@ -401,11 +375,7 @@ export function AssetMediaLibrary() {
             </Alert.Content>
           </Alert>
         ) : state === "cleanup-failed" ? (
-          <Alert
-            className={`mb-4`}
-            status="danger"
-            role="alert"
-          >
+          <Alert className={`mb-4`} status="danger" role="alert">
             <Alert.Content>
               <Alert.Title>{m.asset_cleanup_needs_retry()}</Alert.Title>
               <Alert.Description>
@@ -502,9 +472,7 @@ export function AssetMediaLibrary() {
                           height: asset.height,
                         })}
                       </span>
-                      <span className={`mt-1`}>
-                        {assetStatusChip(asset)}
-                      </span>
+                      <span className={`mt-1`}>{assetStatusChip(asset)}</span>
                     </span>
                   </button>
                 </li>

@@ -1,4 +1,11 @@
-import { Alert, AlertDialog, Button, Dropdown, Input, Modal } from "@heroui/react";
+import {
+  Alert,
+  AlertDialog,
+  Button,
+  Dropdown,
+  Input,
+  Modal,
+} from "@heroui/react";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -274,9 +281,7 @@ export function ChannelsView() {
               </AlertDialog.Heading>
             </AlertDialog.Header>
             <AlertDialog.Body>
-              <p>
-                {m.channel_delete_body({ name: deleteTarget?.name ?? "" })}
-              </p>
+              <p>{m.channel_delete_body({ name: deleteTarget?.name ?? "" })}</p>
             </AlertDialog.Body>
             <AlertDialog.Footer>
               <Button type="button" variant="secondary" slot="close">
@@ -428,7 +433,10 @@ function ChannelRow({
                     else if (key === "delete") onDelete();
                   }}
                 >
-                  <Dropdown.Item id="view" textValue={m.channel_view_articles()}>
+                  <Dropdown.Item
+                    id="view"
+                    textValue={m.channel_view_articles()}
+                  >
                     {m.channel_view_articles()}
                   </Dropdown.Item>
                   <Dropdown.Item id="copy" textValue={m.channel_copy_prompt()}>

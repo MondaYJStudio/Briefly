@@ -6,13 +6,7 @@ import type {
 import { m } from "../../paraglide/messages.js";
 
 export type PublicationIssueSurface =
-  | "title"
-  | "slug"
-  | "body"
-  | "byline"
-  | "language"
-  | "cover"
-  | "asset";
+  "title" | "slug" | "body" | "byline" | "language" | "cover" | "asset";
 
 const publicationIssueSurfaceLabels: Record<
   PublicationIssueSurface,

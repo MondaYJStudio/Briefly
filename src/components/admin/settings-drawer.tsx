@@ -201,9 +201,7 @@ function SiteDescriptionField({
             onChange({
               ...settings,
               siteDescription:
-                activeOption.id === "en"
-                  ? nextValue
-                  : settings.siteDescription,
+                activeOption.id === "en" ? nextValue : settings.siteDescription,
               siteDescriptions: {
                 ...settings.siteDescriptions,
                 [activeOption.id]: nextValue,

@@ -260,7 +260,10 @@ describe("Channel on Draft, Publish, and public API", () => {
     const all = await SELF.fetch("http://briefly.test/api/articles?limit=20");
     expect(all.status).toBe(200);
     const allPage = await all.json<{
-      items: Array<{ slug: string; channel: { slug: string; name: string } | null }>;
+      items: Array<{
+        slug: string;
+        channel: { slug: string; name: string } | null;
+      }>;
     }>();
     expect(allPage.items.map((item) => item.slug).sort()).toEqual([
       "blog-one",
@@ -416,7 +419,9 @@ describe("Channel on Draft, Publish, and public API", () => {
     );
     expect(filtered.status).toBe(200);
     const body = await filtered.json<{
-      articles: Array<{ draft: { slug: string | null; channelSlug: string | null } }>;
+      articles: Array<{
+        draft: { slug: string | null; channelSlug: string | null };
+      }>;
     }>();
     expect(body.articles.map((article) => article.draft.slug)).toEqual([
       "docs-one",

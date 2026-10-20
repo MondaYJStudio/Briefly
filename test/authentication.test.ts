@@ -7,6 +7,7 @@ import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApiClient } from "../src/api/client";
+import { maskAdministratorEmail } from "../src/auth/administrator-identity";
 import worker from "../src/server";
 
 const administrator = {
@@ -964,10 +965,11 @@ describe("sole Administrator authentication", () => {
     );
     expect(authenticatedDestination.status).toBe(200);
     const authenticatedHtml = await authenticatedDestination.text();
+    const shownEmail = maskAdministratorEmail(administrator.email);
     expect(authenticatedHtml).toContain("Signed in as");
-    expect(authenticatedHtml).toContain(administrator.email);
+    expect(authenticatedHtml).toContain(shownEmail);
     expect(authenticatedHtml).toContain(
-      `Settings and account menu — ${administrator.email}`,
+      `Settings and account menu — ${shownEmail}`,
     );
 
     const recoveryResponse = await SELF.fetch(

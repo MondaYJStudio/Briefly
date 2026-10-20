@@ -15,7 +15,9 @@ describe("channelIntegrationPrompt", () => {
     expect(prompt).toContain(
       "GET https://news.example.test/api/articles?channel=tech-news&limit=20",
     );
-    expect(prompt).toContain("GET https://news.example.test/api/articles/{slug}");
+    expect(prompt).toContain(
+      "GET https://news.example.test/api/articles/{slug}",
+    );
     expect(prompt).toContain("https://news.example.test/api/openapi.json");
     expect(prompt).toContain("nextCursor");
     expect(prompt).toContain("ARTICLE_LIST_CURSOR_STALE");
@@ -31,7 +33,7 @@ describe("channelIntegrationPrompt", () => {
       });
 
       expect(prompt).toContain("encodeURIComponent");
-      expect(prompt).toContain('channel.slug');
+      expect(prompt).toContain("channel.slug");
       expect(prompt).toContain('"tech-news"');
       expect(prompt).toContain("ARTICLE_NOT_FOUND");
       expect(prompt).toContain("ARTICLE_GONE");

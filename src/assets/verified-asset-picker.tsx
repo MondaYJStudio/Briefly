@@ -207,9 +207,7 @@ export function VerifiedAssetPicker({
                   })}
                 />
               </div>
-              <div
-                className={`flex items-center gap-3`}
-              >
+              <div className={`flex items-center gap-3`}>
                 <div className={`${styles.summaryGrow} min-w-0`}>
                   <div className={`${styles.summaryName} text-sm`}>
                     {selected.originalFilename}

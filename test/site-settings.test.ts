@@ -2,6 +2,7 @@ import { SELF } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { maskAdministratorEmail } from "../src/auth/administrator-identity";
 import { administrator, initializeAndSignIn } from "./administrator-fixture";
 
 describe("site identity and Byline defaults", () => {
@@ -278,10 +279,9 @@ describe("site identity and Byline defaults", () => {
     const html = await response.text();
 
     expect(response.status).toBe(200);
+    const shownEmail = maskAdministratorEmail(administrator.email);
     expect(html).toContain("Signed in as");
-    expect(html).toContain(administrator.email);
-    expect(html).toContain(
-      `Settings and account menu — ${administrator.email}`,
-    );
+    expect(html).toContain(shownEmail);
+    expect(html).toContain(`Settings and account menu — ${shownEmail}`);
   }, 15_000);
 });
