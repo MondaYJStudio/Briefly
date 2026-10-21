@@ -6,6 +6,7 @@ import type {
   ArticleTrashTransition,
 } from "./articles";
 import { purgeConfirmationMatches } from "./article-trash";
+import { dissolveLoneTranslationGroup } from "./translation-groups.server";
 
 export { purgeConfirmationMatches } from "./article-trash";
 
@@ -138,6 +139,15 @@ export async function purgeTrashedArticle(
   }
 
   const purgedAt = Date.now();
+  // Read before the delete: the group must dissolve if this purge leaves one.
+  const membership = await database
+    .prepare(
+      `SELECT translation_group_id FROM article
+       WHERE id = ? AND trashed_at IS NOT NULL`,
+    )
+    .bind(articleId)
+    .first<{ translation_group_id: string | null }>();
+  const translationGroupId = membership?.translation_group_id ?? null;
   const [, deleted] = await database.batch([
     database
       .prepare(
@@ -158,6 +168,9 @@ export async function purgeTrashedArticle(
          RETURNING id`,
       )
       .bind(articleId),
+    ...(translationGroupId === null
+      ? []
+      : [dissolveLoneTranslationGroup(database, translationGroupId)]),
   ]);
   const row = deleted?.results.at(0) as { id: string } | undefined;
   return row

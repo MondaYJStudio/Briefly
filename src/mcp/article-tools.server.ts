@@ -19,6 +19,12 @@ import { projectAdminArticles } from "../articles/publication-history.server";
 import { publicationWorkflow } from "../articles/publication-workflow.server";
 import type { PublicationOutcome } from "../articles/publication-workflow";
 import { deriveSlugFromTitle } from "../articles/slug-follow";
+import {
+  createArticleTranslation,
+  listArticleTranslations,
+  unlinkArticleTranslation,
+  type CreateArticleTranslationResult,
+} from "../articles/translation-groups.server";
 import { listChannels } from "../channels/channels.server";
 import type { RuntimeBindings } from "../env/runtime.server";
 
@@ -67,8 +73,9 @@ async function articleView(
   article: Article,
   options: { includeBody: boolean },
 ) {
-  const [projected] = await projectAdminArticles(context.bindings.DB, [
-    article,
+  const [[projected], translations] = await Promise.all([
+    projectAdminArticles(context.bindings.DB, [article]),
+    listArticleTranslations(context.bindings.DB, article.id),
   ]);
   const draft = article.draft;
   return {
@@ -86,6 +93,14 @@ async function articleView(
     byline: draft.byline,
     hasCover: draft.cover !== null,
     updatedAt: draft.updatedAt,
+    translations: translations.ok
+      ? translations.translations.map((translation) => ({
+          id: translation.id,
+          title: translation.title,
+          language: translation.language,
+          lifecycle: translation.lifecycleProjection,
+        }))
+      : [],
     ...(options.includeBody
       ? { markdown: articleDocumentToMarkdown(draft.document) }
       : {}),
@@ -107,6 +122,29 @@ function draftSaveRefusal(
     case "conflict":
       return refusal(
         "The Draft changed since that Draft Version. Call get_article for the current version and apply your change again.",
+      );
+  }
+}
+
+function translationRefusal(
+  result: Exclude<CreateArticleTranslationResult, { ok: true }>,
+): CallToolResult {
+  switch (result.reason) {
+    case "invalid":
+      return refusal("Nothing was created: the language is invalid.", {
+        issues: result.issues,
+      });
+    case "not-found":
+      return refusal(
+        "Nothing was created: no Article with the translationOf id exists (it may be in Trash).",
+      );
+    case "language-taken":
+      return refusal(
+        "Nothing was created: another Article in that Translation Group already uses this language. Languages compare by language and script, so zh-CN and zh-Hans, or en and en-GB, count as one. Call get_article on translationOf to see the languages in use.",
+      );
+    case "conflict":
+      return refusal(
+        "Nothing was created: the Translation Group changed meanwhile. Try again.",
       );
   }
 }
@@ -147,6 +185,13 @@ const markdown = z
   .string()
   .describe(
     'The Article body as Markdown (GitHub-flavored). Headings map to levels 2–4 (# becomes ##); the title is stored separately, so do not repeat it as a heading. Links must be absolute http(s) or mailto URLs. Tables only at the top level. Images must be uploaded assets written as ![alt](briefly-asset:<asset id> "caption"); video embeds as a paragraph holding only [title](briefly-video:youtube/<id>). Raw HTML and task lists are rejected.',
+  );
+const language = z
+  .string()
+  .nullable()
+  .optional()
+  .describe(
+    "BCP 47 tag. Prefer en, zh-Hans, zh-Hant, ja, or ko; any other valid tag is accepted. For a translation, reuse the exact tags its Translation Group already uses (see translations in get_article). null uses the Site Settings default.",
   );
 const byline = z
   .object({
@@ -225,7 +270,7 @@ export function registerArticleTools(
     {
       title: "Get Article",
       description:
-        "Read one Article's Draft: metadata, Markdown body, Draft Version, and Current Publication id. Read this before update_draft, preview_article, or publish_article.",
+        "Read one Article's Draft: metadata, Markdown body, Draft Version, Current Publication id, and the other Articles in its Translation Group (id, title, language, lifecycle). Read this before update_draft, preview_article, or publish_article.",
       inputSchema: { articleId },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -242,7 +287,7 @@ export function registerArticleTools(
     {
       title: "Create Article",
       description:
-        "Create a new Article with a private Draft. Nothing becomes public until publish_article. Without a slug, the slug follows the title as it does in the editor.",
+        "Create a new Article with a private Draft. Nothing becomes public until publish_article. Without a slug, the slug follows the title as it does in the editor. Pass translationOf to create it as a translation of another Article in the same Translation Group.",
       inputSchema: {
         title: z.string().trim().min(1).max(300),
         markdown,
@@ -250,16 +295,17 @@ export function registerArticleTools(
           .string()
           .optional()
           .describe(
-            "Canonical public slug, e.g. check-backlinks. Unicode is allowed; slashes, ?, #, % and backslashes are not.",
+            "Canonical public slug, e.g. check-backlinks. Unicode is allowed; slashes, ?, #, % and backslashes are not. Slugs are unique across the whole site, so a translation needs its own slug; omit it to let the slug follow the translated title.",
           ),
         summary: z.string().nullable().optional(),
         tags: z.array(z.string()).optional(),
-        language: z
+        language,
+        translationOf: z
           .string()
-          .nullable()
+          .uuid()
           .optional()
           .describe(
-            "BCP 47 tag such as en or zh-Hans. null uses the Site Settings default.",
+            "Create this Article as a translation of that Article id; it joins the same Translation Group. language is then required, and must not be a language another Article in the group already uses.",
           ),
         channel: z
           .string()
@@ -274,7 +320,25 @@ export function registerArticleTools(
       const converted = markdownToArticleDocument(input.markdown);
       if (!converted.ok) return markdownRefusal(converted.issues);
 
-      const created = await createArticle(database);
+      let created: Article;
+      if (input.translationOf === undefined) {
+        created = await createArticle(database);
+      } else {
+        if (!input.language) {
+          return refusal(
+            "Nothing was created: language is required with translationOf.",
+          );
+        }
+        // Creates the Article and joins the group in one operation; the copy
+        // of the source Draft it starts from is replaced by the save below.
+        const translation = await createArticleTranslation(
+          database,
+          input.translationOf,
+          { language: input.language },
+        );
+        if (!translation.ok) return translationRefusal(translation);
+        created = translation.article;
+      }
       const manualSlug = input.slug?.trim() ? input.slug : null;
       const result = await updateArticleDraft(database, created.id, {
         version: created.draft.version,
@@ -291,12 +355,17 @@ export function registerArticleTools(
       });
       if (!result.ok) {
         // Purging needs the Administrator's confirmation phrase, so a refused
-        // create only moves its empty Article to Trash.
+        // create only moves its unsaved Article to Trash, outside any group.
+        if (input.translationOf !== undefined) {
+          await unlinkArticleTranslation(database, created.id).catch(
+            () => undefined,
+          );
+        }
         await trashArticle(database, created.id).catch(() => undefined);
         const refused = draftSaveRefusal(result);
         refused.content.push({
           type: "text",
-          text: "The empty Article created for this request was moved to Trash.",
+          text: "The unsaved Article created for this request was moved to Trash.",
         });
         return refused;
       }
@@ -326,7 +395,7 @@ export function registerArticleTools(
           ),
         summary: z.string().nullable().optional(),
         tags: z.array(z.string()).optional(),
-        language: z.string().nullable().optional(),
+        language,
         channel: z.string().nullable().optional(),
         byline: byline.optional(),
       },

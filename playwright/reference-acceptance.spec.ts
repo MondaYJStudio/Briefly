@@ -382,6 +382,112 @@ test("Slug taken blocks Publish after a conflicting autosave", async ({
   ).toBeDisabled();
 });
 
+test("Editor Translations section links, creates, and removes translations", async ({
+  page,
+}) => {
+  const suffix = crypto.randomUUID().slice(0, 8);
+  async function createDraft(title: string, language: string) {
+    const created = await page.request.post("/api/admin/articles");
+    expect(created.status()).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    const saved = await page.request.put(`/api/admin/articles/${id}/draft`, {
+      data: {
+        version: 1,
+        title,
+        slug: `${title}-${suffix}`,
+        slugIsManual: true,
+        summary: null,
+        tags: [],
+        byline: { name: "Translator", url: null },
+        language,
+        document: {
+          documentSchemaVersion: 1,
+          doc: {
+            type: "doc",
+            content: [
+              { type: "paragraph", content: [{ type: "text", text: title }] },
+            ],
+          },
+        },
+      },
+    });
+    expect(saved.status()).toBe(200);
+    return id;
+  }
+  const englishTitle = `Hello ${suffix}`;
+  const japaneseTitle = `こんにちは ${suffix}`;
+  const englishId = await createDraft(englishTitle, "en");
+  await createDraft(japaneseTitle, "ja");
+
+  await page.goto(`/admin/articles/${englishId}`);
+  await waitForEditor(page);
+  const section = page.getByRole("region", { name: "Translations" });
+  await expect(section.getByText("No translations yet.")).toBeVisible();
+
+  await section.getByRole("button", { name: "Link existing Article" }).click();
+  const linkDialog = page.getByRole("dialog", {
+    name: "Link an existing Article",
+  });
+  await expect(linkDialog).toBeVisible();
+  await linkDialog.getByLabel("Search by title").fill(suffix);
+  await linkDialog
+    .getByRole("button", { name: `Link ${japaneseTitle} (ja)` })
+    .click();
+  await expect(linkDialog).toBeHidden();
+  await expect(
+    section.getByRole("button", { name: japaneseTitle, exact: true }),
+  ).toBeVisible();
+
+  await section.getByRole("button", { name: "New translation" }).click();
+  const createDialog = page.getByRole("dialog", { name: "New translation" });
+  await expect(createDialog).toBeVisible();
+  // English and Japanese are taken, so only the other presets remain.
+  await createDialog
+    .getByRole("button", { name: /Translation language/u })
+    .click();
+  await expect(page.getByRole("option", { name: /日本語/u })).toHaveCount(0);
+  await page.getByRole("option", { name: /한국어/u }).click();
+  await createDialog
+    .getByRole("button", { name: "Create translation" })
+    .click();
+
+  await expect(page).not.toHaveURL(new RegExp(`/admin/articles/${englishId}$`));
+  await waitForEditor(page);
+  await expect(page.getByLabel("Article title", { exact: true })).toHaveValue(
+    englishTitle,
+  );
+  const translatedSection = page.getByRole("region", { name: "Translations" });
+  await expect(
+    translatedSection.getByRole("button", { name: englishTitle, exact: true }),
+  ).toBeVisible();
+  await expect(
+    translatedSection.getByRole("button", { name: japaneseTitle, exact: true }),
+  ).toBeVisible();
+
+  await translatedSection
+    .getByRole("button", {
+      name: `Remove ${japaneseTitle} from this Translation Group`,
+    })
+    .click();
+  await expect(
+    translatedSection.getByRole("button", { name: japaneseTitle, exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    translatedSection.getByRole("heading", { name: "Translations" }),
+  ).toBeFocused();
+
+  await translatedSection
+    .getByRole("button", { name: englishTitle, exact: true })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/admin/articles/${englishId}$`));
+  await waitForEditor(page);
+  await expect(
+    page
+      .getByRole("region", { name: "Translations" })
+      .getByRole("button", { name: japaneseTitle, exact: true }),
+  ).toHaveCount(0);
+});
+
 test("Media library surfaces cleanup blocked, awaiting, and failed Asset states", async ({
   page,
 }) => {

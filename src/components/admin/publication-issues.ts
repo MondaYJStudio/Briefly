@@ -43,6 +43,7 @@ const publicationIssueByCode: Partial<
   BYLINE_INVALID: () => m.pub_issue_byline_invalid(),
   LANGUAGE_INVALID: () => m.pub_issue_language_invalid(),
   CHANNEL_NOT_FOUND: () => m.pub_issue_channel_not_found(),
+  TRANSLATION_LANGUAGE_TAKEN: () => m.pub_issue_translation_language_taken(),
   ASSET_NOT_RESOLVED: () => m.pub_issue_asset_not_resolved(),
   FIGURE_ALT_REQUIRED: () => m.pub_issue_figure_alt_required(),
   INVALID_ASSET_IDENTITY: () => m.pub_issue_invalid_asset_identity(),

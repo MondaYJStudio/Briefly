@@ -33,7 +33,7 @@ const byline = z.object({
   url: bylineUrl.nullable(),
 });
 
-const language = z
+export const articleContentLanguage = z
   .string()
   .max(LANGUAGE_TAG_MAXIMUM_LENGTH)
   .superRefine((value, context) => {
@@ -74,7 +74,7 @@ const draftInput = z
     summary: z.string().max(ARTICLE_SUMMARY_MAXIMUM_LENGTH).nullable(),
     tags: z.array(tag).max(ARTICLE_TAGS_MAXIMUM_COUNT),
     byline: byline.nullable(),
-    language: language.nullable(),
+    language: articleContentLanguage.nullable(),
     channelSlug: channelSlugSchema.nullable().optional(),
     cover: coverUsage.nullable().optional(),
     document: z.unknown().optional(),
@@ -582,6 +582,44 @@ export async function listArticles(
            ORDER BY article.updated_at DESC, article.id ASC`,
     )
     .bind(...(channelSlug === undefined ? [] : [channelSlug]))
+    .all<ArticleRow>();
+  return results.map(articleFromRow);
+}
+
+/** The other non-trashed Articles in this Article's Translation Group. */
+export async function listTranslationGroupMembers(
+  database: D1Database,
+  articleId: string,
+): Promise<Article[]> {
+  const { results } = await database
+    .prepare(
+      `${articleSelection}
+       WHERE article.trashed_at IS NULL
+         AND article.id <> ?
+         AND article.translation_group_id = (
+           SELECT translation_group_id FROM article WHERE id = ?
+         )
+       ORDER BY article.id ASC`,
+    )
+    .bind(articleId, articleId)
+    .all<ArticleRow>();
+  return results.map(articleFromRow);
+}
+
+/** Non-trashed Articles outside every Translation Group, newest first. */
+export async function listUngroupedArticles(
+  database: D1Database,
+  exceptArticleId: string,
+): Promise<Article[]> {
+  const { results } = await database
+    .prepare(
+      `${articleSelection}
+       WHERE article.trashed_at IS NULL
+         AND article.translation_group_id IS NULL
+         AND article.id <> ?
+       ORDER BY article.updated_at DESC, article.id ASC`,
+    )
+    .bind(exceptArticleId)
     .all<ArticleRow>();
   return results.map(articleFromRow);
 }

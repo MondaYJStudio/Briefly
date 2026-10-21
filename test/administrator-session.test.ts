@@ -147,6 +147,7 @@ describe("every administration route requires an Administrator Session", () => {
       const response = await SELF.fetch(
         `http://briefly.test${path
           .replace(":articleId", uuid)
+          .replace(":translationArticleId", uuid)
           .replace(":publicationId", uuid)
           .replace(":assetId", uuid)
           .replace(":channelId", uuid)}`,

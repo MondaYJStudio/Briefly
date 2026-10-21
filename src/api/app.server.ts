@@ -25,6 +25,13 @@ import {
   resolvePublicArticle,
   unpublishArticle,
 } from "../articles/publications.server";
+import {
+  createArticleTranslation,
+  linkArticleTranslation,
+  listArticleTranslations,
+  listTranslationCandidates,
+  unlinkArticleTranslation,
+} from "../articles/translation-groups.server";
 import { recognizeVideoEmbed } from "../articles/video-embeds";
 import { cleanupAsset, listAssets, uploadAsset } from "../assets/assets.server";
 import {
@@ -323,10 +330,9 @@ async function publicArticleResponse(
     );
     return new Response(null, { status: 308, headers });
   }
-  return publicJsonResponse(request, resolution.article, {
-    head,
-    etag: `"${resolution.publicationId}"`,
-  });
+  // Translations change without the Current Publication changing, so the
+  // validator must cover the whole representation.
+  return publicJsonResponse(request, resolution.article, { head, etag: true });
 }
 
 function createApi(getBindings: () => RuntimeBindings) {
@@ -689,6 +695,155 @@ function createApi(getBindings: () => RuntimeBindings) {
         const article = await readArticle(bindings.DB, params.articleId);
         return article
           ? article
+          : status(404, {
+              status: "error" as const,
+              code: "ARTICLE_NOT_FOUND" as const,
+            });
+      },
+      {
+        administrator: true,
+        params: t.Object({ articleId: t.String({ format: "uuid" }) }),
+      },
+    )
+    .get(
+      "/admin/articles/:articleId/translations",
+      async ({ params, status }) => {
+        const result = await listArticleTranslations(
+          getBindings().DB,
+          params.articleId,
+        );
+        return result.ok
+          ? { translations: result.translations }
+          : status(404, {
+              status: "error" as const,
+              code: "ARTICLE_NOT_FOUND" as const,
+            });
+      },
+      {
+        administrator: true,
+        params: t.Object({ articleId: t.String({ format: "uuid" }) }),
+      },
+    )
+    .get(
+      "/admin/articles/:articleId/translation-candidates",
+      async ({ params, status }) => {
+        const result = await listTranslationCandidates(
+          getBindings().DB,
+          params.articleId,
+        );
+        return result.ok
+          ? { candidates: result.translations }
+          : status(404, {
+              status: "error" as const,
+              code: "ARTICLE_NOT_FOUND" as const,
+            });
+      },
+      {
+        administrator: true,
+        params: t.Object({ articleId: t.String({ format: "uuid" }) }),
+      },
+    )
+    .post(
+      "/admin/articles/:articleId/translations",
+      async ({ body, params, status }) => {
+        const result = await createArticleTranslation(
+          getBindings().DB,
+          params.articleId,
+          body,
+        );
+        if (result.ok) return status(201, result.article);
+        switch (result.reason) {
+          case "invalid":
+            return status(400, {
+              status: "error" as const,
+              code: "ARTICLE_TRANSLATION_INVALID" as const,
+              issues: result.issues,
+            });
+          case "not-found":
+            return status(404, {
+              status: "error" as const,
+              code: "ARTICLE_NOT_FOUND" as const,
+            });
+          case "language-taken":
+            return status(409, {
+              status: "error" as const,
+              code: "TRANSLATION_LANGUAGE_TAKEN" as const,
+            });
+          case "conflict":
+            return status(409, {
+              status: "error" as const,
+              code: "TRANSLATION_GROUP_CONFLICT" as const,
+            });
+        }
+      },
+      {
+        administrator: true,
+        params: t.Object({ articleId: t.String({ format: "uuid" }) }),
+        body: t.Any(),
+      },
+    )
+    .put(
+      "/admin/articles/:articleId/translations/:translationArticleId",
+      async ({ params, status }) => {
+        const result = await linkArticleTranslation(
+          getBindings().DB,
+          params.articleId,
+          params.translationArticleId,
+        );
+        if (result.ok) return { translations: result.translations };
+        switch (result.reason) {
+          case "not-found":
+            return status(404, {
+              status: "error" as const,
+              code: "ARTICLE_NOT_FOUND" as const,
+            });
+          case "translation-not-found":
+            return status(404, {
+              status: "error" as const,
+              code: "TRANSLATION_ARTICLE_NOT_FOUND" as const,
+            });
+          case "self":
+            return status(400, {
+              status: "error" as const,
+              code: "TRANSLATION_SELF_LINK" as const,
+            });
+          case "already-linked":
+            return status(409, {
+              status: "error" as const,
+              code: "TRANSLATION_ALREADY_LINKED" as const,
+            });
+          case "language-taken":
+            return status(409, {
+              status: "error" as const,
+              code: "TRANSLATION_LANGUAGE_TAKEN" as const,
+            });
+          case "conflict":
+            return status(409, {
+              status: "error" as const,
+              code: "TRANSLATION_GROUP_CONFLICT" as const,
+            });
+        }
+      },
+      {
+        administrator: true,
+        params: t.Object({
+          articleId: t.String({ format: "uuid" }),
+          translationArticleId: t.String({ format: "uuid" }),
+        }),
+      },
+    )
+    .delete(
+      "/admin/articles/:articleId/translation-group",
+      async ({ params, status }) => {
+        const result = await unlinkArticleTranslation(
+          getBindings().DB,
+          params.articleId,
+        );
+        return result.ok
+          ? new Response(null, {
+              status: 204,
+              headers: { "cache-control": "no-store" },
+            })
           : status(404, {
               status: "error" as const,
               code: "ARTICLE_NOT_FOUND" as const,

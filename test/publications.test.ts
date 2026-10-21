@@ -511,6 +511,7 @@ describe("first immutable Publication", () => {
         "summary",
         "tags",
         "title",
+        "translations",
         "updatedAt",
       ].sort(),
     );

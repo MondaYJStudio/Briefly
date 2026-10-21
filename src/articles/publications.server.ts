@@ -3,12 +3,13 @@ import { z } from "zod";
 import { LANGUAGE_TAG_MAXIMUM_LENGTH } from "../site-settings/site-settings";
 import { channelSlugSchema } from "../channels/channels.server";
 import { normalizeArticleTag } from "./articles.server";
-import type { PublicArticle, PublicArticleListItem } from "./articles";
+import type { PublicArticleDetail, PublicArticleListItem } from "./articles";
 import { articleSlugKey } from "./article-slug";
 import {
   decodePublicArticleProjection,
   publicArticleListItemFromProjection,
   publicArticleProjectionSelection,
+  readPublicArticleTranslations,
   type PublicArticleProjectionRow,
 } from "./public-article-projection.server";
 
@@ -247,7 +248,7 @@ export async function resolvePublicArticle(
   database: D1Database,
   slug: string,
 ): Promise<
-  | { kind: "article"; article: PublicArticle; publicationId: string }
+  | { kind: "article"; article: PublicArticleDetail; publicationId: string }
   | { kind: "redirect"; canonicalSlug: string }
   | { kind: "gone" }
   | null
@@ -277,7 +278,13 @@ export async function resolvePublicArticle(
   }
   return {
     kind: "article",
-    article: parsed.article,
+    article: {
+      ...parsed.article,
+      translations: await readPublicArticleTranslations(
+        database,
+        parsed.article.id,
+      ),
+    },
     publicationId: parsed.publicationId,
   };
 }

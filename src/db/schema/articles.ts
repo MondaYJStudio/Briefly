@@ -24,9 +24,20 @@ export const article = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
     trashedAt: integer("trashed_at", { mode: "timestamp_ms" }),
+    translationGroupId: text("translation_group_id"),
+    // Translation language key of the Current Publication's language, written
+    // by Publish and by Translation Group linking. It is meaningful only while
+    // the Article has a Current Publication.
+    currentPublicationLanguageKey: text("current_publication_language_key"),
   },
   (table) => [
     index("article_trashed_at_idx").on(table.trashedAt),
+    index("article_translation_group_id_idx").on(table.translationGroupId),
+    uniqueIndex("article_translation_group_public_language_unique")
+      .on(table.translationGroupId, table.currentPublicationLanguageKey)
+      .where(
+        sql`${table.translationGroupId} IS NOT NULL AND ${table.currentPublicationId} IS NOT NULL AND ${table.currentPublicationLanguageKey} IS NOT NULL`,
+      ),
     foreignKey({
       columns: [table.currentPublicationId, table.id],
       foreignColumns: [publication.id, publication.articleId],

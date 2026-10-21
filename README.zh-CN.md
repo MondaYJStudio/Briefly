@@ -26,6 +26,8 @@ Briefly 目前处于 **pre-alpha（`0.x`）**。草稿创作、发布、频道�
 
 每篇文章最多属于一个频道，也可以不属于任何频道。频道是一份由管理员维护的注册表，记录稳定的 slug 与显示名——不是自由标签，也不是站点或多租户。草稿保存频道选择；发布时将其冻结进发布版本。公开过滤只使用该冻结的发布频道。
 
+译本是彼此独立、关联进同一个译本组（Translation Group）的文章。每篇译本都有自己的草稿、发布版本和 slug（slug 仍在全站唯一），一个组里每种语言最多只能有一篇公开，`zh-CN` 与 `zh-Hans` 这类地区写法算作同一种语言。关联是文章之间的关系而不是草稿内容，因此会立即改变公开的 `translations` 字段；只有已发布的译本才会出现在其中。
+
 公开消费者获得的是已存储的语义化 HTML 和解析后的元数据。草稿、认证记录和可编辑的 ProseMirror JSON 永远不会通过公开 API 暴露。
 
 ## 技术方案
@@ -145,7 +147,7 @@ Drizzle schema 文件是数据库结构的事实来源；Drizzle Kit 生成提�
 ## 公开内容 API
 
 - `GET` / `HEAD /api/articles` — 使用不透明游标仅列出当前发布版本；`limit` 默认为 20、上限为 100，并支持可选的归一化 `tag`、规范化 BCP 47 `language`，以及可选的 `channel`（Current Publication 的 Channel slug）精确过滤条件；列表与详情项包含 `channel: { slug, name } | null`
-- `GET` / `HEAD /api/articles/:slug` — 根据规范 slug 获取当前发布版本；Article 公开期间，曾经公开的 slug 会以 `308 Permanent Redirect` 跳转到当前规范 URL
+- `GET` / `HEAD /api/articles/:slug` — 根据规范 slug 获取当前发布版本；Article 公开期间，曾经公开的 slug 会以 `308 Permanent Redirect` 跳转到当前规范 URL；详情还会列出 `translations: [{ id, slug, language }]`，即同一译本组中其他已发布的文章，模板可据此提供语言切换和 `hreflang` 链接
 - `GET /api/openapi.json` — 查看机器可读的 OpenAPI 3.1 契约
 - `/media/...` — 交付受控的私有媒体与不可变公开媒体
 

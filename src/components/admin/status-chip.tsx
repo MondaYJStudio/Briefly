@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import type { ArticleLifecycleProjection } from "../../articles/articles";
+import { m } from "../../paraglide/messages.js";
 import { AdminIcon, type AdminIconName } from "./icons";
 import styles from "./status-chip.module.css";
 
@@ -34,4 +36,36 @@ export function StatusChip({
       {children}
     </span>
   );
+}
+
+/** The Articles workspace lifecycle of one Article. */
+export function LifecycleChip({
+  projection,
+}: Readonly<{ projection: ArticleLifecycleProjection }>) {
+  switch (projection) {
+    case "published":
+      return (
+        <StatusChip variant="success" dot>
+          {m.lifecycle_published()}
+        </StatusChip>
+      );
+    case "changes-pending":
+      return (
+        <StatusChip variant="warning" dot>
+          {m.lifecycle_changes_pending()}
+        </StatusChip>
+      );
+    case "unpublished":
+      return (
+        <StatusChip variant="default" dot>
+          {m.lifecycle_unpublished()}
+        </StatusChip>
+      );
+    case "draft":
+      return (
+        <StatusChip variant="default" dot>
+          {m.lifecycle_draft()}
+        </StatusChip>
+      );
+  }
 }

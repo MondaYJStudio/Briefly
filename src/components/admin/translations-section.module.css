@@ -1,0 +1,67 @@
+/* ============ Translations rail section ============ */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  border-bottom: 1px solid var(--divider);
+}
+
+.item:last-child {
+  border-bottom: 0;
+}
+
+.open {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--foreground);
+  font-weight: 550;
+  text-align: start;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.open:hover {
+  text-decoration: underline;
+}
+
+.candidates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 20rem;
+  overflow-y: auto;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-m);
+}
+
+.candidate {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--divider);
+  background: transparent;
+  color: var(--foreground);
+  text-align: start;
+  cursor: pointer;
+}
+
+.candidates li:last-child .candidate {
+  border-bottom: 0;
+}
+
+.candidate:hover,
+.candidate:focus-visible {
+  background: var(--content2);
+}
+
+.candidate:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.feedback {
+  color: var(--danger-strong);
+}

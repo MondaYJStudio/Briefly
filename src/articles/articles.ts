@@ -145,6 +145,17 @@ export interface PublicArticle {
 
 export type PublicArticleListItem = Omit<PublicArticle, "html">;
 
+/** Another public member of the Article's Translation Group. */
+export interface PublicArticleTranslation {
+  id: string;
+  slug: string;
+  language: string;
+}
+
+export interface PublicArticleDetail extends PublicArticle {
+  translations: PublicArticleTranslation[];
+}
+
 export interface PublicArticleChannel {
   slug: string;
   name: string;

@@ -16,7 +16,7 @@ import { useAdminChannels } from "../../channels/use-admin-channels";
 import { m } from "../../paraglide/messages.js";
 import { AdminIcon } from "./icons";
 import styles from "./articles-view.module.css";
-import { StatusChip } from "./status-chip";
+import { LifecycleChip } from "./status-chip";
 import { articleLifecycleProjection } from "../../articles/article-workspace";
 import type { ArticleListWorkspace } from "./use-article-workspace";
 
@@ -33,35 +33,6 @@ function articleVisible(
   }
   if (channelFilter === null) return true;
   return article.draft.channelSlug === channelFilter;
-}
-
-function lifecycleChip(projection: ArticleLifecycleProjection) {
-  switch (projection) {
-    case "published":
-      return (
-        <StatusChip variant="success" dot>
-          {m.lifecycle_published()}
-        </StatusChip>
-      );
-    case "changes-pending":
-      return (
-        <StatusChip variant="warning" dot>
-          {m.lifecycle_changes_pending()}
-        </StatusChip>
-      );
-    case "unpublished":
-      return (
-        <StatusChip variant="default" dot>
-          {m.lifecycle_unpublished()}
-        </StatusChip>
-      );
-    case "draft":
-      return (
-        <StatusChip variant="default" dot>
-          {m.lifecycle_draft()}
-        </StatusChip>
-      );
-  }
 }
 
 /**
@@ -411,7 +382,7 @@ function ArticleRow({
           >
             {title}
           </span>
-          {lifecycleChip(projection)}
+          <LifecycleChip projection={projection} />
         </span>
         <span className={`${styles.slug} text-xs`}>
           {article.draft.slug ? `/${article.draft.slug}` : m.no_slug_yet()}

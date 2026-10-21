@@ -395,6 +395,110 @@ describe("MCP access", () => {
     expect(republish.text).toContain("Publication Conflict");
   });
 
+  it("creates translations in the source's Translation Group through MCP tools", async () => {
+    const cookie = await initializeAndSignIn();
+    const { accessToken } = await connect(cookie);
+    const articleCount = async () =>
+      (
+        await env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM article WHERE trashed_at IS NULL",
+        ).first<{ count: number }>()
+      )?.count;
+
+    const source = (
+      await callTool(accessToken, "create_article", {
+        title: "检查外链",
+        language: "zh-Hans",
+        markdown: "从 **Search Console** 开始。",
+      })
+    ).value() as { id: string; translations: unknown[] };
+    expect(source.translations).toEqual([]);
+
+    const withoutLanguage = await callTool(accessToken, "create_article", {
+      title: "Check backlinks",
+      markdown: "Start with Search Console.",
+      translationOf: source.id,
+    });
+    expect(withoutLanguage.isError).toBe(true);
+    expect(withoutLanguage.text).toContain("language is required");
+
+    const sameLanguage = await callTool(accessToken, "create_article", {
+      title: "检查外链（大陆）",
+      language: "zh-CN",
+      markdown: "从 Search Console 开始。",
+      translationOf: source.id,
+    });
+    expect(sameLanguage.isError).toBe(true);
+    expect(sameLanguage.text).toContain("already uses this language");
+    expect(await articleCount()).toBe(1);
+
+    const translation = await callTool(accessToken, "create_article", {
+      title: "Check backlinks",
+      language: "en",
+      markdown: "Start with **Search Console**.",
+      translationOf: source.id,
+    });
+    expect(translation.isError).toBe(false);
+    const translated = translation.value() as { id: string };
+    expect(translation.value()).toMatchObject({
+      title: "Check backlinks",
+      slug: "Check backlinks",
+      language: "en",
+      hasCover: false,
+      translations: [
+        {
+          id: source.id,
+          title: "检查外链",
+          language: "zh-Hans",
+          lifecycle: "draft",
+        },
+      ],
+    });
+    const translatedBody = await callTool(accessToken, "get_article", {
+      articleId: translated.id,
+    });
+    expect(translatedBody.value()).toMatchObject({
+      markdown: "Start with **Search Console**.",
+    });
+
+    const readSource = await callTool(accessToken, "get_article", {
+      articleId: source.id,
+    });
+    expect(readSource.value()).toMatchObject({
+      translations: [
+        {
+          id: translated.id,
+          title: "Check backlinks",
+          language: "en",
+          lifecycle: "draft",
+        },
+      ],
+    });
+
+    // A refused save leaves the new Article in Trash, outside the group.
+    const slugTaken = await callTool(accessToken, "create_article", {
+      title: "バックリンク",
+      slug: "检查外链",
+      language: "ja",
+      markdown: "Search Console から始めます。",
+      translationOf: source.id,
+    });
+    expect(slugTaken.isError).toBe(true);
+    expect(slugTaken.text).toContain("moved to Trash");
+    const { results: grouped } = await env.DB.prepare(
+      `SELECT id FROM article
+       WHERE translation_group_id = (
+         SELECT translation_group_id FROM article WHERE id = ?
+       )
+       ORDER BY id`,
+    )
+      .bind(source.id)
+      .all<{ id: string }>();
+    expect(grouped.map(({ id }) => id)).toEqual(
+      [source.id, translated.id].sort(),
+    );
+  });
+
   it("lists Connected Apps and refuses a disconnected one", async () => {
     const cookie = await initializeAndSignIn();
     const { clientId, accessToken } = await connect(cookie);

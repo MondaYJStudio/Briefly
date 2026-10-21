@@ -84,6 +84,20 @@ function ArticleEditorRoute() {
       workspace={workspace}
       siteSettings={siteSettings}
       onBack={() => void navigate({ to: "/admin/articles" })}
+      onOpenArticle={(id) =>
+        void navigate({
+          to: "/admin/articles/$articleId",
+          params: { articleId: id },
+        })
+      }
+      onTranslationCreated={(article) => {
+        // The list was read before this Article existed.
+        void workspace.reloadArticles({ soft: true });
+        void navigate({
+          to: "/admin/articles/$articleId",
+          params: { articleId: article.id },
+        });
+      }}
       onPreviewOpenChange={setPreviewOpen}
     />
   );

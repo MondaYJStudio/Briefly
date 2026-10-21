@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import type { PublicArticle, PublicArticleListItem } from "./articles";
+import type {
+  PublicArticle,
+  PublicArticleDetail,
+  PublicArticleListItem,
+  PublicArticleTranslation,
+} from "./articles";
 
 const publicArticleCover = z.object({
   url: z.string().url(),
@@ -136,11 +141,41 @@ export function publicArticleListItemFromProjection(
   return item;
 }
 
+const publicArticleTranslation = z.object({
+  id: z.string().uuid(),
+  slug: z.string().min(1),
+  language: z.string().min(1),
+});
+
+/** The other public members of the Article's Translation Group. */
+export async function readPublicArticleTranslations(
+  database: D1Database,
+  articleId: string,
+): Promise<PublicArticleTranslation[]> {
+  const { results } = await database
+    .prepare(
+      `SELECT member.id, publication.slug, publication.language
+       FROM article
+       JOIN article AS member
+         ON member.translation_group_id = article.translation_group_id
+        AND member.id <> article.id
+       JOIN publication
+         ON publication.id = member.current_publication_id
+        AND publication.article_id = member.id
+       WHERE article.id = ?
+         AND member.trashed_at IS NULL
+       ORDER BY publication.language, member.id`,
+    )
+    .bind(articleId)
+    .all();
+  return results.map((row) => publicArticleTranslation.parse(row));
+}
+
 export async function confirmCurrentPublicArticle(
   database: D1Database,
   articleId: string,
   publicationId: string,
-): Promise<PublicArticle | null> {
+): Promise<PublicArticleDetail | null> {
   const row = await database
     .prepare(
       `${publicArticleProjectionSelection}
@@ -157,5 +192,9 @@ export async function confirmCurrentPublicArticle(
     .first<PublicArticleProjectionRow>();
   if (!row) return null;
   const decoded = decodePublicArticleProjection(row);
-  return decoded.publicationId === publicationId ? decoded.article : null;
+  if (decoded.publicationId !== publicationId) return null;
+  return {
+    ...decoded.article,
+    translations: await readPublicArticleTranslations(database, articleId),
+  };
 }

@@ -26,6 +26,8 @@ Each Article has one mutable Draft and a history of immutable Publications. Publ
 
 An Article may belong to at most one Channel, or to none. Channels are an Administrator-managed registry of stable slugs and display names—not freeform tags, sites, or tenants. The Draft holds the Channel selection; Publish freezes it into the Publication. Public filtering uses that frozen Publication Channel only.
 
+Translations are separate Articles linked into a Translation Group. Each one keeps its own Draft, Publications, and slug (slugs stay unique across the site), and a group holds at most one public Article per language, where regional variants such as `zh-CN` and `zh-Hans` count as one. Linking is an Article relationship rather than Draft content, so it changes the public `translations` field immediately; only published members ever appear there.
+
 Public consumers receive stored semantic HTML and resolved metadata. Drafts, authentication records, and editable ProseMirror JSON are never exposed by the public API.
 
 ## Technology
@@ -145,7 +147,7 @@ The baseline contains no product telemetry, phone-home behavior, third-party ana
 ## Public content API
 
 - `GET` / `HEAD /api/articles` — list only current Publications using opaque cursor pagination; `limit` defaults to 20 and is capped at 100, and optional normalized `tag`, exact canonical BCP 47 `language`, and optional `channel` (Current Publication Channel slug) filters are supported; list and detail items include `channel: { slug, name } | null`
-- `GET` / `HEAD /api/articles/:slug` — retrieve the Current Publication by canonical slug; while the Article is public, a formerly public slug returns `308 Permanent Redirect` to the current canonical URL
+- `GET` / `HEAD /api/articles/:slug` — retrieve the Current Publication by canonical slug; while the Article is public, a formerly public slug returns `308 Permanent Redirect` to the current canonical URL; the detail also lists `translations: [{ id, slug, language }]`, the other published Articles in its Translation Group, so a template can offer a language switcher and `hreflang` links
 - `GET /api/openapi.json` — inspect the machine-readable OpenAPI 3.1 contract
 - `/media/...` — serve controlled private media and immutable public media
 

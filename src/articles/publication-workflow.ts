@@ -1,5 +1,5 @@
 import type { Byline } from "../site-settings/site-settings";
-import type { PublicArticle } from "./articles";
+import type { PublicArticleDetail } from "./articles";
 
 /**
  * Stable Publication Issue codes. Specific codes are preferred for client
@@ -18,6 +18,7 @@ export const PUBLICATION_ISSUE_CODES = [
   "BYLINE_INVALID",
   "LANGUAGE_INVALID",
   "CHANNEL_NOT_FOUND",
+  "TRANSLATION_LANGUAGE_TAKEN",
   "PERSISTED_FIELD_INVALID",
   "ASSET_NOT_RESOLVED",
   "FIGURE_ALT_REQUIRED",
@@ -63,7 +64,8 @@ export interface PublicationPreview {
 export interface PublicationReceipt {
   publicationId: string;
   draftVersion: number;
-  article: PublicArticle;
+  /** The Article exactly as an anonymous detail read returns it. */
+  article: PublicArticleDetail;
 }
 
 export interface PreviewSavedDraftCommand {

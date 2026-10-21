@@ -24,6 +24,7 @@ import {
 } from "react";
 
 import type {
+  Article,
   ArticleCoverUsage,
   ArticleDraftField,
   ArticlePublicationHistoryEntry,
@@ -57,6 +58,7 @@ import {
   type PublicationIssueSurface,
 } from "./publication-issues";
 import { StatusChip } from "./status-chip";
+import { TranslationsSection } from "./translations-section";
 import type { ArticleEditorWorkspace } from "./use-article-workspace";
 import { WorkspaceAlerts } from "./workspace-alerts";
 
@@ -77,6 +79,8 @@ interface EditorViewProps {
   workspace: ArticleEditorWorkspace;
   siteSettings: SiteSettings | null;
   onBack: () => void;
+  onOpenArticle: (articleId: string) => void;
+  onTranslationCreated: (article: Article) => void;
   onPreviewOpenChange: (open: boolean) => void;
 }
 
@@ -89,6 +93,8 @@ export function EditorView({
   workspace,
   siteSettings,
   onBack,
+  onOpenArticle,
+  onTranslationCreated,
   onPreviewOpenChange,
 }: EditorViewProps) {
   const {
@@ -325,6 +331,8 @@ export function EditorView({
           onOpenPublishDialog={() => setPublishDialogOpen(true)}
           onOpenUnpublishDialog={() => setUnpublishDialogOpen(true)}
           onOpenTrashDialog={() => setTrashDialogOpen(true)}
+          onOpenArticle={onOpenArticle}
+          onTranslationCreated={onTranslationCreated}
           onPreview={openPreview}
         />
       </div>
@@ -526,6 +534,8 @@ function EditorRail({
   onOpenPublishDialog,
   onOpenUnpublishDialog,
   onOpenTrashDialog,
+  onOpenArticle,
+  onTranslationCreated,
   onPreview,
 }: Readonly<{
   workspace: ArticleEditorWorkspace;
@@ -537,6 +547,8 @@ function EditorRail({
   onOpenPublishDialog: () => void;
   onOpenUnpublishDialog: () => void;
   onOpenTrashDialog: () => void;
+  onOpenArticle: (articleId: string) => void;
+  onTranslationCreated: (article: Article) => void;
   onPreview: () => void;
 }>) {
   const {
@@ -986,6 +998,16 @@ function EditorRail({
               </div>
             </section>
           )}
+
+          <TranslationsSection
+            key={selected.id}
+            articleId={selected.id}
+            language={draft.language ?? siteSettings?.defaultLanguage ?? null}
+            disabled={lifecycleActionPending}
+            canCreate={serverConfirmed}
+            onOpenArticle={onOpenArticle}
+            onCreated={onTranslationCreated}
+          />
 
           {/* ---- Danger zone ---- */}
           <section

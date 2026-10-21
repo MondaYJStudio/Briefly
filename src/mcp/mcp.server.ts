@@ -27,7 +27,8 @@ const SERVER_INSTRUCTIONS = `Briefly manages Articles. Each Article has one priv
 Typical flow: create_article (or get_article then update_draft) → preview_article → publish_article.
 - Every save and publish names the exact Draft Version you last read; if the Draft changed meanwhile the call is refused. Re-read with get_article and retry.
 - Bodies are Markdown. Do not repeat the title as a heading.
-- Publishing is public immediately. Confirm with the user first.`;
+- Publishing is public immediately. Confirm with the user first.
+- A translation is its own Article in the source's Translation Group: create it with create_article and translationOf. Slugs are unique site-wide, so each translation has its own slug.`;
 
 /**
  * The SDK validates JSON Schema only for elicitation, which Briefly never

@@ -312,7 +312,7 @@ export const publicOpenApiDocument = {
         operationId: "getArticleBySlug",
         summary: "Retrieve or locate a Current Publication by slug",
         description:
-          "A canonical slug returns the stored semantic HTML fragment. A formerly public slug redirects permanently to the current canonical detail URL. Media URLs in cover metadata and rendered HTML are absolute stable public references.",
+          "A canonical slug returns the stored semantic HTML fragment and the Article's public translations. A formerly public slug redirects permanently to the current canonical detail URL. Media URLs in cover metadata and rendered HTML are absolute stable public references.",
         responses: {
           200: {
             description: "The Current Publication.",
@@ -324,7 +324,8 @@ export const publicOpenApiDocument = {
             },
           },
           304: {
-            description: "The Current Publication is unchanged.",
+            description:
+              "The Current Publication and its public translations are unchanged.",
             headers: publicResponseHeaders,
           },
           308: {
@@ -369,7 +370,8 @@ export const publicOpenApiDocument = {
             headers: publicResponseHeaders,
           },
           304: {
-            description: "The Current Publication is unchanged.",
+            description:
+              "The Current Publication and its public translations are unchanged.",
             headers: publicResponseHeaders,
           },
           308: {
@@ -534,13 +536,37 @@ export const publicOpenApiDocument = {
       ArticleDetail: {
         type: "object",
         additionalProperties: false,
-        required: [...articleMetadataRequired, "html"],
+        required: [...articleMetadataRequired, "html", "translations"],
         properties: {
           ...articleMetadataProperties,
           html: {
             type: "string",
             description:
               "Stored semantic HTML fragment for the Current Publication; never ProseMirror JSON.",
+          },
+          translations: {
+            type: "array",
+            items: { $ref: "#/components/schemas/ArticleTranslation" },
+            description:
+              "The other Articles in this Article's Translation Group that currently have a Current Publication, ordered by language then id. Empty when the Article has no Translation Group or no other public member. Membership changes take effect immediately, without a new Publication.",
+          },
+        },
+      },
+      ArticleTranslation: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "slug", "language"],
+        properties: {
+          id: articleMetadataProperties.id,
+          slug: {
+            type: "string",
+            description:
+              "Current canonical Unicode slug of the translation's Current Publication.",
+          },
+          language: {
+            type: "string",
+            description:
+              "Canonical BCP 47 language tag of the translation's Current Publication. No two translations of one Article share a language and script.",
           },
         },
       },

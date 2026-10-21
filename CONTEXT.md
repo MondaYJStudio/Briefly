@@ -105,6 +105,19 @@ deployment, or tenant.
 _Avoid_: Site, Tag, tenant, multi-site, multi-channel Article, required Channel,
 live Draft override of public Channel filtering
 
+**Translation Group**:
+A set of Articles that are translations of one another. Each member stays a
+single-language Article with its own Draft, Publications, and slug; slugs
+remain unique across the installation rather than per language. An Article
+belongs to at most one Translation Group, and no two members may have Current
+Publications in the same language, compared by language and script so regional
+spellings such as `zh-CN` and `zh-Hans` count as one. Unlike Draft publication
+metadata, membership is an Article-level relationship that changes public
+responses immediately; only members with a Current Publication are ever
+exposed.
+_Avoid_: multilingual Article, locale variant, same-slug translation,
+translation Draft
+
 **Connected App**:
 An MCP client the Administrator has authorized through OAuth to act on their
 behalf: read Articles and Channels, save Drafts, Preview, and Publish. Every
@@ -146,5 +159,6 @@ Public presentation terms use **内建公开站** for Built-in Public Site,
 **公开站开关** for Public Site Enabled,
 **公开模板** for Public Template, **模板清单** for Template Manifest,
 **已安装公开模板** for Installed Public Template, and **启用中的公开模板**
-for Active Public Template. Content partition terms use **频道** for Channel. Agent access uses
+for Active Public Template. Content partition terms use **频道** for Channel, and translation terms use
+**译本组** for Translation Group. Agent access uses
 **已连接应用** for Connected App.

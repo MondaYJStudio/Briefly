@@ -22,6 +22,7 @@ import {
 } from "./articles";
 import { articleSlugKey, articleSlugSchema } from "./article-slug";
 import { confirmCurrentPublicArticle } from "./public-article-projection.server";
+import { translationLanguageKey } from "./translation-groups";
 import {
   renderPublication,
   type PublicationRendererDependencies,
@@ -508,6 +509,42 @@ async function resolveMetadata(
   };
 }
 
+function translationLanguageTakenIssue(): PhasedIssue {
+  return issue(
+    "metadata",
+    "TRANSLATION_LANGUAGE_TAKEN",
+    "draft.language",
+    "Another Article in this Translation Group is already public in this language.",
+  );
+}
+
+/** Whether another member of the Article's group is public in this language. */
+async function translationLanguageIsTaken(
+  database: D1Database,
+  articleId: string,
+  languageKey: string,
+): Promise<boolean> {
+  try {
+    const row = await database
+      .prepare(
+        `SELECT 1 AS taken
+         FROM article
+         JOIN article AS member
+           ON member.translation_group_id = article.translation_group_id
+          AND member.id <> article.id
+         WHERE article.id = ?
+           AND member.current_publication_id IS NOT NULL
+           AND member.current_publication_language_key = ?
+         LIMIT 1`,
+      )
+      .bind(articleId, languageKey)
+      .first();
+    return row !== null;
+  } catch (error) {
+    throw new PublicationWorkflowError("PUBLICATION_NOT_COMPLETED", error);
+  }
+}
+
 const workflowIssueForRendererDiagnostic: Record<
   PublicationRendererDiagnosticCode,
   { code: PublicationIssueCode; message: string }
@@ -637,6 +674,16 @@ async function prepareSavedDraft(
   }
   const resolvedMetadata = await resolveMetadata(database, draft);
   readiness.push(...resolvedMetadata.issues);
+  if (
+    resolvedMetadata.metadata &&
+    (await translationLanguageIsTaken(
+      database,
+      articleId,
+      translationLanguageKey(resolvedMetadata.metadata.language),
+    ))
+  ) {
+    readiness.push(translationLanguageTakenIssue());
+  }
   if (readiness.length > 0) {
     return {
       ok: false,
@@ -842,6 +889,7 @@ async function commitPublication(
   );
   const slug = draft.slug!;
   const slugKey = articleSlugKey(slug);
+  const languageKey = translationLanguageKey(metadata.language);
   let cover: PublicArticleCover | null = null;
   if (draft.cover) {
     const asset = resolvedAssets.get(draft.cover.assetId);
@@ -879,6 +927,13 @@ async function commitPublication(
              AND article_draft.version = ?
              AND article.current_publication_id IS ?
              AND article.trashed_at IS NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM article AS member
+               WHERE member.translation_group_id = article.translation_group_id
+                 AND member.id <> article.id
+                 AND member.current_publication_id IS NOT NULL
+                 AND member.current_publication_language_key = ?
+             )
          )`,
       )
       .bind(
@@ -905,6 +960,7 @@ async function commitPublication(
         command.articleId,
         command.draftVersion,
         command.expectedCurrentPublicationId,
+        languageKey,
       ),
   );
 
@@ -973,6 +1029,7 @@ async function commitPublication(
       .prepare(
         `UPDATE article
          SET current_publication_id = ?,
+             current_publication_language_key = ?,
              published_at = COALESCE(published_at, ?),
              updated_at = ?
          WHERE id = ? AND current_publication_id IS ?
@@ -987,6 +1044,7 @@ async function commitPublication(
       )
       .bind(
         publicationId,
+        languageKey,
         publishedAt,
         publishedAt,
         command.articleId,
@@ -1068,6 +1126,20 @@ async function commitPublication(
         current.currentPublicationId !== command.expectedCurrentPublicationId
       ) {
         return { ok: false, reason: "conflict" };
+      }
+      // Another member published in this language after preparation.
+      if (
+        await translationLanguageIsTaken(
+          database,
+          command.articleId,
+          languageKey,
+        )
+      ) {
+        return {
+          ok: false,
+          reason: "invalid",
+          issues: canonicalIssues([translationLanguageTakenIssue()]),
+        };
       }
       throw new PublicationWorkflowError("PUBLICATION_NOT_COMPLETED");
     } catch (error) {
