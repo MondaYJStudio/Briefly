@@ -1,9 +1,11 @@
 import { expect, test } from "playwright/test";
 
+import { maskAdministratorEmail } from "../src/auth/administrator-identity";
 import { playwrightBaseUrl } from "./runtime";
 
 const setupSecret = "playwright-only-setup-secret-32-characters";
 const administratorEmail = "administrator@example.test";
+const maskedAdministratorEmail = maskAdministratorEmail(administratorEmail);
 const administratorPassword = "playwright-only-password";
 const originalTitle = "A durable first Publication";
 const revisedTitle = "A revised durable Publication";
@@ -185,11 +187,12 @@ test("the recovery surface restores invalid and successful states", async ({
     });
   });
   await page.goto("/admin/recovery");
+  await page.waitForLoadState("networkidle");
   await page.getByLabel("Recovery Secret").fill("wrong-secret");
   await page.getByLabel("New password").fill("a-valid-password");
   await page.getByRole("button", { name: "Reset password" }).click();
   await expect(page.getByRole("alert")).toContainText(
-    "Recovery Secret rejected",
+    "Invalid Recovery Secret",
   );
   await expect(page.getByLabel("Recovery Secret")).toHaveAttribute(
     "aria-invalid",
@@ -210,7 +213,7 @@ test("the recovery surface restores invalid and successful states", async ({
     page.getByRole("heading", { name: "Password reset" }),
   ).toBeVisible();
   await expect(page.getByRole("status")).toContainText(
-    "All existing sessions have been revoked",
+    "Sign in again with the new password",
   );
   await expect(page.getByRole("note")).toContainText(
     "Rotate or remove RECOVERY_SECRET",
@@ -302,11 +305,11 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page.getByLabel("Password").fill(administratorPassword);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(
-      page.getByText(administratorEmail, { exact: true }),
+      page.getByText(maskedAdministratorEmail, { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", {
-        name: `Settings and account menu — ${administratorEmail}`,
+        name: `Settings and account menu — ${maskedAdministratorEmail}`,
       }),
     ).toBeVisible();
     await expect(page.getByText("AD", { exact: true })).toBeVisible();
@@ -320,7 +323,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
   await test.step("admin shell navigation, drawers, locale, theme, and breakpoints", async () => {
     const identityMenu = () =>
       page.getByRole("button", {
-        name: `Settings and account menu — ${administratorEmail}`,
+        name: `Settings and account menu — ${maskedAdministratorEmail}`,
       });
 
     await expect(
@@ -353,34 +356,42 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
 
     await identityMenu().click();
     await page.getByRole("menuitem", { name: "Settings" }).click();
-    await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
+    await expect(
+      page.getByRole("dialog", { name: "Settings", exact: true }),
+    ).toBeVisible();
     await expect(page).toHaveURL(/\/admin\/articles$/);
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog", { name: "Settings" })).toHaveCount(0);
+    await expect(
+      page.getByRole("dialog", { name: "Settings", exact: true }),
+    ).toHaveCount(0);
 
     await identityMenu().click();
     await page.getByRole("menuitem", { name: "Account" }).click();
-    await expect(page.getByRole("dialog", { name: "Account" })).toBeVisible();
+    await expect(
+      page.getByRole("dialog", { name: "Account", exact: true }),
+    ).toBeVisible();
     await expect(page.getByLabel("Email")).toHaveValue(administratorEmail);
     await expect(page).toHaveURL(/\/admin\/articles$/);
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog", { name: "Account" })).toHaveCount(0);
+    await expect(
+      page.getByRole("dialog", { name: "Account", exact: true }),
+    ).toHaveCount(0);
     await expect(identityMenu()).toBeFocused();
 
     await identityMenu().click();
-    await page.getByRole("menuitem", { name: "Appearance, Light" }).click();
+    await page.getByRole("menuitem", { name: "Appearance Light" }).click();
     await expect
       .poll(async () => page.locator("html").getAttribute("data-theme"))
       .toBe("dark");
     await identityMenu().click();
-    await page.getByRole("menuitem", { name: "Appearance, Dark" }).click();
+    await page.getByRole("menuitem", { name: "Appearance Dark" }).click();
     await expect
       .poll(async () => page.locator("html").getAttribute("data-theme"))
       .toBe("light");
 
     await identityMenu().click();
     await page.getByRole("menuitem", { name: "Interface language" }).hover();
-    await page.getByRole("menuitem", { name: "简体中文" }).click();
+    await page.getByRole("menuitemradio", { name: "简体中文" }).click();
     await expect
       .poll(async () => page.locator("html").getAttribute("lang"))
       .toBe("zh-Hans");
@@ -392,7 +403,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page.getByRole("link", { name: "文章" }).click();
     await page
       .getByRole("button", {
-        name: `设置与账户菜单 — ${administratorEmail}`,
+        name: `设置与账户菜单 — ${maskedAdministratorEmail}`,
       })
       .click();
     await page.getByRole("menuitem", { name: "站点设置" }).click();
@@ -403,11 +414,11 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page.keyboard.press("Escape");
     await page
       .getByRole("button", {
-        name: `设置与账户菜单 — ${administratorEmail}`,
+        name: `设置与账户菜单 — ${maskedAdministratorEmail}`,
       })
       .click();
     await page.getByRole("menuitem", { name: "界面语言" }).hover();
-    await page.getByRole("menuitem", { name: "English" }).click();
+    await page.getByRole("menuitemradio", { name: "English" }).click();
     await expect
       .poll(async () => page.locator("html").getAttribute("lang"))
       .toBe("en");
@@ -446,7 +457,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page.goto("/admin/articles");
     await expect(
       page.getByRole("button", {
-        name: `Settings and account menu — ${administratorEmail}`,
+        name: `Settings and account menu — ${maskedAdministratorEmail}`,
       }),
     ).toBeVisible();
   });
@@ -494,9 +505,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await expect(page.getByLabel("Slug (optional)")).toHaveValue(originalTitle);
     await page.getByLabel("Slug (optional)").fill(slug);
     await expect(
-      page.getByText("Manually set — Title changes won't change it.", {
-        exact: true,
-      }),
+      page.getByText("Manually set — Title changes won't change it."),
     ).toBeVisible();
     await page
       .getByRole("button", { name: "Reset to Title", exact: true })
@@ -507,8 +516,10 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await page
       .getByLabel("Plain-text summary (optional)")
       .fill("A browser-proven Publication.");
-    await page.getByLabel("Tags optional").fill("browser,journey");
-    await page.getByLabel("Tags optional").press("Enter");
+    await page
+      .getByRole("textbox", { name: "Tags optional" })
+      .fill("browser,journey");
+    await page.getByRole("textbox", { name: "Tags optional" }).press("Enter");
     await expect(
       page.getByRole("button", { name: "Remove tag browser" }),
     ).toBeVisible();
@@ -595,7 +606,9 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
       mimeType: "text/plain",
       buffer: Buffer.from("not an image"),
     });
-    await uploadDialog.getByRole("button", { name: "Upload" }).click();
+    await uploadDialog
+      .getByRole("button", { name: "Upload", exact: true })
+      .click();
     await expect(page.getByRole("alert")).toContainText(
       "Image was not accepted",
     );
@@ -943,11 +956,11 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
 
     await page
       .getByRole("button", {
-        name: `Settings and account menu — ${administratorEmail}`,
+        name: `Settings and account menu — ${maskedAdministratorEmail}`,
       })
       .click();
     await page.getByRole("menuitem", { name: "Interface language" }).hover();
-    await page.getByRole("menuitem", { name: "简体中文" }).click();
+    await page.getByRole("menuitemradio", { name: "简体中文" }).click();
     await expect
       .poll(async () => page.locator("html").getAttribute("lang"))
       .toBe("zh-Hans");
@@ -959,11 +972,11 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     ).toBeVisible();
     await page
       .getByRole("button", {
-        name: `设置与账户菜单 — ${administratorEmail}`,
+        name: `设置与账户菜单 — ${maskedAdministratorEmail}`,
       })
       .click();
     await page.getByRole("menuitem", { name: "界面语言" }).hover();
-    await page.getByRole("menuitem", { name: "English" }).click();
+    await page.getByRole("menuitemradio", { name: "English" }).click();
     await expect
       .poll(async () => page.locator("html").getAttribute("lang"))
       .toBe("en");
@@ -993,6 +1006,14 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
   });
 
   await test.step("target canonical Publication Issues at their authoring surfaces", async () => {
+    await page
+      .getByRole("button", {
+        name: new RegExp(`${postPublishDraftTitle} · Draft v`),
+      })
+      .click();
+    await expect(page).toHaveURL(/\/admin\/articles\/[^/]+$/);
+    await expect(page.getByLabel("Article body")).toBeVisible();
+
     const issueMessages = {
       title: "Give this Article a Publication title.",
       slug: "Choose a Publication slug.",
@@ -1077,17 +1098,24 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     const settingsRail = page.getByRole("complementary", {
       name: "Article settings",
     });
+    for (const message of [issueMessages.title, issueMessages.cover]) {
+      await expect(
+        settingsRail.getByText(message, { exact: true }),
+      ).toBeVisible();
+    }
+    await settingsRail
+      .getByRole("tab", { name: "Advanced", exact: true })
+      .click();
     for (const message of [
-      issueMessages.title,
       issueMessages.slug,
       issueMessages.byline,
       issueMessages.language,
-      issueMessages.cover,
     ]) {
       await expect(
         settingsRail.getByText(message, { exact: true }),
       ).toBeVisible();
     }
+    await settingsRail.getByRole("tab", { name: "Basic", exact: true }).click();
 
     await page
       .getByRole("button", { name: "Insert image", exact: true })
@@ -1341,12 +1369,15 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await expect(history.getByText("Live", { exact: true })).toBeVisible();
     await expect(
       history.getByRole("button", { name: "Restore Publication 2" }),
-    ).toBeDisabled();
+    ).toHaveCount(0);
+    await expect(
+      history.getByRole("button", { name: "Discard changes" }),
+    ).toBeEnabled();
     await page.getByRole("tab", { name: "Settings", exact: true }).click();
   });
 
   await test.step("unpublish immediately while retaining the authenticated Draft", async () => {
-    await page.getByRole("button", { name: "Unpublish this Article?" }).click();
+    await page.getByRole("button", { name: "Unpublish", exact: true }).click();
     const confirmation = page.getByRole("alertdialog", {
       name: "Unpublish this Article?",
     });
@@ -1374,7 +1405,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
 
   await test.step("Trash restore stays unpublished and purge requires typed confirmation phrase", async () => {
     await page
-      .getByRole("button", { name: "Move this Article to Trash?" })
+      .getByRole("button", { name: "Move to Trash", exact: true })
       .click();
     const trashConfirm = page.getByRole("alertdialog", {
       name: "Move this Article to Trash?",
@@ -1424,7 +1455,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
       .click();
     await expect(page).toHaveURL(/\/admin\/articles\/[^/]+$/);
     await page
-      .getByRole("button", { name: "Move this Article to Trash?" })
+      .getByRole("button", { name: "Move to Trash", exact: true })
       .click();
     await page
       .getByRole("alertdialog", { name: "Move this Article to Trash?" })
@@ -1466,7 +1497,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     await expect(
       page.getByRole("heading", { name: "Deleted permanently" }),
     ).toBeVisible();
-    await expect(page.getByText(/410 Gone/, { exact: false })).toBeVisible();
+    await expect(page.getByText(/slugs answer 410 Gone/)).toBeVisible();
     await expect(page.getByText(/media files were not touched/i)).toBeVisible();
     await expect(
       page.getByText(concurrentConflictDraftTitle, { exact: true }),
@@ -1484,7 +1515,7 @@ test("a first-time Administrator publishes, revises, and withdraws an Asset-back
     );
     await page
       .getByRole("button", {
-        name: `Settings and account menu — ${administratorEmail}`,
+        name: `Settings and account menu — ${maskedAdministratorEmail}`,
       })
       .click();
     await page.getByRole("menuitem", { name: "Sign out" }).click();

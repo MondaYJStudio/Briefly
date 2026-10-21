@@ -4,6 +4,7 @@ import { maskAdministratorEmail } from "../src/auth/administrator-identity";
 
 const setupSecret = "playwright-only-setup-secret-32-characters";
 const administratorEmail = "administrator@example.test";
+const maskedAdministratorEmail = maskAdministratorEmail(administratorEmail);
 const administratorPassword = "playwright-only-password";
 const replacementPassword = "playwright-replacement-password";
 
@@ -34,13 +35,22 @@ async function openIdentityMenu(
 test("Settings and Account drawers expose localized security feedback", async ({
   page,
 }) => {
-  await page.goto("/admin/setup");
-  await page.getByLabel("Setup code").fill(setupSecret);
-  await page.getByLabel("Admin email").fill(administratorEmail);
-  await page.getByLabel("Password").fill(administratorPassword);
-  await page.getByRole("button", { name: "Initialize Briefly" }).click();
-  await page.getByRole("button", { name: "Continue to sign in" }).click();
-  await expect(page).toHaveURL(/\/admin\/login$/);
+  // The suite shares one installation; an earlier spec may have set it up.
+  const installation = await page.request.get("/api/installation");
+  const { initialized } = (await installation.json()) as {
+    initialized: boolean;
+  };
+  if (initialized) {
+    await page.goto("/admin/login");
+  } else {
+    await page.goto("/admin/setup");
+    await page.getByLabel("Setup code").fill(setupSecret);
+    await page.getByLabel("Admin email").fill(administratorEmail);
+    await page.getByLabel("Password").fill(administratorPassword);
+    await page.getByRole("button", { name: "Initialize Briefly" }).click();
+    await page.getByRole("button", { name: "Continue to sign in" }).click();
+    await expect(page).toHaveURL(/\/admin\/login$/);
+  }
   await page.waitForLoadState("networkidle");
 
   await page.getByLabel("Email").fill(administratorEmail);
@@ -52,7 +62,7 @@ test("Settings and Account drawers expose localized security feedback", async ({
   ).toBeVisible();
   await expect(
     page.getByRole("button", {
-      name: `Settings and account menu — ${administratorEmail}`,
+      name: `Settings and account menu — ${maskedAdministratorEmail}`,
     }),
   ).toBeVisible();
   await page.waitForLoadState("networkidle");
@@ -224,7 +234,7 @@ test("Settings and Account drawers expose localized security feedback", async ({
     await expect(page).toHaveURL(/\/admin\/articles$/);
     await expect(
       page.getByRole("button", {
-        name: `Settings and account menu — ${administratorEmail}`,
+        name: `Settings and account menu — ${maskedAdministratorEmail}`,
       }),
     ).toBeVisible();
   });

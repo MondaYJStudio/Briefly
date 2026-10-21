@@ -297,7 +297,7 @@ export function AdminShell({
 
       <div className={`${styles.main} flex min-w-0 flex-col`}>
         <div
-          className={`${styles.mobileBar} hidden sticky top-0 items-center max-[860px]:flex gap-3 py-2 px-3`}
+          className={`${styles.mobileBar} sticky top-0 items-center gap-3 py-2 px-3`}
         >
           <button
             className={`${styles.navItem} ${styles.mobileNavButton}`}

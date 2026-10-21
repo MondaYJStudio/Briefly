@@ -150,6 +150,7 @@
 }
 
 .mobileBar {
+  display: none;
   z-index: 55;
 
   background: var(--surface);
@@ -197,6 +198,10 @@
 
   .sidebarOpen {
     transform: translateX(0);
+  }
+
+  .mobileBar {
+    display: flex;
   }
 
   .editorShell .mobileBar {

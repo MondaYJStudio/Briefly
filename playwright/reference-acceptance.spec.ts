@@ -1,11 +1,13 @@
-import { expect, test, type Page } from "playwright/test";
+import { expect, test, type BrowserContext, type Page } from "playwright/test";
 
 import type { AdminArticleListItem } from "../src/articles/articles";
 import type { AssetLibraryEntry } from "../src/assets/assets";
+import { maskAdministratorEmail } from "../src/auth/administrator-identity";
 import { playwrightBaseUrl } from "./runtime";
 
 const setupSecret = "playwright-only-setup-secret-32-characters";
 const administratorEmail = "administrator@example.test";
+const maskedAdministratorEmail = maskAdministratorEmail(administratorEmail);
 const administratorPassword = "playwright-only-password";
 
 const emptyDocument = {
@@ -83,7 +85,18 @@ function makeAsset(
   };
 }
 
+// Sign-in is rate limited per address, so the suite signs in once and hands
+// the session cookies to each test's fresh context.
+let sessionCookies: Awaited<ReturnType<BrowserContext["cookies"]>> = [];
+
 async function ensureSignedIn(page: Page) {
+  if (sessionCookies.length > 0) {
+    await page.context().addCookies(sessionCookies);
+    const session = await page.request.get("/api/admin/session");
+    if (session.ok()) return;
+    await page.context().clearCookies();
+  }
+
   const installation = await page.request.get("/api/installation");
   const { initialized } = (await installation.json()) as {
     initialized: boolean;
@@ -107,11 +120,12 @@ async function ensureSignedIn(page: Page) {
     headers: { origin: playwrightBaseUrl },
   });
   expect(signIn.ok()).toBeTruthy();
+  sessionCookies = await page.context().cookies();
 }
 
 async function openIdentityMenu(page: Page, itemName: string) {
   const trigger = page.getByRole("button", {
-    name: `Settings and account menu — ${administratorEmail}`,
+    name: `Settings and account menu — ${maskedAdministratorEmail}`,
   });
   await trigger.click();
   const item = page.getByRole("menuitem", { name: itemName });
@@ -524,15 +538,18 @@ test("Media library surfaces cleanup blocked, awaiting, and failed Asset states"
       });
       return;
     }
-    if (
-      route.request().method() === "DELETE" &&
-      route.request().url().includes("dddddddd-dddd-4ddd-8ddd-dddddddddddd")
-    ) {
-      await route.fulfill({ status: 409, body: "Asset referenced" });
-      return;
-    }
     await route.continue();
   });
+  await page.route(
+    "**/api/admin/assets/dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    async (route) => {
+      if (route.request().method() === "DELETE") {
+        await route.fulfill({ status: 409, body: "Asset referenced" });
+        return;
+      }
+      await route.continue();
+    },
+  );
 
   await page.goto("/admin/media");
   await expect(page.getByRole("heading", { name: "Media" })).toBeVisible();
@@ -610,7 +627,7 @@ test("Trash purge success shows the permanent deletion empty state", async ({
   await expect(page.getByText(/^Saved · Draft v\d+$/)).toBeVisible();
 
   await page
-    .getByRole("button", { name: "Move this Article to Trash?" })
+    .getByRole("button", { name: "Move to Trash", exact: true })
     .click();
   await page
     .getByRole("alertdialog", { name: "Move this Article to Trash?" })
@@ -636,7 +653,7 @@ test("Trash purge success shows the permanent deletion empty state", async ({
   await expect(
     page.getByRole("heading", { name: "Deleted permanently" }),
   ).toBeVisible();
-  await expect(page.getByText(/410 Gone/, { exact: false })).toBeVisible();
+  await expect(page.getByText(/slugs answer 410 Gone/)).toBeVisible();
   await expect(page.getByText(/media files were not touched/i)).toBeVisible();
   await expect(page.getByText(title, { exact: true })).toHaveCount(0);
 });
@@ -676,6 +693,8 @@ test("Articles shell responds at phone, tablet, and desktop breakpoints", async 
   await expect(
     page.getByRole("heading", { name: "Articles", exact: true }),
   ).toBeVisible();
+  // The navigation toggle only responds once the shell has hydrated.
+  await page.waitForLoadState("networkidle");
 
   await page.setViewportSize({ width: 860, height: 900 });
   await expect(
