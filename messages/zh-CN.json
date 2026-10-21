@@ -766,7 +766,7 @@
   "oauth_consent_title": "允许 {name} 使用 Briefly？",
   "oauth_consent_grants": "它将能以你的身份：",
   "oauth_consent_grant_read": "读取你的文章、草稿和频道",
-  "oauth_consent_grant_write": "新建文章、保存草稿",
+  "oauth_consent_grant_write": "新建文章、保存草稿、关联或解除译本",
   "oauth_consent_grant_publish": "发布文章，发布后立即公开",
   "oauth_consent_redirect": "确认后，Briefly 会把授权发送到 {hosts}。只有在这次连接是你本人发起、并且你认识这个地址时才继续。",
   "oauth_consent_allow": "允许",

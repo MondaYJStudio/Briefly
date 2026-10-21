@@ -21,9 +21,11 @@ import type { PublicationOutcome } from "../articles/publication-workflow";
 import { deriveSlugFromTitle } from "../articles/slug-follow";
 import {
   createArticleTranslation,
+  linkArticleTranslation,
   listArticleTranslations,
   unlinkArticleTranslation,
   type CreateArticleTranslationResult,
+  type LinkArticleTranslationResult,
 } from "../articles/translation-groups.server";
 import { listChannels } from "../channels/channels.server";
 import type { RuntimeBindings } from "../env/runtime.server";
@@ -145,6 +147,35 @@ function translationRefusal(
     case "conflict":
       return refusal(
         "Nothing was created: the Translation Group changed meanwhile. Try again.",
+      );
+  }
+}
+
+function linkRefusal(
+  result: Exclude<LinkArticleTranslationResult, { ok: true }>,
+): CallToolResult {
+  switch (result.reason) {
+    case "not-found":
+      return refusal(
+        "Nothing was linked: no Article with the articleId exists (it may be in Trash).",
+      );
+    case "translation-not-found":
+      return refusal(
+        "Nothing was linked: no Article with the translationArticleId exists (it may be in Trash).",
+      );
+    case "self":
+      return refusal("Nothing was linked: an Article cannot translate itself.");
+    case "already-linked":
+      return refusal(
+        "Nothing was linked: translationArticleId already belongs to a Translation Group. Call unlink_translation on it first to move it.",
+      );
+    case "language-taken":
+      return refusal(
+        "Nothing was linked: the group already has a Current Publication in the joining Article's public language. Languages compare by language and script, so zh-CN and zh-Hans, or en and en-GB, count as one.",
+      );
+    case "conflict":
+      return refusal(
+        "Nothing was linked: the Translation Group changed meanwhile. Try again.",
       );
   }
 }
@@ -452,6 +483,67 @@ export function registerArticleTools(
       return json(
         await articleView(context, result.article, { includeBody: false }),
       );
+    },
+  );
+
+  server.registerTool(
+    "link_translation",
+    {
+      title: "Link Translation",
+      description:
+        "Join an existing Article that is in no Translation Group into another Article's group (creating the group if that Article has none). Use this for Articles created without translationOf. Membership is not part of the Draft: it changes public responses immediately for members with a Current Publication. To move an Article from one group to another, call unlink_translation on it first.",
+      inputSchema: {
+        articleId: articleId.describe(
+          "An Article whose Translation Group the other one joins.",
+        ),
+        translationArticleId: z
+          .string()
+          .uuid()
+          .describe("The ungrouped Article that joins articleId's group."),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => {
+      const result = await linkArticleTranslation(
+        database,
+        input.articleId,
+        input.translationArticleId,
+      );
+      if (!result.ok) return linkRefusal(result);
+      const article = await readArticle(database, input.articleId);
+      if (!article)
+        return refusal("No Article with that id exists (it may be in Trash).");
+      return json(await articleView(context, article, { includeBody: false }));
+    },
+  );
+
+  server.registerTool(
+    "unlink_translation",
+    {
+      title: "Unlink Translation",
+      description:
+        "Remove an Article from its Translation Group; it keeps its Draft, Publications, and slug. A group left with one member is dissolved. Takes effect on public responses immediately. Unlinking an Article that is in no group does nothing.",
+      inputSchema: { articleId },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({ articleId: id }) => {
+      const result = await unlinkArticleTranslation(database, id);
+      if (!result.ok)
+        return refusal("No Article with that id exists (it may be in Trash).");
+      const article = await readArticle(database, id);
+      if (!article)
+        return refusal("No Article with that id exists (it may be in Trash).");
+      return json(await articleView(context, article, { includeBody: false }));
     },
   );
 

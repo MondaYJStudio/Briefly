@@ -766,7 +766,7 @@
   "oauth_consent_title": "Allow {name} to use Briefly?",
   "oauth_consent_grants": "It will be able to act as you and:",
   "oauth_consent_grant_read": "Read your Articles, Drafts, and Channels",
-  "oauth_consent_grant_write": "Create Articles and save Drafts",
+  "oauth_consent_grant_write": "Create Articles, save Drafts, and link or unlink translations",
   "oauth_consent_grant_publish": "Publish Articles, which makes them public immediately",
   "oauth_consent_redirect": "If you allow it, Briefly sends the authorization to {hosts}. Continue only if you started this connection and recognize that address.",
   "oauth_consent_allow": "Allow",

@@ -120,7 +120,8 @@ translation Draft
 
 **Connected App**:
 An MCP client the Administrator has authorized through OAuth to act on their
-behalf: read Articles and Channels, save Drafts, Preview, and Publish. Every
+behalf: read Articles and Channels, save Drafts, link and unlink translations,
+Preview, and Publish. Every
 authorization passes an explicit consent page, and disconnecting a Connected
 App revokes its tokens immediately. A Connected App is not an Administrator,
 a Byline, or a second account.

@@ -293,10 +293,12 @@ describe("MCP access", () => {
       [
         "create_article",
         "get_article",
+        "link_translation",
         "list_articles",
         "list_channels",
         "preview_article",
         "publish_article",
+        "unlink_translation",
         "update_draft",
       ].sort(),
     );
@@ -497,6 +499,74 @@ describe("MCP access", () => {
     expect(grouped.map(({ id }) => id)).toEqual(
       [source.id, translated.id].sort(),
     );
+  });
+
+  it("links and unlinks existing Articles in Translation Groups through MCP tools", async () => {
+    const cookie = await initializeAndSignIn();
+    const { accessToken } = await connect(cookie);
+    const create = async (title: string, language: string) =>
+      (
+        await callTool(accessToken, "create_article", {
+          title,
+          language,
+          markdown: "Body.",
+        })
+      ).value() as { id: string };
+
+    const source = await create("检查外链", "zh-Hans");
+    const english = await create("Check backlinks", "en");
+    const other = await create("其他文章", "zh-Hans");
+
+    const linked = await callTool(accessToken, "link_translation", {
+      articleId: source.id,
+      translationArticleId: english.id,
+    });
+    expect(linked.isError).toBe(false);
+    expect(linked.value()).toMatchObject({
+      id: source.id,
+      translations: [{ id: english.id, language: "en" }],
+    });
+
+    const self = await callTool(accessToken, "link_translation", {
+      articleId: source.id,
+      translationArticleId: source.id,
+    });
+    expect(self.text).toContain("cannot translate itself");
+
+    // Moving between groups is unlink first, then link.
+    const moved = await callTool(accessToken, "link_translation", {
+      articleId: other.id,
+      translationArticleId: english.id,
+    });
+    expect(moved.isError).toBe(true);
+    expect(moved.text).toContain("unlink_translation");
+
+    const unlinked = await callTool(accessToken, "unlink_translation", {
+      articleId: english.id,
+    });
+    expect(unlinked.isError).toBe(false);
+    expect(unlinked.value()).toMatchObject({
+      id: english.id,
+      translations: [],
+    });
+    const readSource = await callTool(accessToken, "get_article", {
+      articleId: source.id,
+    });
+    expect(readSource.value()).toMatchObject({ translations: [] });
+
+    const relinked = await callTool(accessToken, "link_translation", {
+      articleId: other.id,
+      translationArticleId: english.id,
+    });
+    expect(relinked.value()).toMatchObject({
+      id: other.id,
+      translations: [{ id: english.id }],
+    });
+
+    const again = await callTool(accessToken, "unlink_translation", {
+      articleId: source.id,
+    });
+    expect(again.isError).toBe(false);
   });
 
   it("lists Connected Apps and refuses a disconnected one", async () => {
