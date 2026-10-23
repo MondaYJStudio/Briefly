@@ -422,8 +422,26 @@ describe("MCP access", () => {
     const created = await callTool(accessToken, "create_article", {
       title: "With Image",
       markdown: `![pixel](briefly-asset:${asset.id})`,
+      cover: { assetId: asset.id, alt: "A pixel" },
     });
     expect(created.isError).toBe(false);
+    const draft = created.value() as { id: string; draftVersion: number };
+    expect(created.value()).toMatchObject({
+      cover: { assetId: asset.id, alt: "A pixel" },
+    });
+
+    const retitled = await callTool(accessToken, "update_draft", {
+      articleId: draft.id,
+      draftVersion: draft.draftVersion,
+      title: "Retitled",
+    });
+    expect(retitled.value()).toMatchObject({ cover: { assetId: asset.id } });
+    const cleared = await callTool(accessToken, "update_draft", {
+      articleId: draft.id,
+      draftVersion: (retitled.value() as { draftVersion: number }).draftVersion,
+      cover: null,
+    });
+    expect(cleared.value()).toMatchObject({ cover: null });
   });
 
   it("creates translations in the source's Translation Group through MCP tools", async () => {

@@ -96,6 +96,7 @@ async function articleView(
     channel: draft.channelSlug,
     byline: draft.byline,
     hasCover: draft.cover !== null,
+    cover: draft.cover,
     updatedAt: draft.updatedAt,
     translations: translations.ok
       ? translations.translations.map((translation) => ({
@@ -276,6 +277,16 @@ const byline = z
   })
   .nullable()
   .describe("Public authorship. null uses the Site Settings default byline.");
+
+const cover = z
+  .object({
+    assetId: z.string().uuid().describe("An asset id from upload_asset."),
+    alt: z.string().trim().min(1).describe("Alt text for the cover image."),
+  })
+  .nullable()
+  .describe(
+    "The cover image. Omit to leave it unchanged (update_draft) or have none (create_article); null removes it.",
+  );
 
 export function registerArticleTools(
   server: McpServer,
@@ -465,6 +476,7 @@ export function registerArticleTools(
           .optional()
           .describe("Channel slug from list_channels, or null for none."),
         byline: byline.optional(),
+        cover: cover.optional(),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
     },
@@ -502,7 +514,7 @@ export function registerArticleTools(
         byline: input.byline ?? null,
         language: input.language ?? null,
         channelSlug: input.channel ?? null,
-        cover: null,
+        cover: input.cover ?? null,
         document: converted.document,
       });
       if (!result.ok) {
@@ -532,7 +544,7 @@ export function registerArticleTools(
     {
       title: "Update Draft",
       description:
-        "Save changes to an Article's Draft against an exact Draft Version. Only the fields you pass change; the cover and anything omitted stay as they are. The public version changes only through publish_article.",
+        "Save changes to an Article's Draft against an exact Draft Version. Only the fields you pass change; anything omitted, including the cover, stays as it is. The public version changes only through publish_article.",
       inputSchema: {
         articleId,
         draftVersion,
@@ -550,6 +562,7 @@ export function registerArticleTools(
         language,
         channel: z.string().nullable().optional(),
         byline: byline.optional(),
+        cover: cover.optional(),
       },
       annotations: {
         readOnlyHint: false,
@@ -597,7 +610,7 @@ export function registerArticleTools(
           input.language === undefined ? draft.language : input.language,
         channelSlug:
           input.channel === undefined ? draft.channelSlug : input.channel,
-        cover: draft.cover,
+        cover: input.cover === undefined ? draft.cover : input.cover,
         document,
       });
       if (!result.ok) return draftSaveRefusal(result);
