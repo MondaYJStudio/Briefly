@@ -254,6 +254,13 @@ const worker = {
           await handleMcpRequest(request, configuration.bindings),
           requestId,
         );
+      } else if (routedPathname.startsWith("/mcp/upload/")) {
+        const { handleUploadLinkRequest } =
+          await import("./mcp/upload-link.server");
+        response = withRequestId(
+          await handleUploadLinkRequest(request, configuration.bindings),
+          requestId,
+        );
       } else if (routedPathname.startsWith("/.well-known/")) {
         const { handleWellKnownRequest, wellKnownDocument } =
           await import("./mcp/mcp.server");

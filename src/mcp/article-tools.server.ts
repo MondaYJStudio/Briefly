@@ -9,6 +9,7 @@ import {
 } from "../articles/article-markdown";
 import { ASSET_MAXIMUM_BYTE_SIZE } from "../assets/assets";
 import { uploadAsset } from "../assets/assets.server";
+import { createUploadLink, summarizeAsset } from "./upload-link.server";
 import { trashArticle } from "../articles/article-trash.server";
 import type { Article } from "../articles/articles";
 import {
@@ -322,7 +323,7 @@ export function registerArticleTools(
     {
       title: "Upload Asset",
       description:
-        'Upload an image (PNG, JPEG, WebP, or AVIF, at most 8 MiB and 8192 px per side) to the Asset library and return its asset id. Pass either url (a public https image link the server downloads) or dataBase64 with mimeType. Then reference the image in Markdown as ![alt](briefly-asset:<asset id> "caption") in create_article or update_draft.',
+        'Upload an image (PNG, JPEG, WebP, or AVIF, at most 8 MiB and 8192 px per side) to the Asset library and return its asset id. Pass either url (a public https image link the server downloads) or dataBase64 with mimeType. For a file on the local computer, use create_upload_link instead. Then reference the image in Markdown as ![alt](briefly-asset:<asset id> "caption") in create_article or update_draft.',
       inputSchema: {
         filename: z
           .string()
@@ -380,15 +381,26 @@ export function registerArticleTools(
           ? refusal("The image was not uploaded.", { issues: result.issues })
           : refusal("The image could not be stored. Try again.");
       }
-      const asset = result.asset;
+      return json(summarizeAsset(result.asset));
+    },
+  );
+
+  server.registerTool(
+    "create_upload_link",
+    {
+      title: "Create Upload Link",
+      description:
+        "Get a short-lived URL for uploading a LOCAL image file. This server cannot read the user's disk, so run the returned curl command in a shell (e.g. curl -F file=@/path/image.png <url>); it answers with the same JSON as upload_asset, including the asset id. Use this instead of dataBase64 for anything but tiny images. The link expires in 10 minutes and can only add images.",
+      annotations: { readOnlyHint: false, openWorldHint: true },
+    },
+    async () => {
+      const link = await createUploadLink(
+        context.bindings,
+        context.applicationOrigin,
+      );
       return json({
-        id: asset.id,
-        filename: asset.originalFilename,
-        mimeType: asset.mimeType,
-        width: asset.width,
-        height: asset.height,
-        byteSize: asset.byteSize,
-        markdown: `![alt text](briefly-asset:${asset.id})`,
+        ...link,
+        curl: `curl -sS -F "file=@/path/to/image.png" "${link.url}"`,
       });
     },
   );

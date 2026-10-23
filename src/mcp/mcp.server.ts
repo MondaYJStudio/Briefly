@@ -24,7 +24,7 @@ import { registerArticleTools } from "./article-tools.server";
 
 const SERVER_INSTRUCTIONS = `Briefly manages Articles. Each Article has one private Draft and zero or more immutable Publications; readers only see the Current Publication.
 
-Typical flow: create_article (or get_article then update_draft) → preview_article → publish_article. For images, call upload_asset first and use the returned briefly-asset id in the Markdown.
+Typical flow: create_article (or get_article then update_draft) → preview_article → publish_article. For images, call upload_asset (public URL or base64) or create_upload_link (local file, via curl) first and use the returned briefly-asset id in the Markdown.
 - Every save and publish names the exact Draft Version you last read; if the Draft changed meanwhile the call is refused. Re-read with get_article and retry.
 - Bodies are Markdown. Do not repeat the title as a heading.
 - Publishing is public immediately. Confirm with the user first.

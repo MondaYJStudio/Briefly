@@ -292,6 +292,7 @@ describe("MCP access", () => {
     expect(tools.sort()).toEqual(
       [
         "create_article",
+        "create_upload_link",
         "get_article",
         "link_translation",
         "list_articles",
@@ -442,6 +443,43 @@ describe("MCP access", () => {
       cover: null,
     });
     expect(cleared.value()).toMatchObject({ cover: null });
+  });
+
+  it("uploads a local file through a signed upload link", async () => {
+    const cookie = await initializeAndSignIn();
+    const { accessToken } = await connect(cookie);
+    const link = (
+      await callTool(accessToken, "create_upload_link", {})
+    ).value() as {
+      url: string;
+    };
+
+    const png = Uint8Array.from(
+      atob(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      ),
+      (character) => character.charCodeAt(0),
+    );
+    const form = () => {
+      const body = new FormData();
+      body.append("file", new File([png], "local.png", { type: "image/png" }));
+      return body;
+    };
+
+    const ok = await SELF.fetch(link.url, { method: "POST", body: form() });
+    expect(ok.status).toBe(201);
+    expect(await ok.json()).toMatchObject({ filename: "local.png", width: 1 });
+
+    const tampered =
+      link.url.slice(0, -1) + (link.url.endsWith("0") ? "1" : "0");
+    expect(
+      (await SELF.fetch(tampered, { method: "POST", body: form() })).status,
+    ).toBe(401);
+    const noFile = await SELF.fetch(link.url, {
+      method: "POST",
+      body: new FormData(),
+    });
+    expect(noFile.status).toBe(400);
   });
 
   it("creates translations in the source's Translation Group through MCP tools", async () => {
