@@ -7,6 +7,8 @@ import {
   markdownToArticleDocument,
   type MarkdownIssue,
 } from "../articles/article-markdown";
+import { ASSET_MAXIMUM_BYTE_SIZE } from "../assets/assets";
+import { uploadAsset } from "../assets/assets.server";
 import { trashArticle } from "../articles/article-trash.server";
 import type { Article } from "../articles/articles";
 import {
@@ -204,6 +206,49 @@ function workflowRefusal(
   }
 }
 
+/** Base64 expands bytes by 4/3, so this bounds the string before decoding. */
+const ASSET_BASE64_MAXIMUM_LENGTH =
+  Math.ceil((ASSET_MAXIMUM_BYTE_SIZE * 4) / 3) + 4;
+
+function bytesFromBase64(value: string): Uint8Array<ArrayBuffer> | null {
+  try {
+    const decoded = atob(
+      value.replace(/^data:[^,]*,/u, "").replace(/\s/gu, ""),
+    );
+    const bytes = new Uint8Array(decoded.length);
+    for (let index = 0; index < decoded.length; index += 1)
+      bytes[index] = decoded.charCodeAt(index);
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+
+/** Downloads an image from a public https URL, never reading past the asset size limit. */
+async function fetchImage(
+  url: string,
+): Promise<{ bytes: Uint8Array<ArrayBuffer>; mimeType: string } | string> {
+  let response: Response;
+  try {
+    response = await fetch(url, { headers: { accept: "image/*" } });
+  } catch {
+    return "The image URL could not be fetched.";
+  }
+  if (!response.ok)
+    return `The image URL answered with status ${response.status}.`;
+  const declared = Number(response.headers.get("content-length"));
+  if (declared > ASSET_MAXIMUM_BYTE_SIZE)
+    return "The image is larger than 8 MiB.";
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength > ASSET_MAXIMUM_BYTE_SIZE)
+    return "The image is larger than 8 MiB.";
+  const mimeType = (response.headers.get("content-type") ?? "")
+    .split(";")[0]!
+    .trim()
+    .toLowerCase();
+  return { bytes, mimeType };
+}
+
 const articleId = z.string().uuid().describe("The Article id.");
 const draftVersion = z
   .number()
@@ -259,6 +304,82 @@ export function registerArticleTools(
           name,
         })),
       ),
+  );
+
+  server.registerTool(
+    "upload_asset",
+    {
+      title: "Upload Asset",
+      description:
+        'Upload an image (PNG, JPEG, WebP, or AVIF, at most 8 MiB and 8192 px per side) to the Asset library and return its asset id. Pass either url (a public https image link the server downloads) or dataBase64 with mimeType. Then reference the image in Markdown as ![alt](briefly-asset:<asset id> "caption") in create_article or update_draft.',
+      inputSchema: {
+        filename: z
+          .string()
+          .min(1)
+          .max(255)
+          .describe("Original filename, e.g. diagram.png."),
+        url: z
+          .string()
+          .url()
+          .refine((value) => value.startsWith("https://"), "Use an https URL.")
+          .optional()
+          .describe(
+            "Public https URL of the image. Omit when sending dataBase64.",
+          ),
+        dataBase64: z
+          .string()
+          .max(ASSET_BASE64_MAXIMUM_LENGTH)
+          .optional()
+          .describe("The image bytes, base64-encoded. Omit when sending url."),
+        mimeType: z
+          .enum(["image/avif", "image/jpeg", "image/png", "image/webp"])
+          .optional()
+          .describe(
+            "Required with dataBase64; must match the image bytes. With url it is read from the response.",
+          ),
+      },
+      annotations: { readOnlyHint: false, openWorldHint: true },
+    },
+    async (input) => {
+      if ((input.url === undefined) === (input.dataBase64 === undefined))
+        return refusal("Pass exactly one of url or dataBase64.");
+
+      let bytes: Uint8Array<ArrayBuffer>;
+      let mimeType: string;
+      if (input.url !== undefined) {
+        const fetched = await fetchImage(input.url);
+        if (typeof fetched === "string") return refusal(fetched);
+        ({ bytes, mimeType } = fetched);
+      } else {
+        if (!input.mimeType)
+          return refusal("mimeType is required with dataBase64.");
+        const decoded = bytesFromBase64(input.dataBase64!);
+        if (!decoded) return refusal("dataBase64 is not valid base64.");
+        bytes = decoded;
+        mimeType = input.mimeType;
+      }
+
+      const result = await uploadAsset(
+        database,
+        context.bindings.MEDIA_BUCKET,
+        new File([bytes], input.filename, { type: mimeType }),
+      );
+      if (!result.ok) {
+        return result.reason === "invalid"
+          ? refusal("The image was not uploaded.", { issues: result.issues })
+          : refusal("The image could not be stored. Try again.");
+      }
+      const asset = result.asset;
+      return json({
+        id: asset.id,
+        filename: asset.originalFilename,
+        mimeType: asset.mimeType,
+        width: asset.width,
+        height: asset.height,
+        byteSize: asset.byteSize,
+        markdown: `![alt text](briefly-asset:${asset.id})`,
+      });
+    },
   );
 
   server.registerTool(

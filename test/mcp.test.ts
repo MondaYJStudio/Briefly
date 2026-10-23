@@ -300,6 +300,7 @@ describe("MCP access", () => {
         "publish_article",
         "unlink_translation",
         "update_draft",
+        "upload_asset",
       ].sort(),
     );
 
@@ -395,6 +396,34 @@ describe("MCP access", () => {
     });
     expect(republish.isError).toBe(true);
     expect(republish.text).toContain("Publication Conflict");
+  });
+
+  it("uploads an image asset through MCP and embeds it in an Article", async () => {
+    const cookie = await initializeAndSignIn();
+    const { accessToken } = await connect(cookie);
+
+    const refused = await callTool(accessToken, "upload_asset", {
+      filename: "bad.png",
+      dataBase64: btoa("not an image"),
+      mimeType: "image/png",
+    });
+    expect(refused.isError).toBe(true);
+
+    const uploaded = await callTool(accessToken, "upload_asset", {
+      filename: "pixel.png",
+      dataBase64:
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      mimeType: "image/png",
+    });
+    expect(uploaded.isError).toBe(false);
+    const asset = uploaded.value() as { id: string; width: number };
+    expect(asset.width).toBe(1);
+
+    const created = await callTool(accessToken, "create_article", {
+      title: "With Image",
+      markdown: `![pixel](briefly-asset:${asset.id})`,
+    });
+    expect(created.isError).toBe(false);
   });
 
   it("creates translations in the source's Translation Group through MCP tools", async () => {
